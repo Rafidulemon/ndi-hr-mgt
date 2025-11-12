@@ -24,6 +24,7 @@ import { Modal } from "../atoms/frame/Modal";
 type Props = {
   isLeader?: boolean;
   isAdmin?: boolean;
+  className?: string;
 };
 
 const menuItems = [
@@ -87,7 +88,7 @@ const menuItems = [
   { label: "Invoice", icon: <FaFileInvoice />, href: "/invoice" },
 ];
 
-const LeftMenu = ({ isLeader = false }: Props) => {
+const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
   const router = useRouter();
   const pathname = usePathname();
   const currentPath = pathname ?? "/";
@@ -146,8 +147,15 @@ const LeftMenu = ({ isLeader = false }: Props) => {
         : "text-slate-500 hover:bg-white/70 hover:text-slate-900"
     }`;
 
+  const containerClasses = [
+    "flex min-h-full w-full flex-col gap-6 rounded-[32px] border border-white/60 bg-white/90 p-6 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className="flex min-h-full w-full flex-col gap-6 rounded-[32px] border border-white/60 bg-white/90 p-6 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur">
+    <div className={containerClasses}>
       <div className="flex flex-col items-center gap-4 text-center">
         <Image
           src="/demo_logo.png"
@@ -179,9 +187,6 @@ const LeftMenu = ({ isLeader = false }: Props) => {
       </div>
 
       <nav className="flex flex-col">
-        <p className="px-2 text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
-          Menu
-        </p>
         <ul className="mt-4 space-y-2">
           {menuItems.map((item) => (
             <li key={item.label}>

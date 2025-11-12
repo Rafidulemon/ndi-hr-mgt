@@ -15,7 +15,7 @@ export default function MainLayout({
           <div className="relative z-10 flex w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row lg:px-10 xl:px-14">
             <aside className="w-full lg:w-72 xl:w-80">
               <div className="sticky top-6">
-                <LeftMenu />
+                <LeftMenu className="lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:scrollbar-none" />
               </div>
             </aside>
             <main className="flex-1 pb-16">{children}</main>
