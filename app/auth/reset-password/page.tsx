@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import Button from "../../components/atoms/buttons/Button";
-
-const fieldClass =
-  "w-full rounded-2xl border border-white/60 bg-white/90 px-4 py-3 text-sm font-semibold text-slate-700 shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500";
+import AuthLayout, {
+  authFieldClass,
+  authFormCardClass,
+  authHeroCardClass,
+} from "../components/AuthLayout";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -21,87 +23,96 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-      <section className="rounded-[32px] border border-white/30 bg-white/[0.05] p-8 shadow-2xl shadow-black/40 backdrop-blur">
-        <p className="text-xs uppercase tracking-[0.35em] text-indigo-200">
-          Final step
-        </p>
-        <h2 className="mt-4 text-3xl font-semibold text-white">
-          Create a password that’s truly yours
-        </h2>
-        <p className="mt-2 text-sm text-slate-200">
-          Use at least 12 characters, mix upper and lower case letters, add a
-          number, and include a symbol. Avoid phrases used elsewhere.
-        </p>
-        <ul className="mt-8 space-y-3 text-sm text-slate-100">
-          <li className="flex gap-3 rounded-3xl border border-white/10 bg-white/[0.08] p-4">
-            <span className="mt-1 h-2 w-2 rounded-full bg-indigo-300" />
-            Disable password reuse every 90 days.
-          </li>
-          <li className="flex gap-3 rounded-3xl border border-white/10 bg-white/[0.08] p-4">
-            <span className="mt-1 h-2 w-2 rounded-full bg-indigo-300" />
-            Store credentials in a secure manager endorsed by your IT team.
-          </li>
-          <li className="flex gap-3 rounded-3xl border border-white/10 bg-white/[0.08] p-4">
-            <span className="mt-1 h-2 w-2 rounded-full bg-indigo-300" />
-            Report unusual account activity immediately.
-          </li>
-        </ul>
-      </section>
-
-      <section className="rounded-[32px] border border-white/60 bg-white/95 p-8 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur">
-        <p className="text-xs uppercase tracking-[0.35em] text-slate-400">
-          Reset password
-        </p>
-        <h2 className="mt-3 text-2xl font-semibold text-slate-900">
-          Secure your account
-        </h2>
-        <p className="text-sm text-slate-500">
-          The reset link is tied to your device. Complete the update within 30
-          minutes to keep it valid.
-        </p>
-        <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-600">
-              New Password
-            </label>
-            <input
-              type="password"
-              required
-              placeholder="Create a new password"
-              className={fieldClass}
-            />
+    <AuthLayout
+      hero={
+        <div
+          className={`${authHeroCardClass} flex h-full flex-col items-center justify-between gap-10 text-center`}
+        >
+          <div className="space-y-4">
+            <div className="flex h-32 w-32 items-center justify-center rounded-full bg-white/15">
+              <svg
+                viewBox="0 0 80 80"
+                className="h-16 w-16"
+                fill="none"
+                stroke="white"
+                strokeWidth="3"
+              >
+                <circle cx="40" cy="40" r="30" opacity="0.2" fill="white" />
+                <path d="M26 40h28" strokeLinecap="round" />
+                <path d="M36 30l-10 10 10 10" strokeLinecap="round" />
+              </svg>
+            </div>
+            <p className="text-2xl font-semibold">Set a new password</p>
+            <p className="text-sm text-white/90">
+              Choose a strong password you do not use elsewhere. We will sign
+              out other sessions once this is done.
+            </p>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-600">
-              Confirm Password
-            </label>
-            <input
-              type="password"
-              required
-              placeholder="Re-enter to confirm"
-              className={fieldClass}
-            />
-          </div>
-          <Button
-            type="submit"
-            isWidthFull
-            disabled={isSubmitting}
-            className="mt-2"
-          >
-            {isSubmitting ? "Updating..." : "Update password"}
-          </Button>
-        </form>
-        <p className="mt-6 text-center text-sm text-slate-500">
-          Back to{" "}
           <Link
             href="/auth/login"
-            className="font-semibold text-indigo-600 hover:text-indigo-500"
+            className="w-full rounded-full bg-white/90 px-5 py-3 text-center text-sm font-semibold text-cyan-600 hover:bg-white"
           >
-            login
+            Go to login
           </Link>
-        </p>
-      </section>
-    </div>
+        </div>
+      }
+      form={
+        <div className={`${authFormCardClass} flex h-full flex-col gap-8`}>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">
+              Reset password
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+              Secure your account
+            </h2>
+            <p className="text-sm text-slate-500">
+              Passwords must be 12+ characters and include at least one number.
+            </p>
+          </div>
+          <form className="space-y-5" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-600">
+                New password
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="Create a new password"
+                className={authFieldClass}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-600">
+                Confirm password
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="Re-enter password"
+                className={authFieldClass}
+              />
+            </div>
+            <Button
+              type="submit"
+              theme="aqua"
+              isWidthFull
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Updating..." : "Update password"}
+            </Button>
+          </form>
+          <p className="text-center text-sm text-slate-500">
+            Back to{" "}
+            <Link
+              href="/auth/login"
+              className="font-semibold text-cyan-600 hover:text-cyan-500"
+            >
+              login
+            </Link>
+          </p>
+        </div>
+      }
+      cta={{ label: "Login", href: "/auth/login" }}
+    />
   );
 }

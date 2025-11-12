@@ -7,7 +7,8 @@ type ButtonTheme =
   | "secondary"
   | "cancel"
   | "cancel-secondary"
-  | "white";
+  | "white"
+  | "aqua";
 
 type Props = {
   children?: ReactNode;
@@ -30,6 +31,8 @@ const themeClasses: Record<ButtonTheme, string> = {
     "border border-rose-200 bg-white text-rose-500 shadow hover:bg-rose-50 focus-visible:outline-rose-400",
   white:
     "border border-white/60 bg-white/80 text-slate-700 shadow hover:-translate-y-0.5 focus-visible:outline-slate-300",
+  aqua:
+    "border border-transparent bg-cyan-500 text-white shadow hover:bg-cyan-600 focus-visible:outline-cyan-500",
 };
 
 function Button({

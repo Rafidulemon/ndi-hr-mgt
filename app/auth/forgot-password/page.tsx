@@ -4,15 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import Button from "../../components/atoms/buttons/Button";
-
-const reassurance = [
-  "We only send reset links to verified work emails.",
-  "Reset links remain active for 30 minutes.",
-  "Need urgent help? Ping security@ndi.hr anytime.",
-];
-
-const fieldClass =
-  "w-full rounded-2xl border border-white/60 bg-white/90 px-4 py-3 text-sm font-semibold text-slate-700 shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500";
+import AuthLayout, {
+  authFieldClass,
+  authFormCardClass,
+  authHeroCardClass,
+} from "../components/AuthLayout";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -27,76 +23,96 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-      <section className="rounded-[32px] border border-white/30 bg-white/[0.05] p-8 shadow-2xl shadow-black/40 backdrop-blur">
-        <p className="text-xs uppercase tracking-[0.35em] text-indigo-200">
-          Security first
-        </p>
-        <h2 className="mt-4 text-3xl font-semibold text-white">
-          Reset your access with confidence
-        </h2>
-        <p className="mt-2 text-sm text-slate-200">
-          Your account is protected with device fingerprinting and anomaly
-          alerts. Tell us where to send recovery guidance.
-        </p>
-        <ul className="mt-8 space-y-4 text-sm text-slate-100">
-          {reassurance.map((item) => (
-            <li
-              key={item}
-              className="flex gap-3 rounded-3xl border border-white/10 bg-white/[0.08] p-4"
-            >
-              <span className="mt-1 h-2 w-2 rounded-full bg-orange-300" />
-              {item}
-            </li>
-          ))}
-        </ul>
-        <div className="mt-8 rounded-3xl border border-white/10 bg-white/[0.08] p-4 text-xs uppercase tracking-[0.35em] text-slate-200">
-          Encrypted at rest · MFA enforced · Activity logs monitored 24/7
-        </div>
-      </section>
-
-      <section className="rounded-[32px] border border-white/60 bg-white/95 p-8 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur">
-        <p className="text-xs uppercase tracking-[0.35em] text-slate-400">
-          Forgot password
-        </p>
-        <h2 className="mt-3 text-2xl font-semibold text-slate-900">
-          We'll send a secure link
-        </h2>
-        <p className="text-sm text-slate-500">
-          Enter your work email. If it matches a verified account, we’ll send a
-          reset link and notify your security contact.
-        </p>
-        <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-600">
-              Work Email
-            </label>
-            <input
-              type="email"
-              required
-              placeholder="you@yourcompany.com"
-              className={fieldClass}
-            />
+    <AuthLayout
+      hero={
+        <div
+          className={`${authHeroCardClass} flex h-full flex-col items-center justify-between gap-12 text-center`}
+        >
+          <div className="space-y-4">
+            <div className="flex h-32 w-32 items-center justify-center rounded-full bg-white/15">
+              <svg
+                viewBox="0 0 80 80"
+                className="h-16 w-16"
+                fill="none"
+                stroke="white"
+                strokeWidth="4"
+              >
+                <rect
+                  x="18"
+                  y="34"
+                  width="44"
+                  height="34"
+                  rx="6"
+                  stroke="white"
+                  fill="white"
+                  opacity="0.15"
+                />
+                <path d="M28 34v-8a12 12 0 0 1 24 0v8" />
+                <circle cx="40" cy="52" r="4" fill="white" />
+                <path d="M40 56v8" strokeLinecap="round" />
+              </svg>
+            </div>
+            <p className="text-2xl font-semibold">Need a reset?</p>
+            <p className="text-sm text-white/90">
+              Enter your work email and we will email you a secure link to get
+              back into your account.
+            </p>
           </div>
-          <Button
-            type="submit"
-            isWidthFull
-            disabled={isSubmitting}
-            className="mt-2"
-          >
-            {isSubmitting ? "Sending link..." : "Send reset link"}
-          </Button>
-        </form>
-        <p className="mt-6 text-center text-sm text-slate-500">
-          Remember your password?{" "}
           <Link
             href="/auth/login"
-            className="font-semibold text-indigo-600 hover:text-indigo-500"
+            className="w-full rounded-full bg-white/90 px-5 py-3 text-center text-sm font-semibold text-cyan-600 hover:bg-white"
           >
             Back to login
           </Link>
-        </p>
-      </section>
-    </div>
+        </div>
+      }
+      form={
+        <div className={`${authFormCardClass} flex h-full flex-col gap-8`}>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">
+              Forgot password
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+              Send a recovery link
+            </h2>
+            <p className="text-sm text-slate-500">
+              We only email verified company accounts. The link expires in 30
+              minutes.
+            </p>
+          </div>
+          <form className="space-y-5" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-600">
+                Work email
+              </label>
+              <input
+                type="email"
+                required
+                placeholder="company@example.com"
+                className={authFieldClass}
+              />
+            </div>
+            <Button
+              type="submit"
+              theme="aqua"
+              isWidthFull
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Sending link..." : "Email me a link"}
+            </Button>
+          </form>
+          <p className="text-center text-sm text-slate-500">
+            Remember your password?{" "}
+            <Link
+              href="/auth/login"
+              className="font-semibold text-cyan-600 hover:text-cyan-500"
+            >
+              Log back in
+            </Link>
+          </p>
+        </div>
+      }
+      cta={{ label: "Login", href: "/auth/login" }}
+    />
   );
 }

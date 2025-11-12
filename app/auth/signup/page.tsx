@@ -4,15 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import Button from "../../components/atoms/buttons/Button";
-
-const cultureNotes = [
-  "Collaborate across HR, finance, and leadership from day one.",
-  "Offer employees transparent access to their leave, salary, and docs.",
-  "Capture approvals with audit-ready workflows and digital traces.",
-];
-
-const fieldClass =
-  "w-full rounded-2xl border border-white/60 bg-white/90 px-4 py-3 text-sm font-semibold text-slate-700 shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500";
+import AuthLayout, {
+  authFieldClass,
+  authFormCardClass,
+  authHeroCardClass,
+} from "../components/AuthLayout";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -27,143 +23,177 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-      <section className="rounded-[32px] border border-white/30 bg-white/[0.05] p-8 shadow-2xl shadow-black/40 backdrop-blur">
-        <p className="text-xs uppercase tracking-[0.35em] text-indigo-200">
-          Build a people ops hub
-        </p>
-        <h2 className="mt-4 text-3xl font-semibold text-white">
-          Launch in less than a week
-        </h2>
-        <p className="mt-2 text-sm text-slate-200">
-          From onboarding to payroll, create an experience your team will
-          champion. NDI HR Management scales with every stage.
-        </p>
-        <ul className="mt-8 space-y-4 text-sm text-slate-100">
-          {cultureNotes.map((note) => (
-            <li
-              key={note}
-              className="flex gap-3 rounded-3xl border border-white/10 bg-white/[0.08] p-4"
-            >
-              <span className="mt-1 h-2 w-2 rounded-full bg-emerald-400" />
-              {note}
-            </li>
-          ))}
-        </ul>
-        <div className="mt-8 rounded-3xl border border-white/10 bg-white/[0.08] p-4 text-sm text-slate-200">
-          <p className="text-sm font-semibold text-white">
-            “We unified 7 spreadsheets and 4 tools in a single workspace, saving
-            15 hours per week.”
-          </p>
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-300">
-            Head of People · Loop Logistics
-          </p>
-        </div>
-      </section>
-
-      <section className="rounded-[32px] border border-white/60 bg-white/95 p-8 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur">
-        <p className="text-xs uppercase tracking-[0.35em] text-slate-400">
-          Create account
-        </p>
-        <h2 className="mt-3 text-2xl font-semibold text-slate-900">
-          Start with a 30-day pilot
-        </h2>
-        <p className="text-sm text-slate-500">
-          No credit card required. Invite teammates, automate workflows, and
-          export data anytime.
-        </p>
-        <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-600">
-                Full Name
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Md. Rafidul Islam"
-                className={fieldClass}
-              />
+    <AuthLayout
+      flip
+      hero={
+        <div
+          className={`${authHeroCardClass} flex h-full flex-col items-center justify-between gap-12 text-center`}
+        >
+          <div className="space-y-6">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold">
+              <span className="h-2 w-2 rounded-full bg-emerald-300" />
+              Demo Site
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-600">
-                Work Email
-              </label>
-              <input
-                type="email"
-                required
-                placeholder="you@yourcompany.com"
-                className={fieldClass}
-              />
-            </div>
+            <p className="text-3xl font-semibold">Everything HR in one place</p>
+            <p className="text-sm text-white/90">
+              Collect attendance, track leave balances, and hand payroll off to
+              finance with confidence.
+            </p>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-600">
-              Company Name
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="NDI Technologies"
-              className={fieldClass}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-600">
-              Team Size
-            </label>
-            <select className={fieldClass} required defaultValue="">
-              <option value="" disabled>
-                Select range
-              </option>
-              <option value="1-50">1-50</option>
-              <option value="51-200">51-200</option>
-              <option value="201-1000">201-1,000</option>
-              <option value="1000+">1,000+</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-600">
-              Password
-            </label>
-            <input
-              type="password"
-              required
-              placeholder="Create a secure password"
-              className={fieldClass}
-            />
-          </div>
-          <label className="flex items-start gap-3 text-xs text-slate-500">
-            <input
-              type="checkbox"
-              required
-              className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-            />
-            I agree to the{" "}
-            <Link href="/terms" className="font-semibold text-indigo-600">
-              Terms & Privacy
-            </Link>
-            .
-          </label>
-          <Button
-            type="submit"
-            isWidthFull
-            disabled={isSubmitting}
-            className="mt-2"
-          >
-            {isSubmitting ? "Creating workspace..." : "Create workspace"}
-          </Button>
-        </form>
-        <p className="mt-6 text-center text-sm text-slate-500">
-          Already on NDI?{" "}
           <Link
             href="/auth/login"
-            className="font-semibold text-indigo-600 hover:text-indigo-500"
+            className="w-full rounded-full bg-white/90 px-5 py-3 text-center text-sm font-semibold text-cyan-600 hover:bg-white"
           >
-            Sign in
+            Back to login
           </Link>
-        </p>
-      </section>
-    </div>
+        </div>
+      }
+      form={
+        <div className={`${authFormCardClass} flex h-full flex-col gap-8`}>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">
+              Sign up
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+              Create your workspace
+            </h2>
+            <p className="text-sm text-slate-500">
+              Fill in a few employee details to spin up your HR portal.
+            </p>
+          </div>
+          <form className="space-y-5" onSubmit={handleSubmit}>
+            <div className="grid gap-5 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-600">
+                  Employee ID *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="123456"
+                  className={authFieldClass}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-600">
+                  Department *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="People Operations"
+                  className={authFieldClass}
+                />
+              </div>
+            </div>
+            <div className="grid gap-5 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-600">
+                  First name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Md. Rafidul"
+                  className={authFieldClass}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-600">
+                  Last name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Islam"
+                  className={authFieldClass}
+                />
+              </div>
+            </div>
+            <div className="grid gap-5 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-600">
+                  Designation *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Software Engineer"
+                  className={authFieldClass}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-600">
+                  Phone *
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="+8801 2345 6789"
+                  className={authFieldClass}
+                />
+              </div>
+            </div>
+            <div className="grid gap-5 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-600">
+                  Company email *
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="company@example.com"
+                  className={authFieldClass}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-600">
+                  Password *
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Create a password"
+                  className={authFieldClass}
+                />
+              </div>
+            </div>
+            <label className="flex items-start gap-2 text-xs text-slate-500">
+              <input
+                type="checkbox"
+                required
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+              />
+              I agree to the{" "}
+              <Link
+                href="/terms"
+                className="font-semibold text-cyan-600 hover:text-cyan-500"
+              >
+                Terms & Privacy
+              </Link>
+              .
+            </label>
+            <Button
+              type="submit"
+              theme="aqua"
+              isWidthFull
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Creating account..." : "Create account"}
+            </Button>
+          </form>
+          <p className="text-center text-sm text-slate-500">
+            Already joined?{" "}
+            <Link
+              href="/auth/login"
+              className="font-semibold text-cyan-600 hover:text-cyan-500"
+            >
+              Login
+            </Link>
+          </p>
+        </div>
+      }
+      cta={{ label: "Login", href: "/auth/login" }}
+    />
   );
 }
