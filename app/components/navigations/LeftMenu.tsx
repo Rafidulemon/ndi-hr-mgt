@@ -20,6 +20,7 @@ import { TbReport, TbReportAnalytics } from "react-icons/tb";
 import { HiOutlineDocumentText } from "react-icons/hi";
 import { IoIosPaper } from "react-icons/io";
 import { Modal } from "../atoms/frame/Modal";
+import { ThemeSwitcher } from "../theme/ThemeSwitcher";
 
 type Props = {
   isLeader?: boolean;
@@ -134,18 +135,20 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
   };
 
   const getNavClasses = (isActive: boolean) =>
-    `flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${
+    [
+      "flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200",
       isActive
-        ? "bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 text-white shadow-lg shadow-indigo-500/30"
-        : "text-slate-600 hover:bg-white/70 hover:text-slate-900"
-    }`;
+        ? "bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 text-white shadow-lg shadow-indigo-500/30 dark:shadow-sky-900/40"
+        : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-slate-100",
+    ].join(" ");
 
   const getSubNavClasses = (isActive: boolean) =>
-    `flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold transition-all duration-200 ${
+    [
+      "flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold transition-all duration-200",
       isActive
-        ? "bg-white text-indigo-600 shadow-sm"
-        : "text-slate-500 hover:bg-white/70 hover:text-slate-900"
-    }`;
+        ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-800/80 dark:text-sky-300 dark:shadow-slate-900/40"
+        : "text-slate-500 hover:bg-white/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/70 dark:hover:text-slate-100",
+    ].join(" ");
 
   const isRouteActive = (href: string) => {
     if (href === "/") {
@@ -155,7 +158,8 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
   };
 
   const containerClasses = [
-    "flex min-h-full w-full flex-col gap-6 rounded-[32px] border border-white/60 bg-white/90 p-6 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur lg:min-w-[18rem]",
+    "flex min-h-full w-full flex-col gap-6 rounded-[32px] border border-white/60 bg-white/90 p-6 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur transition-colors duration-200 lg:min-w-[18rem]",
+    "dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:shadow-slate-900/60",
     className,
   ]
     .filter(Boolean)
@@ -172,7 +176,7 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
           className="h-auto w-40"
           priority
         />
-        <div className="relative h-28 w-28 rounded-3xl border-4 border-white shadow-lg shadow-indigo-200">
+        <div className="relative h-28 w-28 rounded-3xl border-4 border-white shadow-lg shadow-indigo-200 dark:border-slate-700/80 dark:shadow-slate-900/60">
           <Image
             src="/dp.png"
             alt="Profile preview"
@@ -183,14 +187,17 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
           />
         </div>
         <div className="space-y-1">
-          <p className="text-lg font-semibold text-slate-900">
+          <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             Md. Rafidul Islam
           </p>
-          <p className="text-sm text-slate-500">Software Engineer</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Software Engineer
+          </p>
         </div>
-        <span className="rounded-full bg-indigo-50 px-4 py-1 text-xs font-semibold text-indigo-600">
+        <span className="rounded-full bg-indigo-50 px-4 py-1 text-xs font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200">
           Member since 2023
         </span>
+        <ThemeSwitcher className="mt-2" />
       </div>
 
       <nav className="flex flex-col">
@@ -441,7 +448,7 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
         <button
           type="button"
           onClick={() => setIsOpenModal(true)}
-          className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-400 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200 transition-transform hover:scale-[1.01]"
+          className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-400 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200 transition-transform hover:scale-[1.01] dark:from-rose-500 dark:via-amber-500 dark:to-orange-400 dark:shadow-rose-900/50"
         >
           <BiLogOut className="text-lg" />
           Logout

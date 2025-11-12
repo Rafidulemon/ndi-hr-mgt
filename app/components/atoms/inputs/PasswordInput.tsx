@@ -39,41 +39,41 @@ function PasswordInput(props: Props) {
 
   return (
     <div className={`flex flex-col ${className}`}>
-      <div className="flex flex-row gap-[5px] mb-2">
-        <label className="text-[16px] text-text_bold font-bold">{label}</label>
+      <div className="mb-2 flex flex-row gap-[5px]">
+        <label className="text-[16px] font-bold text-text_bold dark:text-slate-200">
+          {label}
+        </label>
         {isRequired && (
           <span className="text-[16px] font-bold text-tertiary">*</span>
         )}
       </div>
-      <div className={`relative h-[56px] w-full border-black`}>
-      <input
-        id={id}
-        className={`w-full h-[40px] bg-white rounded-[5px] drop-shadow-lg text-text_primary px-4 focus:outline-none mb-2`}
-        type={viewPassword ? "text" : "password"}
-        defaultValue={defaultValue}
-        value={value}
-        placeholder={placeholder ? placeholder : "********"}
-        onChange={onChange}
-        {...register?.(name)}
-      />
-      {viewPassword ? (
-        <TbEyeFilled
-          size={22}
-          color="#555454"
-          className="cursor-pointer absolute -top-6 bottom-0 right-[6px] m-auto md:-top-5 md:right-[8px]"
-          onClick={() => setViewPassword((prev) => !prev)}
+      <div className="relative h-[56px] w-full">
+        <input
+          id={id}
+          className="mb-2 h-[40px] w-full rounded-[5px] bg-white px-4 text-text_primary shadow-sm shadow-slate-200/70 transition-colors duration-200 focus:outline-none dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:shadow-slate-900/40"
+          type={viewPassword ? "text" : "password"}
+          defaultValue={defaultValue}
+          value={value}
+          placeholder={placeholder ? placeholder : "********"}
+          onChange={onChange}
+          {...register?.(name)}
         />
-      ) : (
-        <IoMdEyeOff
-          size={22}
-          color="#555454"
-          className="cursor-pointer absolute -top-6 bottom-0 right-[6px] m-auto md:-top-5 md:right-[8px]"
-          onClick={() => setViewPassword((prev) => !prev)}
-        />
-      )}
-      {error && (
-        <div className="text-[14px] text-tertiary">{error.message}</div>
-      )}
+        {viewPassword ? (
+          <TbEyeFilled
+            size={22}
+            className="absolute -top-6 bottom-0 right-[6px] m-auto cursor-pointer text-text_bold md:-top-5 md:right-[8px] dark:text-slate-300"
+            onClick={() => setViewPassword((prev) => !prev)}
+          />
+        ) : (
+          <IoMdEyeOff
+            size={22}
+            className="absolute -top-6 bottom-0 right-[6px] m-auto cursor-pointer text-text_bold md:-top-5 md:right-[8px] dark:text-slate-300"
+            onClick={() => setViewPassword((prev) => !prev)}
+          />
+        )}
+        {error && (
+          <div className="text-[14px] text-tertiary">{error.message}</div>
+        )}
       </div>
     </div>
   );

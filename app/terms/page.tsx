@@ -3,19 +3,22 @@ import Text from "../components/atoms/Text/Text";
 
 function TermsPage() {
   return (
-    <div className="max-w-screen min-h-screen p-6 bg-[#ECECEC]">
-      <div className="fixed top-12 left-6 right-6 z-40">
+    <div className="min-h-screen w-full bg-[var(--background)] px-6 py-6 text-[color:var(--foreground)] transition-colors duration-200">
+      <div className="fixed left-6 right-6 top-12 z-40">
         <Header />
       </div>
-      <div className="pt-32 px-6">
-        <div className="mb-10">
-          <Text text="Terms and Conditions" className="text-black text-[32px] font-semibold text-center" />
+      <div className="mx-auto max-w-5xl px-6 pt-32">
+        <div className="mb-10 text-center">
+          <Text
+            text="Terms and Conditions"
+            className="text-3xl font-semibold text-slate-900 transition-colors duration-200 dark:text-slate-100"
+          />
           <Text
             text="Please read these Terms and Conditions carefully before using our services."
-            className="text-black text-[16px] text-center mt-4"
+            className="mt-4 text-base text-slate-600 transition-colors duration-200 dark:text-slate-400"
           />
         </div>
-        <div className="prose mx-auto">
+        <div className="prose prose-slate mx-auto dark:prose-invert">
           <h2>1. Introduction</h2>
           <p>
             Welcome to our website. By accessing or using our services, you agree to be bound by these Terms and Conditions.
@@ -43,7 +46,7 @@ function TermsPage() {
           <h2>5. Acceptable Use</h2>
           <p>
             You agree to use our services in a lawful and ethical manner. You will not engage in any activity that may harm 
-            or disrupt the services or infringe on others' rights.
+            or disrupt the services or infringe on others&apos; rights.
           </p>
 
           <h2>6. Privacy Policy</h2>

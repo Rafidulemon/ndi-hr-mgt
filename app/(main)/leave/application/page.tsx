@@ -142,7 +142,7 @@ export default function LeaveApplicationPage() {
   };
 
   return (
-    <div className="bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <EmployeeHeader
           name="Md. Rafidul Islam"
@@ -150,16 +150,16 @@ export default function LeaveApplicationPage() {
           joining_date="Aug 17, 2023"
         />
 
-        <section className="rounded-3xl border border-white/70 bg-white p-6 shadow-sm sm:p-8">
+        <section className="rounded-3xl border border-white/60 bg-white/85 p-6 shadow-sm transition-colors duration-200 sm:p-8 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
               Leave application
             </p>
             <Text
               text="Submit a clear request"
-              className="text-2xl font-semibold text-slate-900 md:text-3xl"
+              className="text-2xl font-semibold text-slate-900 transition-colors duration-200 dark:text-slate-100 md:text-3xl"
             />
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Update your contact details, describe the leave window, and get a
               PDF-ready template instantly.
             </p>
@@ -169,27 +169,29 @@ export default function LeaveApplicationPage() {
             {highlightCards.map((card) => (
               <div
                 key={card.label}
-                className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                className="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
               >
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
                   {card.label}
                 </p>
-                <p className="mt-2 text-xl font-semibold text-slate-900">
+                <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
                   {card.value}
                 </p>
-                <p className="text-sm text-slate-500">{card.description}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {card.description}
+                </p>
               </div>
             ))}
           </div>
 
           <div className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="space-y-6 rounded-3xl border border-slate-100 bg-slate-50/70 p-6">
+            <div className="space-y-6 rounded-3xl border border-slate-100 bg-slate-50/70 p-6 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70">
               <div className="space-y-2">
                 <Text
                   text="Applicant snapshot"
-                  className="text-lg font-semibold text-slate-900"
+                  className="text-lg font-semibold text-slate-900 dark:text-slate-100"
                 />
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   Pulled directly from your employee profile. Update there if
                   something looks off.
                 </p>
@@ -201,11 +203,11 @@ export default function LeaveApplicationPage() {
                     label={field.label}
                     text={field.value}
                     textFontSize="16px"
-                    className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
+                    className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
                   />
                 ))}
               </div>
-              <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
+              <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent dark:via-slate-700" />
               <form
                 onSubmit={handleSubmit(onSubmit)}
                 className="grid gap-4 md:grid-cols-2"
@@ -245,7 +247,7 @@ export default function LeaveApplicationPage() {
                     register("options", { value });
                   }}
                   error={errors.options}
-                  className="col-span-2 rounded-2xl border border-dashed border-slate-200 bg-white p-4"
+                  className="col-span-2 rounded-2xl border border-dashed border-slate-200 bg-white p-4 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
                 />
                 <TextInput
                   className="col-span-2"
@@ -325,26 +327,26 @@ export default function LeaveApplicationPage() {
               </form>
             </div>
 
-            <aside className="space-y-4 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+            <aside className="space-y-4 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/75 dark:shadow-slate-900/60">
               {isFormSubmitted ? (
                 <>
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <Text
                         text="Preview & export"
-                        className="text-lg font-semibold text-slate-900"
+                        className="text-lg font-semibold text-slate-900 dark:text-slate-100"
                       />
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
                         Review the generated document before pushing it to HR.
                       </p>
                     </div>
-                    <span className="rounded-full bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-600">
+                    <span className="rounded-full bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-200">
                       Ready
                     </span>
                   </div>
                   <div
                     id="application-preview"
-                    className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                    className="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
                   >
                     <ApplicationPreview userData={userData} />
                   </div>
@@ -380,9 +382,9 @@ export default function LeaveApplicationPage() {
                   <div>
                     <Text
                       text="Keep it approvable"
-                      className="text-lg font-semibold text-slate-900"
+                      className="text-lg font-semibold text-slate-900 dark:text-slate-100"
                     />
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
                       A short checklist to help you hand approvers everything
                       they need.
                     </p>
@@ -391,18 +393,20 @@ export default function LeaveApplicationPage() {
                     {helperSteps.map((step) => (
                       <li
                         key={step}
-                        className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
+                        className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
                       >
-                        <span className="mt-1 h-2 w-2 rounded-full bg-primary_dark" />
-                        <p className="text-sm text-slate-600">{step}</p>
+                        <span className="mt-1 h-2 w-2 rounded-full bg-primary_dark dark:bg-sky-400" />
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          {step}
+                        </p>
                       </li>
                     ))}
                   </ul>
-                  <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500">
+                  <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500 transition-colors duration-200 dark:border-slate-700/60 dark:text-slate-400">
                     Need support? Ping{" "}
                     <a
                       href="mailto:hr@ndi.hr"
-                      className="font-semibold text-primary_dark"
+                      className="font-semibold text-primary_dark dark:text-sky-400"
                     >
                       hr@ndi.hr
                     </a>{" "}

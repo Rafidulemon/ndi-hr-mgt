@@ -36,19 +36,31 @@ const ImageInput = (props: ImageInputProps) => {
   return (
     <div className={`flex flex-col ${className}`}>
       {label && (
-        <div className="flex gap-1 mb-2">
-          <label htmlFor={id} className="text-[16px] font-bold text-text_bold">
+        <div className="mb-2 flex gap-1">
+          <label
+            htmlFor={id}
+            className="text-[16px] font-bold text-text_bold dark:text-slate-200"
+          >
             {label}
           </label>
-          {isRequired && <span className="text-[16px] font-bold text-tertiary">*</span>}
+          {isRequired && (
+            <span className="text-[16px] font-bold text-tertiary">*</span>
+          )}
         </div>
       )}
 
-      <div className="relative w-24 h-24 rounded-full overflow-hidden border border-black">
-        <img src={preview} alt="Profile preview" className="w-full h-full object-cover" />
-        
-        <label htmlFor={id} className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 opacity-0 hover:opacity-100 cursor-pointer transition-opacity">
-          <span className="text-white text-sm font-semibold">Change</span>
+      <div className="relative h-24 w-24 overflow-hidden rounded-full border border-white/80 shadow shadow-slate-200/50 transition-colors duration-200 dark:border-slate-700 dark:shadow-slate-900/50">
+        <img
+          src={preview}
+          alt="Profile preview"
+          className="h-full w-full object-cover"
+        />
+
+        <label
+          htmlFor={id}
+          className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/50 opacity-0 transition-opacity hover:opacity-100"
+        >
+          <span className="text-sm font-semibold text-white">Change</span>
         </label>
 
         <input

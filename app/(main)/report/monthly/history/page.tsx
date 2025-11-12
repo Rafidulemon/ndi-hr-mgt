@@ -36,13 +36,13 @@ function MonthlyHistory() {
   };
 
   return (
-    <div className="w-full flex flex-col gap-10">
-      <div className="flex justify-between items-center">
+    <div className="flex w-full flex-col gap-10">
+      <div className="flex items-center justify-between">
         <Text
           text="Monthly Report History"
-          className="font-semibold text-[30px]"
+          className="text-[30px] font-semibold text-slate-900 dark:text-slate-100"
         />
-        <div className="h-[46px] w-[250px] bg-primary rounded-md flex justify-between items-center px-[4px]">
+        <div className="flex h-[46px] w-[250px] items-center justify-between rounded-md bg-primary px-[4px] text-white shadow-sm shadow-indigo-200 transition-colors duration-200 dark:bg-sky-600 dark:shadow-sky-900/50">
           <MdKeyboardArrowLeft
             size={20}
             color="white"
@@ -62,24 +62,39 @@ function MonthlyHistory() {
         </div>
       </div>
 
-      <div className="w-full bg-white shadow p-8 flex flex-col gap-6">
+      <div className="flex w-full flex-col gap-6 rounded-[32px] border border-white/60 bg-white/85 p-8 shadow-xl shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
         <div className="flex flex-col gap-2">
-          <Text text="Monthly Report" className="font-semibold text-[24px]" />
+          <Text
+            text="Monthly Report"
+            className="text-[24px] font-semibold text-slate-900 dark:text-slate-100"
+          />
           <Text
             text={`${months[currentMonth]}, ${year}`}
-            className="text-text_bold"
+            className="text-text_bold dark:text-slate-300"
           />
         </div>
 
-        <div className="w-full mt-4 grid grid-cols-2 gap-6">
+        <div className="mt-4 grid w-full grid-cols-1 gap-6 md:grid-cols-2">
           <div className="col-span-1 flex flex-col gap-12">
-            <TextFeild label="Task Done" text="5" />
-            <TextFeild label="Story Point" text="20" />
-            <TextFeild label="Working Hours" text="80" />
+            <TextFeild
+              label="Task Done"
+              text="5"
+              className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
+            />
+            <TextFeild
+              label="Story Point"
+              text="20"
+              className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
+            />
+            <TextFeild
+              label="Working Hours"
+              text="80"
+              className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
+            />
             <Button
               theme="secondary"
               className="w-[185px]"
-              onClick={() => navigate.push("/monthly/report")}
+              onClick={() => navigate.push("/report/monthly")}
             >
               <Text text="Add New Report" className="font-semibold" />
             </Button>
@@ -87,9 +102,9 @@ function MonthlyHistory() {
           <div className="col-span-1 flex flex-col gap-2">
             <Text
               text="Task Name/ Ticket Number"
-              className="text-text_bold font-semibold"
+              className="font-semibold text-text_bold dark:text-slate-200"
             />
-            <div className="flex flex-col gap-1 text-text_primary font-semibold">
+            <div className="flex flex-col gap-1 font-semibold text-text_primary dark:text-slate-300">
               <Text text="Task-1" />
               <Text text="Task-2" />
               <Text text="Task-3" />

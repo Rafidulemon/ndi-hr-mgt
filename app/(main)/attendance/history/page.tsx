@@ -246,10 +246,13 @@ const statusFilters: Array<AttendanceStatus | "All"> = [
 ];
 
 const statusChipClasses: Record<AttendanceStatus, string> = {
-  Present: "bg-emerald-50 text-emerald-600",
-  Late: "bg-amber-50 text-amber-600",
-  "Half Day": "bg-sky-50 text-sky-600",
-  Absent: "bg-rose-50 text-rose-600",
+  Present:
+    "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300",
+  Late: "bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200",
+  "Half Day":
+    "bg-sky-50 text-sky-600 dark:bg-sky-500/20 dark:text-sky-200",
+  Absent:
+    "bg-rose-50 text-rose-600 dark:bg-rose-500/20 dark:text-rose-200",
 };
 
 export default function AttendanceHistory() {
@@ -379,34 +382,34 @@ export default function AttendanceHistory() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm">
+      <section className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
               Attendance
             </p>
-            <h1 className="text-2xl font-semibold text-slate-900">
+            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
               History & shift log
             </h1>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Monitor check-ins, hours, and exceptions for each month.
             </p>
           </div>
-          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70">
             <button
               type="button"
               onClick={() => shiftMonth("prev")}
-              className="rounded-full p-2 text-slate-500 hover:bg-white hover:text-slate-800"
+              className="rounded-full p-2 text-slate-500 transition-colors duration-150 hover:bg-white hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
             >
               <MdKeyboardArrowLeft size={20} />
             </button>
-            <span className="text-sm font-semibold text-slate-700">
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
               {months[selectedMonth]} {selectedYear}
             </span>
             <button
               type="button"
               onClick={() => shiftMonth("next")}
-              className="rounded-full p-2 text-slate-500 hover:bg-white hover:text-slate-800"
+              className="rounded-full p-2 text-slate-500 transition-colors duration-150 hover:bg-white hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
             >
               <MdKeyboardArrowRight size={20} />
             </button>
@@ -417,27 +420,29 @@ export default function AttendanceHistory() {
           {summaryCards.map((card) => (
             <div
               key={card.label}
-              className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+              className="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
             >
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">
+              <p className="text-xs uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
                 {card.label}
               </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">
+              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
                 {card.value}
               </p>
-              <p className="text-sm text-slate-500">{card.helper}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {card.helper}
+              </p>
             </div>
           ))}
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-4">
-          <div className="flex flex-1 min-w-[220px] items-center rounded-2xl border border-slate-200 bg-white px-4 py-2">
+          <div className="flex min-w-[220px] flex-1 items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70">
             <input
               type="text"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search by date or weekday"
-              className="w-full bg-transparent text-sm text-slate-600 placeholder:text-slate-400 focus:outline-none"
+              className="w-full bg-transparent text-sm text-slate-600 placeholder:text-slate-400 focus:outline-none dark:text-slate-200 dark:placeholder:text-slate-500"
             />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -448,8 +453,8 @@ export default function AttendanceHistory() {
                 onClick={() => setSelectedStatus(filter)}
                 className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                   selectedStatus === filter
-                    ? "bg-primary_dark text-white shadow"
-                    : "border border-slate-200 bg-white text-slate-600 hover:border-primary_dark/40 hover:text-primary_dark"
+                    ? "bg-primary_dark text-white shadow dark:bg-sky-600"
+                    : "border border-slate-200 bg-white text-slate-600 transition-colors duration-150 hover:border-primary_dark/40 hover:text-primary_dark dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-300 dark:hover:border-sky-500/50 dark:hover:text-sky-400"
                 }`}
               >
                 {filter}
@@ -458,7 +463,7 @@ export default function AttendanceHistory() {
           </div>
         </div>
 
-        <div className="mt-6 rounded-3xl border border-slate-100 bg-white shadow-sm">
+        <div className="mt-6 rounded-3xl border border-slate-100 bg-white shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/70 dark:shadow-slate-900/60">
           {filteredRecords.length > 0 ? (
             <>
               <Table
@@ -475,24 +480,24 @@ export default function AttendanceHistory() {
               />
             </>
           ) : (
-            <div className="p-10 text-center text-sm text-slate-500">
+            <div className="p-10 text-center text-sm text-slate-500 dark:text-slate-400">
               No attendance entries match the current filters.
             </div>
           )}
         </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm">
+      <section className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               Recent timeline
             </h2>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Exceptions and highlights for {months[0]}.
             </p>
           </div>
-          <span className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
+          <span className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
             {timelineEntries.length} entries
           </span>
         </div>
@@ -500,13 +505,13 @@ export default function AttendanceHistory() {
           {timelineEntries.map((entry) => (
             <li
               key={`${entry.date}-${entry.day}`}
-              className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
+              className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
             >
               <div>
-                <p className="text-sm font-semibold text-slate-900">
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                   {entry.date}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   {entry.day} · {entry.note}
                 </p>
               </div>
@@ -518,7 +523,7 @@ export default function AttendanceHistory() {
             </li>
           ))}
           {timelineEntries.length === 0 && (
-            <li className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
+            <li className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500 dark:border-slate-700/60 dark:text-slate-400">
               No timeline events for this month.
             </li>
           )}

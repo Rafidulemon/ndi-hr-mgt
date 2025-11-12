@@ -51,16 +51,16 @@ function EditProfilePage() {
 
   return (
     <div className="space-y-8">
-      <div className="glass-panel items-center justify-between gap-4 text-slate-600 md:flex-row">
+      <div className="glass-panel items-center justify-between gap-4 text-slate-600 transition-colors duration-200 dark:text-slate-300 md:flex-row">
         <div>
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
             Profile centre
           </p>
           <Text
             text="Keep your profile current and actionable."
-            className="text-xl font-semibold text-slate-900"
+            className="text-xl font-semibold text-slate-900 dark:text-slate-100"
           />
-          <p className="mt-1 text-sm">
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             The more context you share, the easier it is for HR and your squad
             to support you.
           </p>
@@ -78,8 +78,10 @@ function EditProfilePage() {
                 id="profilePic"
                 onChange={(event) => console.log(event.target.files)}
               />
-              <div className="space-y-1 text-sm text-slate-500">
-                <p className="font-semibold text-slate-900">Profile photo</p>
+              <div className="space-y-1 text-sm text-slate-500 dark:text-slate-400">
+                <p className="font-semibold text-slate-900 dark:text-slate-100">
+                  Profile photo
+                </p>
                 <p>JPG or PNG · Max 5 MB · Square crop recommended.</p>
               </div>
             </div>
@@ -104,13 +106,15 @@ function EditProfilePage() {
         </Card>
 
         <Card title="Profile Checklist" isTransparentBackground>
-          <div className="space-y-4 text-sm text-slate-600">
+          <div className="space-y-4 text-sm text-slate-600 dark:text-slate-400">
             {helperChecklist.map((item) => (
               <div
                 key={item.title}
-                className="rounded-2xl border border-white/60 bg-white/80 p-4 shadow-sm"
+                className="rounded-2xl border border-white/60 bg-white/80 p-4 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60"
               >
-                <p className="font-semibold text-slate-900">{item.title}</p>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">
+                  {item.title}
+                </p>
                 <p>{item.detail}</p>
               </div>
             ))}
@@ -199,7 +203,10 @@ function EditProfilePage() {
         closeOnClick={() => setIsModalOpen(false)}
         crossOnClick={() => setIsModalOpen(false)}
       >
-        <Text className="text-sm text-slate-600" text="Please confirm with your password before saving these updates." />
+        <Text
+          className="text-sm text-slate-600 dark:text-slate-300"
+          text="Please confirm with your password before saving these updates."
+        />
         <PasswordInput label="Password" />
       </Modal>
     </div>

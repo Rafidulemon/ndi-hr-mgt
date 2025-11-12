@@ -236,13 +236,13 @@ export default function DailyReportHistoryPage() {
   };
 
   return (
-    <div className="w-full">
-      <div className="flex justify-between items-center">
+    <div className="flex w-full flex-col gap-10">
+      <div className="flex items-center justify-between">
         <Text
           text="Daily Report History"
-          className="font-semibold text-[30px]"
+          className="text-[30px] font-semibold text-slate-900 dark:text-slate-100"
         />
-        <div className="h-[46px] w-[250px] bg-primary rounded-md flex justify-between items-center px-[4px]">
+        <div className="flex h-[46px] w-[250px] items-center justify-between rounded-md bg-primary px-[4px] text-white shadow-sm shadow-indigo-200 transition-colors duration-200 dark:bg-sky-600 dark:shadow-sky-900/50">
           <MdKeyboardArrowLeft
             size={20}
             color="white"
@@ -267,7 +267,7 @@ export default function DailyReportHistoryPage() {
           <Table
             headers={attendenceTableHeader}
             rows={currentPageData}
-            className="shadow-lg py-6"
+            className="rounded-[28px] py-6"
             isTextCenter
           />
         )}

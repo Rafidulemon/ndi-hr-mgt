@@ -115,7 +115,7 @@ function ProfilePage() {
       <section className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <Card title="Profile Overview">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
-            <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-[28px] border border-white/60 shadow-lg shadow-indigo-100">
+            <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-[28px] border border-white/60 shadow-lg shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:shadow-slate-900/60">
               <Image
                 src="/dp.png"
                 alt="Profile"
@@ -128,9 +128,9 @@ function ProfilePage() {
             <div className="flex-1 space-y-3">
               <Text
                 text="Product-led engineer focused on crafting reliable HR experiences."
-                className="text-base text-slate-600"
+                className="text-base text-slate-600 dark:text-slate-300"
               />
-              <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
+              <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
                 <span>Frontend</span>
                 <span>Performance Advocate</span>
                 <span>Mentor</span>
@@ -141,15 +141,17 @@ function ProfilePage() {
             {quickStats.map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-2xl border border-white/60 bg-white/80 p-4 shadow-sm"
+                className="rounded-2xl border border-white/60 bg-white/80 p-4 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60"
               >
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
                   {stat.label}
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
                   {stat.value}
                 </p>
-                <p className="text-sm text-slate-500">{stat.helper}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {stat.helper}
+                </p>
               </div>
             ))}
           </div>
@@ -160,7 +162,7 @@ function ProfilePage() {
             {skillTags.map((skill) => (
               <span
                 key={skill}
-                className="rounded-full border border-white/60 bg-white/80 px-4 py-1 text-sm font-semibold text-slate-600"
+                className="rounded-full border border-white/60 bg-white/80 px-4 py-1 text-sm font-semibold text-slate-600 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-200"
               >
                 {skill}
               </span>
@@ -168,7 +170,7 @@ function ProfilePage() {
           </div>
           <div className="section-divider" />
           <div>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Currently exploring: Design tokens, DX automation, AI-assisted QA.
             </p>
           </div>
@@ -182,12 +184,12 @@ function ProfilePage() {
               {section.data.map((item) => (
                 <div
                   key={item.label}
-                  className="rounded-2xl border border-white/60 bg-white/80 px-4 py-3"
+                  className="rounded-2xl border border-white/60 bg-white/80 px-4 py-3 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60"
                 >
-                  <p className="text-xs uppercase tracking-[0.25em] text-slate-400">
+                  <p className="text-xs uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500">
                     {item.label}
                   </p>
-                  <p className="text-sm font-semibold text-slate-900">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                     {item.value}
                   </p>
                 </div>
@@ -203,17 +205,19 @@ function ProfilePage() {
             {careerTimeline.map((event) => (
               <div
                 key={event.title}
-                className="flex gap-4 rounded-2xl border border-white/60 bg-white/80 p-4"
+                className="flex gap-4 rounded-2xl border border-white/60 bg-white/80 p-4 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60"
               >
-                <div className="mt-1 h-2 w-2 rounded-full bg-indigo-500" />
+                <div className="mt-1 h-2 w-2 rounded-full bg-indigo-500 dark:bg-indigo-400" />
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                     {event.title}
                   </p>
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
                     {event.time}
                   </p>
-                  <p className="mt-1 text-sm text-slate-600">{event.detail}</p>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                    {event.detail}
+                  </p>
                 </div>
               </div>
             ))}
@@ -221,20 +225,28 @@ function ProfilePage() {
         </Card>
 
         <Card title="Availability & Wellbeing">
-          <div className="space-y-4 text-sm text-slate-600">
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-emerald-900">
+          <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-emerald-900 transition-colors duration-200 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">
               <p className="text-sm font-semibold">
                 Weekly focus blockers
               </p>
               <p>Deep work from 10 AM – 1 PM. Prefer meetings after 2 PM.</p>
             </div>
-            <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 text-sm">
-              <p className="font-semibold text-slate-900">Health & wellbeing</p>
-              <p>Enrolled in corporate wellness plan · Practising mindfulness.</p>
+            <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 text-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60">
+              <p className="font-semibold text-slate-900 dark:text-slate-100">
+                Health & wellbeing
+              </p>
+              <p className="text-slate-600 dark:text-slate-400">
+                Enrolled in corporate wellness plan · Practising mindfulness.
+              </p>
             </div>
-            <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 text-sm">
-              <p className="font-semibold text-slate-900">Travel readiness</p>
-              <p>Available for travel within APAC with 2 weeks notice.</p>
+            <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 text-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60">
+              <p className="font-semibold text-slate-900 dark:text-slate-100">
+                Travel readiness
+              </p>
+              <p className="text-slate-600 dark:text-slate-400">
+                Available for travel within APAC with 2 weeks notice.
+              </p>
             </div>
           </div>
         </Card>

@@ -27,9 +27,9 @@ export default function SelectBox({
   const allOptions = [{ label: "Select Any", value: "default" }, ...options];
   return (
     <div className="flex flex-col">
-      <div className="flex flex-row gap-1 mb-2">
+      <div className="mb-2 flex flex-row gap-1">
         <label
-          className="text-[16px] font-bold text-text_bold"
+          className="text-[16px] font-bold text-text_bold dark:text-slate-200"
           htmlFor={label}
         >
           {label}
@@ -42,8 +42,7 @@ export default function SelectBox({
       <select
         id={label}
         {...register?.(name)}
-        className={`h-[40px] px-4 text-[16px] text-text_primary rounded-lg shadow-xl bg-white 
-        focus:outline-none hover:cursor-pointer ${className}`}
+        className={`h-[40px] rounded-lg border border-white/60 bg-white px-4 text-[16px] text-text_primary shadow-sm shadow-slate-200/70 transition-colors duration-200 focus:outline-none hover:cursor-pointer dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-100 dark:shadow-slate-900/40 ${className}`}
       >
         {options.length > 0 ? (
           allOptions.map((option, index) => (

@@ -31,9 +31,9 @@ export const CardWithHeader = (props: Props) => {
 
   return (
     <div
-      className={`${rounding} relative w-full overflow-hidden border border-white/60 bg-white/90 p-6 shadow-xl shadow-indigo-100 backdrop-blur ${className}`}
+      className={`${rounding} relative w-full overflow-hidden border border-white/60 bg-white/90 p-6 shadow-xl shadow-indigo-100 backdrop-blur transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60 ${className}`}
     >
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/80 via-white/60 to-transparent" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/80 via-white/60 to-transparent dark:from-slate-900/60 dark:via-slate-900/40 dark:to-transparent" />
       <div className="relative z-10 flex flex-col gap-6">
         <div className={`flex items-center gap-4 ${titleBarSize}`}>
           <div
@@ -45,7 +45,7 @@ export const CardWithHeader = (props: Props) => {
           </div>
           <Text
             text={title}
-            className={`text-xl font-semibold text-slate-900 ${
+            className={`text-xl font-semibold text-slate-900 dark:text-slate-100 ${
               isItalicHeader ? "italic" : ""
             }`}
           />

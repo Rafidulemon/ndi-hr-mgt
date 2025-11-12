@@ -32,8 +32,11 @@ function TextInput(props: Props) {
 
   return (
     <div className={`flex flex-col ${className}`}>
-      <div className="flex flex-row gap-[5px] mb-2">
-        <label htmlFor={id} className="text-[16px] font-bold text-text_bold">
+      <div className="mb-2 flex flex-row gap-[5px]">
+        <label
+          htmlFor={id}
+          className="text-[16px] font-bold text-text_bold dark:text-slate-200"
+        >
           {label}
         </label>
         {isRequired && (
@@ -43,14 +46,16 @@ function TextInput(props: Props) {
       <input
         id={id}
         type="text"
-        className="w-full h-[40px] bg-white rounded-[5px] drop-shadow-lg text-text_primary px-4 focus:outline-none mb-2"
+        className="mb-2 h-[40px] w-full rounded-[5px] bg-white px-4 text-text_primary shadow-sm shadow-slate-200/70 transition-colors duration-200 focus:outline-none dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:shadow-slate-900/40"
         defaultValue={defaultValue}
         value={value}
         placeholder={placeholder}
         onChange={onChange}
         {...register?.(name)}
       />
-      {error && <div className="text-[14px] text-tertiary">{error.message}</div>}
+      {error && (
+        <div className="text-[14px] text-tertiary">{error.message}</div>
+      )}
     </div>
   );
 }

@@ -4,7 +4,6 @@ import React, {
   useCallback,
   useEffect,
   useId,
-  useState,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
@@ -50,7 +49,6 @@ export const Modal = (props: Props) => {
     minWidthModal,
   } = props;
 
-  const [isMounted, setIsMounted] = useState(false);
   const headingId = useId();
 
   const handleClose = useCallback(() => {
@@ -72,11 +70,7 @@ export const Modal = (props: Props) => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open, handleClose]);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  if (!open || !isMounted) return null;
+  if (!open || typeof document === "undefined") return null;
 
   const handleBackdropClick = () => {
     handleClose();
@@ -88,24 +82,24 @@ export const Modal = (props: Props) => {
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center text-[#1D212D]"
+      className="fixed inset-0 z-[100] flex items-center justify-center text-slate-800 dark:text-slate-100"
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? headingId : undefined}
     >
       <div
-        className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm dark:bg-slate-950/60"
         onClick={handleBackdropClick}
       />
       <div
-        className={`relative z-10 flex flex-col gap-6 rounded-[28px] border border-white/60 bg-white/95 p-6 text-slate-700 shadow-2xl shadow-black/10 backdrop-blur ${widthClass} ${className}`}
+        className={`relative z-10 flex flex-col gap-6 rounded-[28px] border border-white/60 bg-white/95 p-6 text-slate-700 shadow-2xl shadow-black/10 backdrop-blur transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/85 dark:text-slate-200 dark:shadow-slate-900/70 ${widthClass} ${className}`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
             <p
               id={title ? headingId : undefined}
-              className={`font-semibold text-slate-900 ${
+              className={`font-semibold text-slate-900 dark:text-slate-100 ${
                 titleTextSize ?? "text-xl"
               }`}
             >
@@ -116,14 +110,14 @@ export const Modal = (props: Props) => {
           <button
             type="button"
             aria-label="Close dialog"
-            className="text-3xl text-slate-400 transition-colors hover:text-indigo-500"
+            className="text-3xl text-slate-400 transition-colors hover:text-indigo-500 dark:text-slate-500 dark:hover:text-sky-400"
             onClick={crossOnClick || handleClose}
           >
             <IoIosCloseCircle />
           </button>
         </div>
 
-        <div className="max-h-[55vh] overflow-y-auto pr-1 text-sm text-slate-600">
+        <div className="max-h-[55vh] overflow-y-auto pr-1 text-sm text-slate-600 dark:text-slate-300">
           {children}
         </div>
 

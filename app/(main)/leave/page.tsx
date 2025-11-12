@@ -137,10 +137,14 @@ const statusFilters: Array<LeaveStatus | "All"> = [
 ];
 
 const statusClasses: Record<LeaveStatus, string> = {
-  Pending: "bg-amber-50 text-amber-600",
-  Approved: "bg-emerald-50 text-emerald-600",
-  Denied: "bg-rose-50 text-rose-600",
-  Processing: "bg-sky-50 text-sky-600",
+  Pending:
+    "bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200",
+  Approved:
+    "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-200",
+  Denied:
+    "bg-rose-50 text-rose-600 dark:bg-rose-500/20 dark:text-rose-300",
+  Processing:
+    "bg-sky-50 text-sky-600 dark:bg-sky-500/20 dark:text-sky-200",
 };
 
 export default function EmployeeLeavePage() {
@@ -194,7 +198,7 @@ export default function EmployeeLeavePage() {
   };
 
   return (
-    <div className="bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <EmployeeHeader
           name="Md. Rafidul Islam"
@@ -205,34 +209,34 @@ export default function EmployeeLeavePage() {
           onButtonClick={() => router.push("/leave/application")}
         />
 
-        <section className="rounded-3xl border border-white/70 bg-white p-6 shadow-sm">
+        <section className="rounded-3xl border border-white/60 bg-white/85 p-6 shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
                 Leave balance
               </p>
-              <h2 className="text-2xl font-semibold text-slate-900">
+              <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
                 Track allocations at a glance
               </h2>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 Balances update automatically after every approved request.
               </p>
             </div>
-            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70">
               <button
                 type="button"
                 onClick={decrementYear}
-                className="rounded-full p-2 text-slate-500 hover:bg-white hover:text-slate-800"
+                className="rounded-full p-2 text-slate-500 transition-colors duration-150 hover:bg-white hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
               >
                 <MdKeyboardArrowLeft size={20} />
               </button>
-              <span className="text-sm font-semibold text-slate-700">
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                 {year}
               </span>
               <button
                 type="button"
                 onClick={incrementYear}
-                className="rounded-full p-2 text-slate-500 hover:bg-white hover:text-slate-800"
+                className="rounded-full p-2 text-slate-500 transition-colors duration-150 hover:bg-white hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
               >
                 <MdKeyboardArrowRight size={20} />
               </button>
@@ -244,15 +248,15 @@ export default function EmployeeLeavePage() {
               return (
                 <div
                   key={balance.type}
-                  className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                  className="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
                 >
-                  <p className="text-xs uppercase tracking-[0.35em] text-slate-400">
+                  <p className="text-xs uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
                     {balance.type}
                   </p>
-                  <p className="mt-2 text-3xl font-semibold text-slate-900">
+                  <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">
                     {remaining}
                   </p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
                     of {balance.allocated} days · {balance.used} used
                   </p>
                 </div>
@@ -262,23 +266,23 @@ export default function EmployeeLeavePage() {
         </section>
 
         <div className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
-          <section className="rounded-3xl border border-white/70 bg-white p-6 shadow-sm">
+          <section className="rounded-3xl border border-white/60 bg-white/85 p-6 shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                   Leave history
                 </h3>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   Search by ID, filter by status, and keep an eye on approvals.
                 </p>
               </div>
-              <div className="flex flex-1 min-w-[220px] items-center rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="flex min-w-[220px] flex-1 items-center rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70">
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder="Search ID or purpose"
-                  className="w-full bg-transparent text-sm text-slate-600 placeholder:text-slate-400 focus:outline-none"
+                  className="w-full bg-transparent text-sm text-slate-600 placeholder:text-slate-400 focus:outline-none dark:text-slate-200 dark:placeholder:text-slate-500"
                 />
               </div>
             </div>
@@ -291,8 +295,8 @@ export default function EmployeeLeavePage() {
                   onClick={() => setStatusFilter(filter)}
                   className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                     statusFilter === filter
-                      ? "bg-primary_dark text-white shadow"
-                      : "border border-slate-200 bg-white text-slate-600 hover:border-primary_dark/40 hover:text-primary_dark"
+                      ? "bg-primary_dark text-white shadow dark:bg-sky-600"
+                      : "border border-slate-200 bg-white text-slate-600 transition-colors duration-150 hover:border-primary_dark/40 hover:text-primary_dark dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-300 dark:hover:border-sky-500/50 dark:hover:text-sky-400"
                   }`}
                 >
                   {filter}
@@ -300,23 +304,23 @@ export default function EmployeeLeavePage() {
               ))}
             </div>
 
-            <div className="mt-6 rounded-3xl border border-slate-100 bg-white">
+            <div className="mt-6 rounded-3xl border border-slate-100 bg-white transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/70">
               {tableRows.length > 0 ? (
                 <Table headers={headers} rows={tableRows} />
               ) : (
-                <div className="p-10 text-center text-sm text-slate-500">
+                <div className="p-10 text-center text-sm text-slate-500 dark:text-slate-400">
                   No leave applications match these filters.
                 </div>
               )}
             </div>
           </section>
 
-          <aside className="space-y-4 rounded-3xl border border-white/70 bg-white p-6 shadow-sm">
+          <aside className="space-y-4 rounded-3xl border border-white/60 bg-white/85 p-6 shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Upcoming decisions
               </h3>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 Requests waiting on manager or HR approval.
               </p>
             </div>
@@ -324,10 +328,10 @@ export default function EmployeeLeavePage() {
               {upcoming.map((request) => (
                 <li
                   key={request.id}
-                  className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                  className="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
                 >
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-900">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                       {request.leaveType}
                     </p>
                     <span
@@ -336,15 +340,17 @@ export default function EmployeeLeavePage() {
                       {request.status}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     {request.from} → {request.to} · {request.days} day
                     {request.days > 1 ? "s" : ""}
                   </p>
-                  <p className="mt-1 text-sm text-slate-600">{request.note}</p>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                    {request.note}
+                  </p>
                 </li>
               ))}
               {upcoming.length === 0 && (
-                <li className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
+                <li className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500 transition-colors duration-200 dark:border-slate-700/60 dark:text-slate-400">
                   You have no pending requests this year.
                 </li>
               )}

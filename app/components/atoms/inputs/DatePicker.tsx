@@ -28,9 +28,12 @@ function CustomDatePicker(props: Props) {
   } = props;
 
   return (
-    <div className={`flex flex-col ${className}`}>
-      <div className="flex flex-row gap-[5px] mb-2">
-        <label htmlFor={id} className="text-[16px] font-bold text-text_bold">
+    <div className={`flex flex-col ${className ?? ""}`}>
+      <div className="mb-2 flex flex-row gap-[5px]">
+        <label
+          htmlFor={id}
+          className="text-[16px] font-bold text-text_bold dark:text-slate-200"
+        >
           {label}
         </label>
         {isRequired && (
@@ -38,7 +41,7 @@ function CustomDatePicker(props: Props) {
         )}
       </div>
       <DatePicker
-        className="cursor-pointer w-full h-[40px] bg-white rounded-[5px] drop-shadow-lg text-text_primary px-4 focus:outline-none mb-2"
+        className="mb-2 h-[40px] w-full cursor-pointer rounded-[5px] bg-white px-4 text-text_primary shadow-sm shadow-slate-200/70 transition-colors duration-200 focus:outline-none dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:shadow-slate-900/40"
         selected={value}
         onChange={onChange}
         placeholderText={placeholder}

@@ -38,17 +38,21 @@ export default function Pagination<T>({
   }, [data.length, pageNumber, postsPerPage]);
 
   const pillClass =
-    "inline-flex h-10 min-w-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:border-[#0DBAD2] hover:text-[#0DBAD2] focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0DBAD2]";
+    "inline-flex h-10 min-w-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:border-[#0DBAD2] hover:text-[#0DBAD2] focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0DBAD2] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-sky-400 dark:hover:text-sky-300 dark:focus-visible:outline-sky-400";
 
   return (
-    <div className="mt-6 rounded-[28px] border border-white/60 bg-white/90 p-4 shadow-inner shadow-white/40">
-      <div className="flex flex-col gap-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs uppercase tracking-[0.35em] text-slate-400">
+    <div className="mt-6 rounded-[28px] border border-white/60 bg-white/90 p-4 shadow-inner shadow-white/40 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
+      <div className="flex flex-col gap-4 text-sm text-slate-500 transition-colors duration-200 sm:flex-row sm:items-center sm:justify-between dark:text-slate-400">
+        <p className="text-xs uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
           Showing{" "}
-          <span className="text-slate-900">
+          <span className="text-slate-900 dark:text-slate-100">
             {rangeSummary.start}-{rangeSummary.end}
           </span>{" "}
-          of <span className="text-slate-900">{data.length}</span> records
+          of{" "}
+          <span className="text-slate-900 dark:text-slate-100">
+            {data.length}
+          </span>{" "}
+          records
         </p>
         <ReactPaginate
           breakLabel="..."

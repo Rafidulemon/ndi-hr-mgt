@@ -57,30 +57,36 @@ function DailyReportPage() {
   };
 
   return (
-    <div className="w-full flex flex-col gap-10">
+    <div className="flex w-full flex-col gap-10">
       <EmployeeHeader
         name="Md. Rafidul Islam"
         designation="Software Engineer"
         joining_date="Aug 17, 2023"
         hasRightButton
         buttonText="History"
-        onButtonClick={() => navigate.push("/daily/report-history")}
+        onButtonClick={() => navigate.push("/report/daily/history")}
       />
-      <div className="w-full bg-white shadow p-8 flex flex-col gap-6">
-        <div className="flex flex-col gap-2 mb-6">
-          <Text text="Daily Report" className="text-[24px] font-semibold" />
-          <Text text={day} className="text-text_primary" />
+      <div className="flex w-full flex-col gap-6 rounded-[32px] border border-white/60 bg-white/85 p-8 shadow-xl shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
+        <div className="mb-6 flex flex-col gap-2">
+          <Text
+            text="Daily Report"
+            className="text-[24px] font-semibold text-slate-900 dark:text-slate-100"
+          />
+          <Text
+            text={day}
+            className="text-text_primary dark:text-slate-300"
+          />
         </div>
 
         {reports.map((report, index) => (
           <div
             key={report.id}
-            className="w-full grid grid-cols-2 gap-6 mb-6 border-b pb-6 relative"
+            className="relative mb-6 grid w-full grid-cols-1 gap-6 border-b border-slate-200 pb-6 transition-colors duration-200 md:grid-cols-2 dark:border-slate-700/60"
           >
             <div className="col-span-2 flex justify-end">
               <button
                 onClick={() => handleDeleteReport(report.id)}
-                className="text-[30px] hover:text-red-500"
+                className="text-[30px] text-slate-400 transition-colors duration-150 hover:text-red-500 dark:text-slate-500"
                 aria-label={`Delete Report ${index + 1}`}
               >
                 <MdDeleteForever />
@@ -118,7 +124,7 @@ function DailyReportPage() {
           <Text text="Add New Report" className="font-semibold" />
         </Button>
 
-        <div className="w-full flex flex-row gap-6 mt-10">
+        <div className="mt-10 flex w-full flex-row gap-6">
           <Button type="submit" className="w-[185px]">
             <Text text="Submit" className="font-semibold" />
           </Button>

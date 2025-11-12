@@ -53,10 +53,10 @@ function Index() {
   return (
     <div className="space-y-8">
       <section className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-        <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-indigo-600 via-sky-500 to-cyan-400 p-8 text-white shadow-2xl">
+        <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-indigo-600 via-sky-500 to-cyan-400 p-8 text-white shadow-2xl dark:shadow-slate-950/60">
           <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-6">
-              <div className="relative h-28 w-28 rounded-[32px] border-4 border-white/40 shadow-xl shadow-indigo-300">
+              <div className="relative h-28 w-28 rounded-[32px] border-4 border-white/40 shadow-xl shadow-indigo-300 dark:border-slate-900/60 dark:shadow-slate-950/60">
                 <Image
                   src="/dp.png"
                   alt="Profile"
@@ -81,7 +81,7 @@ function Index() {
               {monthSnapshot.map((item) => (
                 <div
                   key={item.label}
-                  className="rounded-2xl border border-white/40 bg-white/10 p-4 text-center backdrop-blur"
+                  className="rounded-2xl border border-white/40 bg-white/10 p-4 text-center backdrop-blur dark:border-slate-900/60 dark:bg-slate-900/40"
                 >
                   <p className="text-3xl font-semibold text-white">
                     {item.value}
@@ -94,10 +94,10 @@ function Index() {
             </div>
           </div>
           <div className="mt-8 flex flex-wrap gap-4 text-sm text-white/80">
-            <span className="rounded-full border border-white/40 px-4 py-2">
+            <span className="rounded-full border border-white/40 px-4 py-2 dark:border-slate-900/60">
               Working hours · 10:00 AM – 06:00 PM
             </span>
-            <span className="rounded-full border border-white/40 px-4 py-2">
+            <span className="rounded-full border border-white/40 px-4 py-2 dark:border-slate-900/60">
               Current project · HR Management
             </span>
           </div>
@@ -107,15 +107,17 @@ function Index() {
           {quickStats.map((stat) => (
             <div
               key={stat.label}
-              className="rounded-[28px] border border-white/60 bg-white/90 p-5 shadow-xl shadow-indigo-100 backdrop-blur"
+              className="rounded-[28px] border border-white/60 bg-white/90 p-5 shadow-xl shadow-indigo-100 backdrop-blur transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60"
             >
-              <p className="text-sm font-semibold uppercase tracking-[0.35em] text-slate-400">
+              <p className="text-sm font-semibold uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
                 {stat.label}
               </p>
-              <p className="mt-2 text-3xl font-semibold text-slate-900">
+              <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">
                 {stat.value}
               </p>
-              <p className="text-sm text-slate-500">{stat.helper}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {stat.helper}
+              </p>
             </div>
           ))}
         </div>
@@ -131,10 +133,12 @@ function Index() {
             {personalDetails.map((detail) => (
               <div
                 key={detail.label}
-                className="flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm"
+                className="flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60"
               >
-                <span className="text-slate-500">{detail.label}</span>
-                <span className="font-semibold text-slate-900">
+                <span className="text-slate-500 dark:text-slate-400">
+                  {detail.label}
+                </span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">
                   {detail.value}
                 </span>
               </div>
@@ -151,10 +155,12 @@ function Index() {
             {companyDetails.map((detail) => (
               <div
                 key={detail.label}
-                className="flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm"
+                className="flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60"
               >
-                <span className="text-slate-500">{detail.label}</span>
-                <span className="font-semibold text-slate-900">
+                <span className="text-slate-500 dark:text-slate-400">
+                  {detail.label}
+                </span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">
                   {detail.value}
                 </span>
               </div>
@@ -167,18 +173,18 @@ function Index() {
           titleColor="bg-emerald-500"
           className="h-full"
         >
-          <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/70 px-5 py-6 text-emerald-900 shadow-inner">
+          <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/70 px-5 py-6 text-emerald-900 shadow-inner dark:border-emerald-900/60 dark:bg-emerald-500/10 dark:text-emerald-200">
             <p className="text-sm font-semibold uppercase tracking-[0.3em]">
               Notices
             </p>
             <p className="mt-2 text-lg font-semibold">
-              You're all caught up 🎉
+              {"You're all caught up 🎉"}
             </p>
             <p className="text-sm text-emerald-700">
               No pending announcements for the team.
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-100 bg-white/80 px-5 py-4 text-sm text-slate-600 shadow-sm">
+          <div className="rounded-2xl border border-slate-100 bg-white/80 px-5 py-4 text-sm text-slate-600 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300">
             <p>Tip: Sync your leave plan with the team to avoid overlaps.</p>
           </div>
         </CardWithHeader>
@@ -190,10 +196,14 @@ function Index() {
             {holidayList.map((holiday) => (
               <div
                 key={holiday.label}
-                className="flex flex-col rounded-2xl border border-white/60 bg-white/80 px-5 py-4 text-sm text-slate-600 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col rounded-2xl border border-white/60 bg-white/80 px-5 py-4 text-sm text-slate-600 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between"
               >
-                <p className="font-semibold text-slate-900">{holiday.label}</p>
-                <span className="text-slate-500">{holiday.date}</span>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">
+                  {holiday.label}
+                </p>
+                <span className="text-slate-500 dark:text-slate-400">
+                  {holiday.date}
+                </span>
               </div>
             ))}
           </div>
@@ -204,10 +214,12 @@ function Index() {
             {notificationList.map((notification) => (
               <div
                 key={notification.title}
-                className="rounded-2xl border border-white/60 bg-white/80 px-5 py-4 text-sm shadow-sm"
+                className="rounded-2xl border border-white/60 bg-white/80 px-5 py-4 text-sm shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300"
               >
-                <p className="text-slate-900">{notification.title}</p>
-                <span className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                <p className="text-slate-900 dark:text-slate-100">
+                  {notification.title}
+                </p>
+                <span className="text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
                   {notification.time}
                 </span>
               </div>

@@ -25,8 +25,12 @@ function RadioGroup({
 }: RadioGroupProps) {
   return (
     <div className={`radio-group flex flex-col gap-2 ${className}`}>
-      <div className="flex flex-row gap-[5px] mb-2">
-        <Text text={title} className="text-[16px] text-text_bold font-bold" isBold />
+      <div className="mb-2 flex flex-row gap-[5px]">
+        <Text
+          text={title}
+          className="text-[16px] font-bold text-text_bold dark:text-slate-200"
+          isBold
+        />
         {isRequired && (
           <span className="text-[16px] font-bold text-tertiary">*</span>
         )}
@@ -42,7 +46,9 @@ function RadioGroup({
           onChange={onChange}
         />
       ))}
-      {error && <div className="text-[14px] text-tertiary">{error.message}</div>}
+      {error && (
+        <div className="text-[14px] text-tertiary">{error.message}</div>
+      )}
     </div>
   );
 }

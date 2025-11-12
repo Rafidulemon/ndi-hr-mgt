@@ -27,16 +27,18 @@ export function Table(props: TableProps) {
     onRowClick,
   } = props;
   return (
-    <div className={`bg-white overflow-x-auto ${className}`}>
+    <div
+      className={`overflow-x-auto rounded-[24px] border border-white/60 bg-white/90 shadow-sm shadow-slate-200/50 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/70 dark:shadow-slate-900/50 ${className}`}
+    >
       <table className="min-w-full">
         <thead>
-          <tr className="border-b border-black">
+          <tr className="border-b border-slate-200 dark:border-slate-700/70">
             {headers.map((header, index) => (
               <th
                 key={index}
                 className={`${
                   isTextCenter ? "text-center" : "text-left"
-                }  py-2 px-4 font-semibold text-gray-700`}
+                } py-3 px-4 font-semibold text-slate-700 transition-colors duration-200 dark:text-slate-200`}
               >
                 {header}
               </th>
@@ -47,8 +49,10 @@ export function Table(props: TableProps) {
           {rows.map((row, rowIndex) => (
             <tr
               key={rowIndex}
-              className={`border-b border-gray-300 ${
-                onRowClick ? "cursor-pointer hover:bg-gray-100 " : ""
+              className={`border-b border-slate-100 text-slate-600 transition-colors duration-200 last:border-b-0 dark:border-slate-800/70 dark:text-slate-300 ${
+                onRowClick
+                  ? "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-slate-800/60"
+                  : ""
               }`}
               onClick={() => onRowClick && onRowClick(row)}
             >
@@ -71,8 +75,8 @@ export function Table(props: TableProps) {
                     key={headerIndex}
                     className={`${
                       isTextCenter ? "text-center" : "text-left"
-                    } py-2 px-4  `}
-                    style={{ color: textColors || "gray" }}
+                    } py-3 px-4`}
+                    style={{ color: textColors || "var(--text-muted)" }}
                   >
                     {row[header] || "N/A"}
                   </td>

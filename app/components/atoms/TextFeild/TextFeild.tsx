@@ -26,9 +26,11 @@ const TextFeild = (props: Props) => {
     className,
   } = props;
   return (
-    <div className={`flex flex-col gap-2 ${className}`}>
+    <div className={`flex flex-col gap-2 ${className ?? ""}`}>
       <p
-        className={`${labelColor ? `${labelColor}` : "text-text_bold"} `}
+        className={
+          labelColor ?? "text-slate-900 dark:text-slate-100"
+        }
         style={{
           fontWeight: labelFontWeight,
           fontSize: labelFontSize,
@@ -38,7 +40,9 @@ const TextFeild = (props: Props) => {
         {label}
       </p>
       <p
-        className={`${textColor ? `${textColor}` : "text-text_primary"} `}
+        className={
+          textColor ?? "text-slate-600 dark:text-slate-300"
+        }
         style={{
           fontWeight: textFontWeight,
           fontSize: textFontSize,

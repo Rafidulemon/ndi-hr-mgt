@@ -50,33 +50,42 @@ export default function MonthlyReportApplication() {
   };
 
   return (
-    <div className="w-full flex flex-col gap-10">
+    <div className="flex w-full flex-col gap-10">
       <EmployeeHeader
         name="Md. Rafidul Islam"
         designation="Software Engineer"
         joining_date="Aug 17, 2023"
         hasRightButton
         buttonText="History"
-        onButtonClick={() => navigate.push("/monthly/report-history")}
+        onButtonClick={() => navigate.push("/report/monthly/history")}
       />
-      <div className="w-full bg-white shadow p-8 flex flex-col gap-6">
-        <div className="flex flex-col gap-2 mb-6">
-          <Text text="Daily Report" className="text-[24px] font-semibold" />
-          <Text text={today} className="text-text_primary" />
+      <div className="flex w-full flex-col gap-6 rounded-[32px] border border-white/60 bg-white/85 p-8 shadow-xl shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
+        <div className="mb-6 flex flex-col gap-2">
+          <Text
+            text="Monthly Report"
+            className="text-[24px] font-semibold text-slate-900 dark:text-slate-100"
+          />
+          <Text
+            text={today}
+            className="text-text_primary dark:text-slate-300"
+          />
         </div>
 
         {reports.map((report, index) => (
-          <div className="border-b pb-6 mb-10" key={report.id}>
+          <div
+            className="mb-10 border-b border-slate-200 pb-6 transition-colors duration-200 dark:border-slate-700/60"
+            key={report.id}
+          >
             <div className="col-span-2 flex justify-end">
               <button
                 onClick={() => handleDeleteReport(report?.id)}
-                className="text-[30px] hover:text-red-500 mb-4"
+                className="mb-4 text-[30px] text-slate-400 transition-colors duration-150 hover:text-red-500 dark:text-slate-500"
                 aria-label={`Delete Report ${report.id}`}
               >
                 <MdDeleteForever />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-10">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-10">
               <TextInput
                 label={`Task Name / Ticket Number ${index + 1}`}
                 placeholder="Enter Task Name"
@@ -111,7 +120,7 @@ export default function MonthlyReportApplication() {
           <Button
             theme="cancel"
             className="w-[185px]"
-            onClick={() => navigate.push("/monthly/report-history")}
+            onClick={() => navigate.push("/report/monthly/history")}
           >
             <Text text="Cancel" className="font-semibold" />
           </Button>

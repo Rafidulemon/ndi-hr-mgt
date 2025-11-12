@@ -8,18 +8,20 @@ type RadioButtonProps = {
 
 function RadioButton({ label, value, name, selectedValue, onChange }: RadioButtonProps) {
   return (
-    <label className="flex items-center gap-2 cursor-pointer">
+    <label className="flex cursor-pointer items-center gap-2">
       <input
         type="radio"
         name={name}
         value={value}
         checked={selectedValue === value}
         onChange={() => onChange(value)}
-        className={`appearance-none w-4 h-4 rounded-full border transition-colors cursor-pointer 
-            ${selectedValue === value ? "bg-[#0DBAD2] border-[#0DBAD2]" : "bg-white border-[#555454]"}
-          `}
+        className={`h-4 w-4 appearance-none rounded-full border transition-colors duration-150 ${
+          selectedValue === value
+            ? "border-[#0DBAD2] bg-[#0DBAD2] shadow-[0_0_0_3px_rgba(13,186,210,0.25)]"
+            : "border-slate-400 bg-white dark:border-slate-600 dark:bg-slate-900"
+        }`}
       />
-      <span className="text-text_primary">{label}</span>
+      <span className="text-text_primary dark:text-slate-300">{label}</span>
     </label>
   );
 }
