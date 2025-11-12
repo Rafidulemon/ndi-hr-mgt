@@ -1,0 +1,726 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ORG_ADMIN
+  HR_ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  NON_BINARY
+  UNDISCLOSED
+}
+
+enum WorkModel {
+  ONSITE
+  HYBRID
+  REMOTE
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  PROBATION
+  INACTIVE
+  TERMINATED
+  SABBATICAL
+}
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  HALF_DAY
+  ABSENT
+  REMOTE
+  HOLIDAY
+}
+
+enum BreakType {
+  MEAL
+  PERSONAL
+  OTHER
+}
+
+enum LeaveStatus {
+  DRAFT
+  PENDING
+  PROCESSING
+  APPROVED
+  DENIED
+  CANCELLED
+}
+
+enum WorkType {
+  PROJECT
+  DESIGN
+  DEVELOPMENT
+  TESTING
+  SUPPORT
+  OTHER
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum NotificationType {
+  SYSTEM
+  LEAVE
+  ATTENDANCE
+  PAYROLL
+  GENERAL
+}
+
+enum NotificationStatus {
+  DRAFT
+  SCHEDULED
+  SENT
+  CANCELLED
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  DELIVERED
+  READ
+  DISMISSED
+}
+
+enum PayrollStatus {
+  DRAFT
+  PROCESSING
+  READY
+  SENT
+  CLOSED
+}
+
+enum PayslipStatus {
+  DRAFT
+  GENERATED
+  SENT
+  LOCKED
+}
+
+enum CompensationComponentType {
+  EARNINGS
+  DEDUCTION
+  CONTRIBUTION
+}
+
+enum ThemePreference {
+  SYSTEM
+  LIGHT
+  DARK
+}
+
+/// Top-level organisation/workspace that owns employees and policies.
+model Organization {
+  id           String             @id @default(uuid())
+  name         String
+  legalName    String?
+  domain       String?            @unique
+  timezone     String?            @default("Asia/Dhaka")
+  locale       String?            @default("en-US")
+  metadata     Json?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  users                User[]
+  departments          Department[]
+  employmentDetails    EmploymentDetail[]
+  teams                Team[]
+  leaveTypes           LeaveType[]
+  projects             Project[]
+  skills               Skill[]
+  notifications        Notification[]
+  payrollRuns          PayrollRun[]
+
+  @@index([name])
+}
+
+/// Authenticated user record. One row per employee/admin.
+model User {
+  id             String           @id @default(uuid())
+  organizationId String
+  email          String           @unique
+  passwordHash   String
+  phone          String?
+  role           UserRole         @default(EMPLOYEE)
+  status         EmploymentStatus @default(ACTIVE)
+  lastLoginAt    DateTime?
+  invitedAt      DateTime?
+  archivedAt     DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization          Organization          @relation(fields: [organizationId], references: [id])
+  profile               EmployeeProfile?      @relation("EmployeeProfileUser")
+  employment            EmploymentDetail?     @relation("EmployeeEmployment")
+  preferences           UserPreference?
+  emergencyContacts     EmergencyContact[]
+  bankAccounts          EmployeeBankAccount[]
+  skills                EmployeeSkill[]
+  careerEvents          CareerEvent[]
+  attendanceRecords     AttendanceRecord[]
+  leaveRequests         LeaveRequest[]        @relation("LeaveAuthor")
+  reviewedLeaveRequests LeaveRequest[]        @relation("LeaveReviewer")
+  leaveBalances         LeaveBalance[]
+  reportsAuthored       WorkReport[]          @relation("ReportAuthor")
+  reportsApproved       WorkReport[]          @relation("ReportApprover")
+  notificationReceipts  NotificationReceipt[]
+  notificationsSent     Notification[]        @relation("NotificationSender")
+  payrollRunsSubmitted  PayrollRun[]          @relation("PayrollSubmitter")
+  payslips              Payslip[]
+  projectMemberships    ProjectMember[]
+  teamMemberships       TeamMember[]
+  headedDepartments     Department[]          @relation("DepartmentHead")
+  ledTeams              Team[]                @relation("TeamLead")
+  directReports         EmploymentDetail[]    @relation("ManagerReports")
+
+  @@index([organizationId])
+}
+
+/// Extended profile information captured from the employee.
+model EmployeeProfile {
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  firstName        String
+  lastName         String
+  preferredName    String?
+  gender           Gender?
+  dateOfBirth      DateTime?
+  nationality      String?
+  bio              String?
+  profilePhotoUrl  String?
+  workModel        WorkModel?
+  currentAddress   String?
+  permanentAddress String?
+  personalEmail    String?
+  workEmail        String?
+  workPhone        String?
+  personalPhone    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user User @relation("EmployeeProfileUser", fields: [userId], references: [id])
+}
+
+model EmergencyContact {
+  id             String   @id @default(uuid())
+  userId         String
+  name           String
+  relationship   String
+  phone          String
+  alternatePhone String?
+  email          String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model EmployeeBankAccount {
+  id            String   @id @default(uuid())
+  userId        String
+  accountHolder String
+  bankName      String
+  accountNumber String
+  branch        String?
+  swiftCode     String?
+  taxId         String?
+  isPrimary     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+/// Canonical employment data linked to an organisation.
+model EmploymentDetail {
+  id                 String            @id @default(uuid())
+  userId             String            @unique
+  organizationId     String
+  employeeCode       String?
+  designation        String
+  employmentType     EmploymentType
+  status             EmploymentStatus  @default(ACTIVE)
+  startDate          DateTime
+  endDate            DateTime?
+  departmentId       String?
+  teamId             String?
+  reportingManagerId String?
+  currentProjectId   String?
+  primaryLocation    String?
+  workHours          String?
+  currentProjectNote String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  user         User         @relation("EmployeeEmployment", fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  team         Team?        @relation("PrimaryTeam", fields: [teamId], references: [id])
+  manager      User?        @relation("ManagerReports", fields: [reportingManagerId], references: [id])
+  currentProject Project?   @relation("CurrentProject", fields: [currentProjectId], references: [id])
+
+  @@unique([organizationId, employeeCode])
+  @@index([organizationId])
+  @@index([departmentId])
+  @@index([teamId])
+  @@index([reportingManagerId])
+}
+
+model Department {
+  id             String       @id @default(uuid())
+  organizationId String
+  name           String
+  code           String?
+  description    String?
+  headId         String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  head         User?        @relation("DepartmentHead", fields: [headId], references: [id])
+  employees    EmploymentDetail[]
+  teams        Team[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, code])
+  @@index([organizationId])
+}
+
+model Team {
+  id             String       @id @default(uuid())
+  organizationId String
+  departmentId   String?
+  name           String
+  description    String?
+  leadId         String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization    Organization      @relation(fields: [organizationId], references: [id])
+  department      Department?       @relation(fields: [departmentId], references: [id])
+  lead            User?             @relation("TeamLead", fields: [leadId], references: [id])
+  primaryMembers  EmploymentDetail[] @relation("PrimaryTeam")
+  members         TeamMember[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([departmentId])
+}
+
+model TeamMember {
+  id        String   @id @default(uuid())
+  teamId    String
+  userId    String
+  role      String?
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  team Team @relation(fields: [teamId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+model Skill {
+  id             String    @id @default(uuid())
+  organizationId String?
+  name           String
+  category       String?
+  description    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  employees    EmployeeSkill[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model EmployeeSkill {
+  id        String     @id @default(uuid())
+  userId    String
+  skillId   String
+  level     SkillLevel?
+  years     Int?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id])
+  skill Skill @relation(fields: [skillId], references: [id])
+
+  @@unique([userId, skillId])
+  @@index([skillId])
+}
+
+model CareerEvent {
+  id          String   @id @default(uuid())
+  userId      String
+  title       String
+  detail      String?
+  happenedAt  DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, happenedAt])
+}
+
+model AttendanceRecord {
+  id                String           @id @default(uuid())
+  employeeId        String
+  attendanceDate    DateTime
+  checkInAt         DateTime?
+  checkOutAt        DateTime?
+  totalWorkSeconds  Int?
+  totalBreakSeconds Int?
+  status            AttendanceStatus
+  note              String?
+  location          String?
+  source            String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  employee User             @relation(fields: [employeeId], references: [id])
+  breaks   AttendanceBreak[]
+
+  @@unique([employeeId, attendanceDate])
+  @@index([attendanceDate])
+  @@index([employeeId])
+}
+
+model AttendanceBreak {
+  id           String    @id @default(uuid())
+  attendanceId String
+  startedAt    DateTime
+  endedAt      DateTime?
+  type         BreakType @default(MEAL)
+  note         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  attendance AttendanceRecord @relation(fields: [attendanceId], references: [id])
+
+  @@index([attendanceId])
+}
+
+model LeaveType {
+  id               String   @id @default(uuid())
+  organizationId   String
+  name             String
+  code             String?
+  category         String?
+  description      String?
+  requiresApproval Boolean  @default(true)
+  isPaid           Boolean  @default(true)
+  maxPerRequest    Decimal? @db.Decimal(5, 2)
+  maxPerYear       Decimal? @db.Decimal(5, 2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  leaveRequests LeaveRequest[]
+  leaveBalances LeaveBalance[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, code])
+  @@index([organizationId])
+}
+
+model LeaveRequest {
+  id          String      @id @default(uuid())
+  employeeId  String
+  leaveTypeId String
+  startDate   DateTime
+  endDate     DateTime
+  totalDays   Decimal     @db.Decimal(5, 2)
+  status      LeaveStatus @default(PENDING)
+  reason      String?
+  note        String?
+  reviewerId  String?
+  reviewedAt  DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  employee    User       @relation("LeaveAuthor", fields: [employeeId], references: [id])
+  leaveType   LeaveType  @relation(fields: [leaveTypeId], references: [id])
+  reviewer    User?      @relation("LeaveReviewer", fields: [reviewerId], references: [id])
+  attachments LeaveAttachment[]
+
+  @@index([employeeId, startDate])
+  @@index([status])
+}
+
+model LeaveAttachment {
+  id             String   @id @default(uuid())
+  leaveRequestId String
+  filename       String
+  fileUrl        String
+  mimeType       String?
+  sizeBytes      Int?
+  createdAt      DateTime @default(now())
+
+  leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id])
+
+  @@index([leaveRequestId])
+}
+
+model LeaveBalance {
+  id          String   @id @default(uuid())
+  employeeId  String
+  leaveTypeId String
+  year        Int
+  allocated   Decimal  @db.Decimal(6, 2) @default(0)
+  used        Decimal  @db.Decimal(6, 2) @default(0)
+  carriedOver Decimal  @db.Decimal(6, 2) @default(0)
+  expiresOn   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employee User      @relation(fields: [employeeId], references: [id])
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@index([employeeId])
+}
+
+model WorkReport {
+  id           String       @id @default(uuid())
+  employeeId   String
+  reportDate   DateTime
+  status       ReportStatus @default(DRAFT)
+  submittedAt  DateTime?
+  approvedById String?
+  approvedAt   DateTime?
+  note         String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  employee  User      @relation("ReportAuthor", fields: [employeeId], references: [id])
+  approvedBy User?    @relation("ReportApprover", fields: [approvedById], references: [id])
+  items     WorkItem[]
+
+  @@unique([employeeId, reportDate])
+  @@index([reportDate])
+}
+
+model WorkItem {
+  id        String   @id @default(uuid())
+  reportId  String
+  workType  WorkType @default(OTHER)
+  taskName  String
+  projectId String?
+  others    String?
+  details   String?
+  hours     Decimal  @db.Decimal(5, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  report WorkReport @relation(fields: [reportId], references: [id])
+  project Project?  @relation(fields: [projectId], references: [id])
+
+  @@index([reportId])
+}
+
+model Project {
+  id                 String            @id @default(uuid())
+  organizationId     String
+  name               String
+  code               String?
+  description        String?
+  clientName         String?
+  status             ProjectStatus     @default(ACTIVE)
+  startDate          DateTime?
+  endDate            DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  organization        Organization        @relation(fields: [organizationId], references: [id])
+  workItems           WorkItem[]
+  members             ProjectMember[]
+  currentAssignments  EmploymentDetail[]  @relation("CurrentProject")
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, code])
+  @@index([organizationId])
+}
+
+model ProjectMember {
+  id              String   @id @default(uuid())
+  projectId       String
+  userId          String
+  role            String?
+  allocatedPercent Int?
+  assignedAt      DateTime @default(now())
+  unassignedAt    DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+}
+
+model Notification {
+  id             String             @id @default(uuid())
+  organizationId String
+  senderId       String?
+  title          String
+  body           String
+  type           NotificationType   @default(GENERAL)
+  status         NotificationStatus @default(DRAFT)
+  actionUrl      String?
+  metadata       Json?
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  sender       User?        @relation("NotificationSender", fields: [senderId], references: [id])
+  recipients   NotificationReceipt[]
+
+  @@index([organizationId])
+}
+
+model NotificationReceipt {
+  id             String                    @id @default(uuid())
+  notificationId String
+  userId         String
+  status         NotificationDeliveryStatus @default(PENDING)
+  deliveredAt    DateTime?
+  readAt         DateTime?
+  dismissedAt    DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  notification Notification @relation(fields: [notificationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([notificationId, userId])
+  @@index([notificationId])
+  @@index([userId])
+}
+
+model PayrollRun {
+  id             String        @id @default(uuid())
+  organizationId String
+  payrollMonth   Int
+  payrollYear    Int
+  periodStart    DateTime
+  periodEnd      DateTime
+  status         PayrollStatus @default(DRAFT)
+  processedAt    DateTime?
+  submittedById  String?
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  submittedBy  User?        @relation("PayrollSubmitter", fields: [submittedById], references: [id])
+  payslips     Payslip[]
+
+  @@unique([organizationId, payrollMonth, payrollYear])
+  @@index([organizationId])
+}
+
+model Payslip {
+  id           String        @id @default(uuid())
+  payrollRunId String
+  employeeId   String
+  grossPay     Decimal       @db.Decimal(12, 2)
+  netPay       Decimal       @db.Decimal(12, 2)
+  currency     String        @default("BDT")
+  status       PayslipStatus @default(DRAFT)
+  generatedAt  DateTime?
+  releasedAt   DateTime?
+  fileUrl      String?
+  remarks      String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  payrollRun PayrollRun        @relation(fields: [payrollRunId], references: [id])
+  employee   User              @relation(fields: [employeeId], references: [id])
+  components PayslipComponent[]
+
+  @@unique([payrollRunId, employeeId])
+  @@index([employeeId])
+}
+
+model PayslipComponent {
+  id             String                    @id @default(uuid())
+  payslipId      String
+  title          String
+  amount         Decimal                   @db.Decimal(12, 2)
+  componentType  CompensationComponentType
+  sortOrder      Int                       @default(0)
+
+  payslip Payslip @relation(fields: [payslipId], references: [id])
+
+  @@index([payslipId])
+}
+
+model UserPreference {
+  id                 String          @id @default(uuid())
+  userId             String          @unique
+  theme              ThemePreference @default(SYSTEM)
+  emailNotifications Boolean        @default(true)
+  pushNotifications  Boolean        @default(true)
+  dailyDigest        Boolean        @default(false)
+  language           String?        @default("en")
+  timezone           String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}

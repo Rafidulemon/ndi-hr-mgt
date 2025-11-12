@@ -8,11 +8,16 @@
     "start": "next start",
     "lint": "eslint"
   },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@premieroctet/next-admin": "^8.3.0",
+    "@prisma/client": "^6.19.0",
     "html2pdf.js": "^0.12.1",
     "next": "16.0.1",
+    "prisma": "^6.19.0",
     "react": "19.2.0",
     "react-datepicker": "^8.9.0",
     "react-dom": "19.2.0",

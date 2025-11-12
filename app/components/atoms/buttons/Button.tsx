@@ -55,7 +55,7 @@ function Button({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`${widthClass} ${baseClasses} ${themeClass} ${className}`}
+      className={`${widthClass} ${baseClasses} ${themeClass} ${className} rounded`}
     >
       {children}
     </button>

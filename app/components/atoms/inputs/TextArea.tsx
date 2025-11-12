@@ -45,7 +45,7 @@ function TextArea(props: Props) {
       </div>
       <textarea
         id={id}
-        className="mb-2 w-full rounded-[5px] bg-white p-4 text-text_primary shadow-sm shadow-slate-200/70 transition-colors duration-200 focus:outline-none dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:shadow-slate-900/40"
+        className="mb-2 w-full rounded-[5px] bg-white p-4 text-text_primary shadow-sm shadow-slate-200/70 transition-colors duration-200 focus:outline-none dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:shadow-slate-900/40"
         style={{ height: height || "100px" }}
         defaultValue={defaultValue}
         value={value}

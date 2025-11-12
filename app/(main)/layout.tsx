@@ -21,7 +21,6 @@ export default function MainLayout({
           {children}
         </main>
       </div>
-      <ChatLauncher />
     </div>
   );
 }
