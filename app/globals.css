@@ -1,26 +1,75 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f5f9ff;
+  --foreground: #0f172a;
+  --accent-primary: #0f7edd;
+  --accent-secondary: #6c59ff;
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-surface: rgba(255, 255, 255, 0.85);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  scroll-behavior: smooth;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  min-height: 100%;
 }
 
 body {
-  background: var(--background);
+  position: relative;
+  background: radial-gradient(
+      circle at 20% 20%,
+      rgba(99, 102, 241, 0.12),
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 80% 0%,
+      rgba(14, 165, 233, 0.15),
+      transparent 50%
+    ),
+    var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  line-height: 1.6;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(
+      circle at 25% 25%,
+      rgba(255, 255, 255, 0.65),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 75% 40%,
+      rgba(59, 130, 246, 0.1),
+      transparent 50%
+    ),
+    repeating-linear-gradient(
+      120deg,
+      rgba(15, 126, 221, 0.04),
+      rgba(15, 126, 221, 0.04) 1px,
+      transparent 1px,
+      transparent 12px
+    );
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.8;
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply rounded-[28px] border border-white/50 bg-white/80 p-6 shadow backdrop-blur-md;
+  }
+
+  .section-divider {
+    @apply h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent;
+  }
 }
