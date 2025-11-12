@@ -1,6 +1,6 @@
 import Image from "next/image";
-import Text from "./components/atoms/Text/Text";
-import { CardWithHeader } from "./components/atoms/frame/CardWithHeader";
+import Text from "../components/atoms/Text/Text";
+import { CardWithHeader } from "../components/atoms/frame/CardWithHeader";
 
 const holidayList = [
   { date: "23 Nov, 2024", label: "Labour Thanksgiving Day" },

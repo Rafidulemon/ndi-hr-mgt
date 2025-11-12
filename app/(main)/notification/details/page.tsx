@@ -1,7 +1,7 @@
 "use client"
-import { EmployeeHeader } from "../../components/layouts/EmployeeHeader"
-import Text from "../../components/atoms/Text/Text"
-import Button from "../../components/atoms/buttons/Button"
+import { EmployeeHeader } from "../../../components/layouts/EmployeeHeader"
+import Text from "../../../components/atoms/Text/Text"
+import Button from "../../../components/atoms/buttons/Button"
 import { useRouter } from "next/navigation";
 
 function NotificationDetails() {

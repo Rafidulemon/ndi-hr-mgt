@@ -1,8 +1,8 @@
 "use client"
 import { ReactElement, useState } from "react";
-import { EmployeeHeader } from "../components/layouts/EmployeeHeader";
-import Table from "../components/atoms/tables/Table";
-import Pagination from "../components/pagination/Pagination";
+import { EmployeeHeader } from "../../components/layouts/EmployeeHeader";
+import Table from "../../components/atoms/tables/Table";
+import Pagination from "../../components/pagination/Pagination";
 import { IoEye } from "react-icons/io5";
 import { useRouter } from "next/navigation";
 

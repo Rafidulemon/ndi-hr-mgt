@@ -1,11 +1,11 @@
 "use client"
-import Table from "../components/atoms/tables/Table";
+import Table from "../../components/atoms/tables/Table";
 import { ReactElement, useState } from "react";
 import { IoEye } from "react-icons/io5";
-import { Modal } from "../components/atoms/frame/Modal";
-import PasswordInput from "../components/atoms/inputs/PasswordInput";
-import { EmployeeHeader } from "../components/layouts/EmployeeHeader";
-import Pagination from "../components/pagination/Pagination";
+import { Modal } from "../../components/atoms/frame/Modal";
+import PasswordInput from "../../components/atoms/inputs/PasswordInput";
+import { EmployeeHeader } from "../../components/layouts/EmployeeHeader";
+import Pagination from "../../components/pagination/Pagination";
 import { useRouter } from "next/navigation";
 
 

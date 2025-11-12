@@ -1,9 +1,9 @@
 "use client"
-import Text from "../components/atoms/Text/Text";
-import Button from "../components/atoms/buttons/Button";
+import Text from "../../components/atoms/Text/Text";
+import Button from "../../components/atoms/buttons/Button";
 import { useState, useEffect } from "react";
-import { Modal } from "../components/atoms/frame/Modal";
-import { EmployeeHeader } from "../components/layouts/EmployeeHeader";
+import { Modal } from "../../components/atoms/frame/Modal";
+import { EmployeeHeader } from "../../components/layouts/EmployeeHeader";
 import { useRouter } from "next/navigation";
 
 function AttendancePage() {

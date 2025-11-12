@@ -1,10 +1,10 @@
 "use client"
 import { useState } from "react";
 import { MdKeyboardArrowLeft, MdKeyboardArrowRight } from "react-icons/md";
-import Table from "../components/atoms/tables/Table";
-import Text from "../components/atoms/Text/Text";
+import Table from "../../components/atoms/tables/Table";
+import Text from "../../components/atoms/Text/Text";
 import { useRouter } from "next/navigation";
-import { EmployeeHeader } from "../components/layouts/EmployeeHeader";
+import { EmployeeHeader } from "../../components/layouts/EmployeeHeader";
 
 export default function EmployeeLeavePage() {
   const [year, setYear] = useState(2021);

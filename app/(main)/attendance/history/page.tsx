@@ -1,10 +1,10 @@
 "use client"
 import { useState } from "react";
 import { MdKeyboardArrowLeft, MdKeyboardArrowRight } from "react-icons/md";
-import Table from "../../components/atoms/tables/Table";
-import Text from "../../components/atoms/Text/Text";
-import Pagination from "../../components/pagination/Pagination";
-import { months } from "../../utils/dateAndMonth";
+import Table from "../../../components/atoms/tables/Table";
+import Text from "../../../components/atoms/Text/Text";
+import Pagination from "../../../components/pagination/Pagination";
+import { months } from "../../../utils/dateAndMonth";
 const attendenceTableHeader = [
   "Date",
   "Day of the week",

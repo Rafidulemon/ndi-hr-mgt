@@ -3,12 +3,12 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import Button from "../components/atoms/buttons/Button";
-import PasswordInput from "../components/atoms/inputs/PasswordInput";
-import { Card } from "../components/atoms/frame/Card";
-import { Modal } from "../components/atoms/frame/Modal";
-import Text from "../components/atoms/Text/Text";
-import { EmployeeHeader } from "../components/layouts/EmployeeHeader";
+import Button from "../../components/atoms/buttons/Button";
+import PasswordInput from "../../components/atoms/inputs/PasswordInput";
+import { Card } from "../../components/atoms/frame/Card";
+import { Modal } from "../../components/atoms/frame/Modal";
+import Text from "../../components/atoms/Text/Text";
+import { EmployeeHeader } from "../../components/layouts/EmployeeHeader";
 
 const personalInfo = [
   { label: "First Name", value: "Md. Rafidul" },

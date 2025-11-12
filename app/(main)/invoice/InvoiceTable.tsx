@@ -1,4 +1,4 @@
-import Text from "../components/atoms/Text/Text";
+import Text from "../../components/atoms/Text/Text";
 export function InvoiceTable() {
   return (
     <div className="bg-white overflow-x-auto border-t border-text_primary w-full grid grid-cols-11">

@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Button from "../../components/atoms/buttons/Button";
-import ImageInput from "../../components/atoms/inputs/ImageInput";
-import PasswordInput from "../../components/atoms/inputs/PasswordInput";
-import TextArea from "../../components/atoms/inputs/TextArea";
-import TextInput from "../../components/atoms/inputs/TextInput";
-import { Card } from "../../components/atoms/frame/Card";
-import { Modal } from "../../components/atoms/frame/Modal";
-import Text from "../../components/atoms/Text/Text";
-import SelectBox from "../../components/atoms/selectBox/SelectBox";
+import Button from "../../../components/atoms/buttons/Button";
+import ImageInput from "../../../components/atoms/inputs/ImageInput";
+import PasswordInput from "../../../components/atoms/inputs/PasswordInput";
+import TextArea from "../../../components/atoms/inputs/TextArea";
+import TextInput from "../../../components/atoms/inputs/TextInput";
+import { Card } from "../../../components/atoms/frame/Card";
+import { Modal } from "../../../components/atoms/frame/Modal";
+import Text from "../../../components/atoms/Text/Text";
+import SelectBox from "../../../components/atoms/selectBox/SelectBox";
 
 const genderOptions = [
   { label: "Male", value: "male" },

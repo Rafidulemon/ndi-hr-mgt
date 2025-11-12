@@ -1,8 +1,8 @@
 "use client"
-import { EmployeeHeader } from "../../components/layouts/EmployeeHeader";
-import Text from "../../components/atoms/Text/Text";
+import { EmployeeHeader } from "../../../components/layouts/EmployeeHeader";
+import Text from "../../../components/atoms/Text/Text";
 import { InvoiceTable } from "../InvoiceTable";
-import Button from "../../components/atoms/buttons/Button";
+import Button from "../../../components/atoms/buttons/Button";
 import { useRouter } from "next/navigation";
 
 function InvoiceDetails() {
