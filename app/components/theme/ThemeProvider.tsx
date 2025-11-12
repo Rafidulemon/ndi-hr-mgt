@@ -11,11 +11,13 @@ import {
   type ReactNode,
 } from "react";
 
-type Theme = "light" | "dark";
+type ThemePreference = "light" | "dark" | "system";
+type ResolvedTheme = "light" | "dark";
 
 type ThemeContextValue = {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
+  preference: ThemePreference;
+  resolvedTheme: ResolvedTheme;
+  setPreference: (preference: ThemePreference) => void;
   toggleTheme: () => void;
 };
 
@@ -27,74 +29,77 @@ type ThemeProviderProps = {
   children: ReactNode;
 };
 
-type ThemeState = {
-  theme: Theme;
-  hasStoredPreference: boolean;
-};
-
-const applyThemeToRoot = (nextTheme: Theme) => {
+const applyThemeToRoot = (theme: ResolvedTheme) => {
   if (typeof document === "undefined") return;
   const rootElement = document.documentElement;
-  rootElement.classList.toggle("dark", nextTheme === "dark");
-  rootElement.setAttribute("data-theme", nextTheme);
+  rootElement.classList.toggle("dark", theme === "dark");
+  rootElement.setAttribute("data-theme", theme);
+};
+
+const getStoredPreference = (): ThemePreference => {
+  if (typeof window === "undefined") return "system";
+  const stored = window.localStorage.getItem(STORAGE_KEY) as
+    | ThemePreference
+    | null;
+  if (stored === "light" || stored === "dark" || stored === "system") {
+    return stored;
+  }
+  return "system";
+};
+
+const getSystemTheme = (): ResolvedTheme => {
+  if (typeof window === "undefined") return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
 };
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [state, setState] = useState<ThemeState>({
-    theme: "light",
-    hasStoredPreference: false,
-  });
-  const { theme, hasStoredPreference } = state;
-
-  useEffect(() => {
-    applyThemeToRoot(theme);
-  }, [theme]);
+  const [preference, setPreferenceState] =
+    useState<ThemePreference>("system");
+  const [resolvedTheme, setResolvedTheme] =
+    useState<ResolvedTheme>("light");
+  const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const storedPreference = getStoredPreference();
+    const nextResolved =
+      storedPreference === "system" ? getSystemTheme() : storedPreference;
 
-    const storedTheme = window.localStorage.getItem(STORAGE_KEY) as
-      | Theme
-      | null;
-
-    if (storedTheme === "light" || storedTheme === "dark") {
-      startTransition(() => {
-        setState((previous) => {
-          if (
-            previous.theme === storedTheme &&
-            previous.hasStoredPreference === true
-          ) {
-            return previous;
-          }
-          return { theme: storedTheme, hasStoredPreference: true };
-        });
-      });
-      return;
-    }
-
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    applyThemeToRoot(nextResolved);
     startTransition(() => {
-      setState((previous) => {
-        const nextTheme = prefersDark ? "dark" : "light";
-        if (
-          previous.theme === nextTheme &&
-          previous.hasStoredPreference === false
-        ) {
-          return previous;
-        }
-        return { theme: nextTheme, hasStoredPreference: false };
-      });
+      setPreferenceState(storedPreference);
+      setResolvedTheme(nextResolved);
+      setHasHydrated(true);
     });
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined" || hasStoredPreference) return;
+    if (typeof window === "undefined" || !hasHydrated) return;
+
+    const nextResolved =
+      preference === "system" ? getSystemTheme() : preference;
+
+    applyThemeToRoot(nextResolved);
+    startTransition(() => setResolvedTheme(nextResolved));
+
+    window.localStorage.setItem(STORAGE_KEY, preference);
+  }, [preference, hasHydrated]);
+
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      !hasHydrated ||
+      preference !== "system"
+    )
+      return;
+
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = (event: MediaQueryListEvent) => {
-      setState((previous) => ({
-        ...previous,
-        theme: event.matches ? "dark" : "light",
-      }));
+      const nextResolved: ResolvedTheme = event.matches ? "dark" : "light";
+      applyThemeToRoot(nextResolved);
+      startTransition(() => setResolvedTheme(nextResolved));
     };
 
     if (mediaQuery.addEventListener) {
@@ -110,34 +115,31 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         mediaQuery.removeListener(handleChange);
       }
     };
-  }, [hasStoredPreference]);
+  }, [preference, hasHydrated]);
 
-  const setExplicitTheme = useCallback((next: Theme) => {
-    setState(() => {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(STORAGE_KEY, next);
-      }
-      return { theme: next, hasStoredPreference: true };
-    });
+  const setPreference = useCallback((next: ThemePreference) => {
+    startTransition(() => setPreferenceState(next));
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setState((previous) => {
-      const next = previous.theme === "dark" ? "light" : "dark";
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(STORAGE_KEY, next);
-      }
-      return { theme: next, hasStoredPreference: true };
-    });
-  }, []);
+    startTransition(() =>
+      setPreferenceState((current) => {
+        if (current === "system") {
+          return resolvedTheme === "dark" ? "light" : "dark";
+        }
+        return current === "dark" ? "light" : "dark";
+      })
+    );
+  }, [resolvedTheme]);
 
-  const value = useMemo<ThemeContextValue>(
+  const value = useMemo(
     () => ({
-      theme,
-      setTheme: setExplicitTheme,
+      preference,
+      resolvedTheme,
+      setPreference,
       toggleTheme,
     }),
-    [theme, setExplicitTheme, toggleTheme]
+    [preference, resolvedTheme, setPreference, toggleTheme]
   );
 
   return (

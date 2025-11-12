@@ -19,8 +19,8 @@ import { MdOutlineDashboard } from "react-icons/md";
 import { TbReport, TbReportAnalytics } from "react-icons/tb";
 import { HiOutlineDocumentText } from "react-icons/hi";
 import { IoIosPaper } from "react-icons/io";
+import { FiSettings } from "react-icons/fi";
 import { Modal } from "../atoms/frame/Modal";
-import { ThemeSwitcher } from "../theme/ThemeSwitcher";
 
 type Props = {
   isLeader?: boolean;
@@ -87,6 +87,7 @@ const menuItems = [
   },
   { label: "Notification", icon: <FaBell />, href: "/notification" },
   { label: "Invoice", icon: <FaFileInvoice />, href: "/invoice" },
+  { label: "Settings", icon: <FiSettings />, href: "/settings" },
 ];
 
 const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
@@ -197,7 +198,6 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
         <span className="rounded-full bg-indigo-50 px-4 py-1 text-xs font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200">
           Member since 2023
         </span>
-        <ThemeSwitcher className="mt-2" />
       </div>
 
       <nav className="flex flex-col">

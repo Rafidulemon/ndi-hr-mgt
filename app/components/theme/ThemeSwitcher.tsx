@@ -1,6 +1,6 @@
 'use client';
 
-import { FiMoon, FiSun } from "react-icons/fi";
+import { FiMonitor, FiMoon, FiSun } from "react-icons/fi";
 import { useTheme } from "./ThemeProvider";
 
 type ThemeSwitcherProps = {
@@ -8,9 +8,18 @@ type ThemeSwitcherProps = {
 };
 
 export function ThemeSwitcher({ className = "" }: ThemeSwitcherProps) {
-  const { theme, toggleTheme } = useTheme();
-  const isDark = theme === "dark";
-  const nextThemeLabel = isDark ? "light" : "dark";
+  const { preference, resolvedTheme, toggleTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  const isSystem = preference === "system";
+
+  const nextThemeLabel =
+    preference === "light"
+      ? "dark"
+      : preference === "dark"
+      ? "light"
+      : isDark
+      ? "light"
+      : "dark";
 
   const containerClasses = [
     "group flex w-full items-center gap-4 rounded-3xl border px-4 py-3 text-left transition-all duration-200",
@@ -29,21 +38,42 @@ export function ThemeSwitcher({ className = "" }: ThemeSwitcherProps) {
     "dark:bg-slate-800/70 dark:text-sky-300 dark:shadow-none",
   ].join(" ");
 
+  const icon = isSystem ? (
+    <FiMonitor />
+  ) : isDark ? (
+    <FiMoon />
+  ) : (
+    <FiSun />
+  );
+
+  const modeLabel = isSystem
+    ? `System (${isDark ? "dark" : "light"})`
+    : isDark
+    ? "Dark mode"
+    : "Light mode";
+
+  const helperText = isSystem
+    ? "Follows device preference"
+    : "Manual override";
+
   return (
     <button
       type="button"
       onClick={toggleTheme}
-      aria-label={`Activate ${nextThemeLabel} theme`}
+      aria-label={`Switch to ${nextThemeLabel} theme`}
       aria-pressed={isDark}
       className={containerClasses}
     >
-      <span className={iconClasses}>{isDark ? <FiMoon /> : <FiSun />}</span>
+      <span className={iconClasses}>{icon}</span>
       <span className="flex flex-1 flex-col">
         <span className="text-xs uppercase tracking-[0.3em] text-slate-400 transition-colors duration-150 dark:text-slate-500">
           Theme
         </span>
         <span className="text-sm font-semibold text-slate-900 transition-colors duration-150 dark:text-slate-100">
-          {isDark ? "Dark Mode" : "Light Mode"}
+          {modeLabel}
+        </span>
+        <span className="text-xs text-slate-400 transition-colors duration-150 dark:text-slate-500">
+          {helperText}
         </span>
       </span>
     </button>
