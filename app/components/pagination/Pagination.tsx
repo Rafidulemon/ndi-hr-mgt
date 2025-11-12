@@ -38,7 +38,7 @@ export default function Pagination<T>({
   }, [data.length, pageNumber, postsPerPage]);
 
   const pillClass =
-    "inline-flex h-10 min-w-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600 focus:outline-none";
+    "inline-flex h-10 min-w-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:border-[#0DBAD2] hover:text-[#0DBAD2] focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0DBAD2]";
 
   return (
     <div className="mt-6 rounded-[28px] border border-white/60 bg-white/90 p-4 shadow-inner shadow-white/40">
@@ -62,7 +62,7 @@ export default function Pagination<T>({
           previousLinkClassName={pillClass}
           nextLinkClassName={pillClass}
           breakLinkClassName={`${pillClass} cursor-default`}
-          activeLinkClassName="bg-indigo-600 text-white border-indigo-600 hover:text-white"
+          activeLinkClassName="!border-[#0DBAD2] !bg-[#0DBAD2] !text-white hover:!text-white"
           disabledLinkClassName="opacity-40 cursor-not-allowed pointer-events-none"
         />
       </div>

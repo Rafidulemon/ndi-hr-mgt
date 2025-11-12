@@ -22,17 +22,17 @@ type Props = {
 
 const themeClasses: Record<ButtonTheme, string> = {
   primary:
-    "border-transparent bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 text-white shadow-lg hover:shadow-xl focus-visible:outline-indigo-500",
+    "border border-transparent bg-[#0DBAD2] text-white hover:bg-[#0BA5BC] focus-visible:outline-[#0BA5BC]",
   secondary:
-    "border border-slate-200 bg-white text-slate-700 shadow hover:border-indigo-200 hover:text-indigo-600 focus-visible:outline-indigo-400",
+    "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus-visible:outline-slate-400",
   cancel:
-    "border-transparent bg-gradient-to-r from-rose-500 to-orange-500 text-white shadow-lg hover:shadow-xl focus-visible:outline-rose-500",
+    "border border-transparent bg-rose-500 text-white hover:bg-rose-600 focus-visible:outline-rose-500",
   "cancel-secondary":
-    "border border-rose-200 bg-white text-rose-500 shadow hover:bg-rose-50 focus-visible:outline-rose-400",
+    "border border-rose-200 bg-white text-rose-500 hover:bg-rose-50 focus-visible:outline-rose-400",
   white:
-    "border border-white/60 bg-white/80 text-slate-700 shadow hover:-translate-y-0.5 focus-visible:outline-slate-300",
+    "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus-visible:outline-slate-300",
   aqua:
-    "border border-transparent bg-cyan-500 text-white shadow hover:bg-cyan-600 focus-visible:outline-cyan-500",
+    "border border-transparent bg-[#1CB5E0] text-white hover:bg-[#16A0C7] focus-visible:outline-[#16A0C7]",
 };
 
 function Button({
@@ -45,7 +45,7 @@ function Button({
   disabled = false,
 }: Props) {
   const baseClasses =
-    "inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold tracking-tight transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
+    "inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
 
   const widthClass = isWidthFull ? "w-full" : "w-fit";
   const themeClass = themeClasses[theme] ?? themeClasses.primary;

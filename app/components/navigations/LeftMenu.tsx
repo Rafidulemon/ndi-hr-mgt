@@ -80,7 +80,7 @@ const menuItems = [
       {
         label: "Monthly Report History",
         icon: <IoIosPaper />,
-        href: "report/monthly/history",
+        href: "/report/monthly/history",
       },
     ],
   },
@@ -101,11 +101,11 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
   );
 
   const [isDailyReportDropdownOpen, setIsDailyReportDropdownOpen] = useState(
-    currentPath.startsWith("/daily/report")
+    currentPath.startsWith("/report/daily")
   );
 
   const [isMonthlyReportDropdownOpen, setIsMonthlyReportDropdownOpen] =
-    useState(currentPath.startsWith("/monthly/report"));
+    useState(currentPath.startsWith("/report/monthly"));
   const [isOpenModal, setIsOpenModal] = useState<boolean>(false);
 
   const profileDropdownOpen =
@@ -113,9 +113,9 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
   const leaveDropdownOpen =
     isLeaveDropdownOpen || currentPath.startsWith("/leave");
   const dailyReportDropdownOpen =
-    isDailyReportDropdownOpen || currentPath.startsWith("/daily/report");
+    isDailyReportDropdownOpen || currentPath.startsWith("/report/daily");
   const monthlyReportDropdownOpen =
-    isMonthlyReportDropdownOpen || currentPath.startsWith("/monthly/report");
+    isMonthlyReportDropdownOpen || currentPath.startsWith("/report/monthly");
 
   const toggleProfileDropdown = () => {
     setIsProfileDropdownOpen((prev) => !prev);
@@ -147,8 +147,15 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
         : "text-slate-500 hover:bg-white/70 hover:text-slate-900"
     }`;
 
+  const isRouteActive = (href: string) => {
+    if (href === "/") {
+      return currentPath === "/";
+    }
+    return currentPath === href || currentPath.startsWith(`${href}/`);
+  };
+
   const containerClasses = [
-    "flex min-h-full w-full flex-col gap-6 rounded-[32px] border border-white/60 bg-white/90 p-6 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur",
+    "flex min-h-full w-full flex-col gap-6 rounded-[32px] border border-white/60 bg-white/90 p-6 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur lg:min-w-[18rem]",
     className,
   ]
     .filter(Boolean)
@@ -285,7 +292,7 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
               ) : item.label === "Notification" ? (
                 <Link
                   href={item.href}
-                  className={getNavClasses(currentPath.startsWith("/notification"))}
+                  className={getNavClasses(isRouteActive("/notification"))}
                 >
                   {item.icon}
                   <span className="text-[16px] font-semibold">
@@ -295,7 +302,7 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
               ) : item.label === "Invoice" ? (
                 <Link
                   href={item.href}
-                  className={getNavClasses(currentPath.startsWith("/invoice"))}
+                  className={getNavClasses(isRouteActive("/invoice"))}
                 >
                   {item.icon}
                   <span className="text-[16px] font-semibold">
@@ -405,10 +412,7 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
               ) : (
                 <Link
                   href={item.href}
-                  className={getNavClasses(
-                    currentPath === item.href ||
-                      (item.href === "/" && currentPath === "/")
-                  )}
+                  className={getNavClasses(isRouteActive(item.href))}
                 >
                   {item.icon}
                   <span className="text-[16px] font-semibold">

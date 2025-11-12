@@ -13,7 +13,7 @@ export default function MainLayout({
         <div className="relative flex min-h-screen w-full">
           <div className="absolute inset-x-0 top-0 h-40 w-full bg-gradient-to-b from-white/70 to-transparent blur-2xl" />
           <div className="relative z-10 flex w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row lg:px-10 xl:px-14">
-            <aside className="w-full lg:w-72 xl:w-80">
+            <aside className="w-full flex-shrink-0 lg:w-72 lg:flex-shrink-0 xl:w-80">
               <div className="sticky top-6">
                 <LeftMenu className="lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:scrollbar-none" />
               </div>

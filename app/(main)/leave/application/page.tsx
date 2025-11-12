@@ -96,30 +96,19 @@ export default function LeaveApplicationPage() {
 
   const highlightCards = [
     {
-      label: "Status",
-      value: isFormSubmitted ? "Preview ready" : "Draft in progress",
-      description: isFormSubmitted
-        ? "Download the formatted letter below."
-        : "Complete the steps to generate the PDF.",
-      accent: "from-emerald-500/10 via-white to-white",
-    },
-    {
       label: "Department",
       value: userData.department,
       description: userData.designation,
-      accent: "from-sky-500/10 via-white to-white",
     },
     {
       label: "Employee ID",
       value: userData.employeeId,
       description: "Linked to your HR profile",
-      accent: "from-indigo-500/10 via-white to-white",
     },
     {
       label: "Application Date",
       value: userData.date,
       description: "Captured automatically",
-      accent: "from-violet-500/10 via-white to-white",
     },
   ];
 
@@ -153,269 +142,275 @@ export default function LeaveApplicationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100/70 px-4 py-10 md:px-8 lg:px-12">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8">
+    <div className="bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl space-y-6">
         <EmployeeHeader
           name="Md. Rafidul Islam"
           designation="Software Engineer"
           joining_date="Aug 17, 2023"
         />
 
-        <section className="rounded-3xl border border-white/40 bg-white/80 p-6 shadow-2xl backdrop-blur-lg sm:p-8 md:p-10">
-          <div className="space-y-3 text-slate-600">
+        <section className="rounded-3xl border border-white/70 bg-white p-6 shadow-sm sm:p-8">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
+              Leave application
+            </p>
             <Text
-              text="Leave Application"
+              text="Submit a clear request"
               className="text-2xl font-semibold text-slate-900 md:text-3xl"
             />
-            <p className="text-sm md:text-base">
-              Capture every important detail, preview the formatted letter, and
-              download a polished PDF that is ready to share with HR.
+            <p className="text-sm text-slate-500">
+              Update your contact details, describe the leave window, and get a
+              PDF-ready template instantly.
             </p>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {highlightCards.map((card) => (
               <div
                 key={card.label}
-                className={`rounded-2xl border border-white/60 bg-gradient-to-br ${card.accent} p-5 shadow-sm`}
+                className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
               >
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
                   {card.label}
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                <p className="mt-2 text-xl font-semibold text-slate-900">
                   {card.value}
                 </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {card.description}
-                </p>
+                <p className="text-sm text-slate-500">{card.description}</p>
               </div>
             ))}
           </div>
 
-          <div className="mt-8">
-            {!isFormSubmitted ? (
-              <div className="grid gap-8 lg:grid-cols-[1.35fr_0.65fr]">
-                <div className="space-y-6 rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-lg md:p-8">
-                  <div className="space-y-2">
-                    <Text
-                      text="Applicant Snapshot"
-                      className="text-xl font-semibold text-slate-900"
+          <div className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-6 rounded-3xl border border-slate-100 bg-slate-50/70 p-6">
+              <div className="space-y-2">
+                <Text
+                  text="Applicant snapshot"
+                  className="text-lg font-semibold text-slate-900"
+                />
+                <p className="text-sm text-slate-500">
+                  Pulled directly from your employee profile. Update there if
+                  something looks off.
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {profileFields.map((field) => (
+                  <TextFeild
+                    key={field.label}
+                    label={field.label}
+                    text={field.value}
+                    textFontSize="16px"
+                    className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
+                  />
+                ))}
+              </div>
+              <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
+              <form
+                onSubmit={handleSubmit(onSubmit)}
+                className="grid gap-4 md:grid-cols-2"
+              >
+                <EmailInput
+                  className="col-span-2 md:col-span-1"
+                  label="Email"
+                  defaultValue={userData.email}
+                  name="email"
+                  isRequired
+                  register={register}
+                  error={errors.email}
+                />
+                <TextInput
+                  className="col-span-2 md:col-span-1"
+                  label="Phone"
+                  defaultValue={userData.phone}
+                  name="phone"
+                  isRequired
+                  register={register}
+                  error={errors.phone}
+                />
+                <RadioGroup
+                  name="options"
+                  title="Leave Type"
+                  options={[
+                    { label: "Casual", value: "casual" },
+                    { label: "Sick", value: "sick" },
+                    { label: "Annual", value: "annual" },
+                    { label: "Paternity/Maternity", value: "maternity" },
+                    { label: "Other", value: "other" },
+                  ]}
+                  selectedValue={selectedValue}
+                  isRequired
+                  onChange={(value) => {
+                    setSelectedValue(value);
+                    register("options", { value });
+                  }}
+                  error={errors.options}
+                  className="col-span-2 rounded-2xl border border-dashed border-slate-200 bg-white p-4"
+                />
+                <TextInput
+                  className="col-span-2"
+                  label="Reason"
+                  isRequired
+                  placeholder="Explain why you need the leave"
+                  name="reason"
+                  register={register}
+                  error={errors.reason}
+                />
+                <Controller
+                  name="from"
+                  control={control}
+                  render={({ field }) => (
+                    <CustomDatePicker
+                      {...field}
+                      label="From"
+                      isRequired
+                      error={errors.from}
+                      placeholder="Select start date"
+                      value={field.value ? new Date(field.value) : null}
+                      className="col-span-2 md:col-span-1"
                     />
-                    <p className="text-sm text-slate-500">
-                      These details come directly from your employee profile.
-                    </p>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {profileFields.map((field) => (
-                      <TextFeild
-                        key={field.label}
-                        label={field.label}
-                        text={field.value}
-                        textFontSize="16px"
-                        className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 shadow-sm"
-                      />
-                    ))}
-                  </div>
-                  <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-                  <form
-                    onSubmit={handleSubmit(onSubmit)}
-                    className="grid gap-4 md:grid-cols-2"
+                  )}
+                />
+                <Controller
+                  name="to"
+                  control={control}
+                  render={({ field }) => (
+                    <CustomDatePicker
+                      {...field}
+                      label="To"
+                      isRequired
+                      error={errors.to}
+                      placeholder="Select end date"
+                      value={field.value ? new Date(field.value) : null}
+                      className="col-span-2 md:col-span-1"
+                    />
+                  )}
+                />
+                <PasswordInput
+                  className="col-span-2 md:col-span-1"
+                  label="Password"
+                  isRequired
+                  name="password"
+                  register={register}
+                  error={errors.password}
+                />
+                <PasswordInput
+                  className="col-span-2 md:col-span-1"
+                  label="Confirm Password"
+                  isRequired
+                  name="confirm_password"
+                  register={register}
+                  error={errors.confirm_password}
+                />
+                <div className="col-span-2 flex flex-wrap justify-end gap-3 pt-2">
+                  <Button
+                    type="submit"
+                    theme="aqua"
+                    className="w-full sm:w-auto"
                   >
-                    <EmailInput
-                      className="col-span-2 md:col-span-1"
-                      label="Email"
-                      defaultValue={userData.email}
-                      name="email"
-                      isRequired
-                      register={register}
-                      error={errors.email}
+                    <Text
+                      text="Submit application"
+                      className="text-[15px] font-semibold"
                     />
-                    <TextInput
-                      className="col-span-2 md:col-span-1"
-                      label="Phone"
-                      defaultValue={userData.phone}
-                      name="phone"
-                      isRequired
-                      register={register}
-                      error={errors.phone}
-                    />
-                    <RadioGroup
-                      name="options"
-                      title="Leave Type"
-                      options={[
-                        { label: "Casual", value: "casual" },
-                        { label: "Sick", value: "sick" },
-                        { label: "Annual", value: "annual" },
-                        { label: "Paternity/Maternity", value: "maternity" },
-                        { label: "Other", value: "other" },
-                      ]}
-                      selectedValue={selectedValue}
-                      isRequired
-                      onChange={(value) => {
-                        setSelectedValue(value);
-                        register("options", { value });
-                      }}
-                      error={errors.options}
-                      className="col-span-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4"
-                    />
-                    <TextInput
-                      className="col-span-2"
-                      label="Reason"
-                      isRequired
-                      placeholder="Explain why you need the leave"
-                      name="reason"
-                      register={register}
-                      error={errors.reason}
-                    />
-                    <Controller
-                      name="from"
-                      control={control}
-                      render={({ field }) => (
-                        <CustomDatePicker
-                          {...field}
-                          label="From"
-                          isRequired
-                          error={errors.from}
-                          placeholder="Select start date"
-                          value={field.value ? new Date(field.value) : null}
-                          className="col-span-2 md:col-span-1"
-                        />
-                      )}
-                    />
-
-                    <Controller
-                      name="to"
-                      control={control}
-                      render={({ field }) => (
-                        <CustomDatePicker
-                          {...field}
-                          label="To"
-                          isRequired
-                          error={errors.to}
-                          placeholder="Select end date"
-                          value={field.value ? new Date(field.value) : null}
-                          className="col-span-2 md:col-span-1"
-                        />
-                      )}
-                    />
-                    <PasswordInput
-                      className="col-span-2 md:col-span-1"
-                      label="Password"
-                      isRequired
-                      name="password"
-                      register={register}
-                      error={errors.password}
-                    />
-                    <PasswordInput
-                      className="col-span-2 md:col-span-1"
-                      label="Confirm Password"
-                      isRequired
-                      name="confirm_password"
-                      register={register}
-                      error={errors.confirm_password}
-                    />
-                    <div className="col-span-2 flex flex-wrap justify-end gap-4 pt-2">
-                      <Button
-                        type="submit"
-                        className="w-full sm:w-[185px]"
-                      >
-                        <Text
-                          text="Submit Application"
-                          className="text-[16px] font-semibold"
-                        />
-                      </Button>
-                      <Button
-                        theme="cancel"
-                        type="button"
-                        className="w-full sm:w-[185px]"
-                        onClick={() => navigate.push("/leave")}
-                      >
-                        <Text
-                          text="Cancel"
-                          className="text-[16px] font-semibold"
-                        />
-                      </Button>
-                    </div>
-                  </form>
+                  </Button>
+                  <Button
+                    theme="secondary"
+                    type="button"
+                    className="w-full sm:w-auto"
+                    onClick={() => navigate.push("/leave")}
+                  >
+                    <Text text="Cancel" className="text-[15px] font-semibold" />
+                  </Button>
                 </div>
+              </form>
+            </div>
 
-                <div className="flex flex-col gap-6 rounded-3xl border border-slate-100 bg-gradient-to-b from-indigo-50/80 via-white to-white p-6 shadow-inner">
+            <aside className="space-y-4 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+              {isFormSubmitted ? (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <Text
+                        text="Preview & export"
+                        className="text-lg font-semibold text-slate-900"
+                      />
+                      <p className="text-sm text-slate-500">
+                        Review the generated document before pushing it to HR.
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-600">
+                      Ready
+                    </span>
+                  </div>
+                  <div
+                    id="application-preview"
+                    className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                  >
+                    <ApplicationPreview userData={userData} />
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      theme="aqua"
+                      className="flex-1 min-w-[160px]"
+                      onClick={generatePDF}
+                      type="button"
+                    >
+                      <Text
+                        text="Download PDF"
+                        className="text-[15px] font-semibold"
+                      />
+                    </Button>
+                    <Button
+                      theme="secondary"
+                      className="flex-1 min-w-[160px]"
+                      onClick={() => {
+                        setIsFormSubmitted(false);
+                      }}
+                      type="button"
+                    >
+                      <Text
+                        text="Edit details"
+                        className="text-[15px] font-semibold"
+                      />
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
                   <div>
                     <Text
-                      text="Polish every request"
+                      text="Keep it approvable"
                       className="text-lg font-semibold text-slate-900"
                     />
-                    <p className="mt-1 text-sm text-slate-500">
-                      Use this mini checklist to keep your leave requests crisp
-                      and approvable.
+                    <p className="text-sm text-slate-500">
+                      A short checklist to help you hand approvers everything
+                      they need.
                     </p>
                   </div>
                   <ul className="space-y-3">
                     {helperSteps.map((step) => (
                       <li
                         key={step}
-                        className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-white/70 p-4 shadow-sm"
+                        className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
                       >
-                        <span className="mt-[6px] h-2 w-2 rounded-full bg-sky-500" />
+                        <span className="mt-1 h-2 w-2 rounded-full bg-primary_dark" />
                         <p className="text-sm text-slate-600">{step}</p>
                       </li>
                     ))}
                   </ul>
-                  <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 text-sm text-slate-600 shadow-sm">
-                    <p>
-                      Need help? Reach out to your team lead or HR partner after
-                      you submit to keep everyone aligned.
-                    </p>
+                  <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500">
+                    Need support? Ping{" "}
+                    <a
+                      href="mailto:hr@ndi.hr"
+                      className="font-semibold text-primary_dark"
+                    >
+                      hr@ndi.hr
+                    </a>{" "}
+                    or talk to your manager before submitting.
                   </div>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-6 rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-xl md:p-8">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <Text
-                      text="Preview & Export"
-                      className="text-xl font-semibold text-slate-900"
-                    />
-                    <p className="text-sm text-slate-500">
-                      Review the generated document before sharing it with HR.
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-emerald-50 px-4 py-1 text-sm font-semibold text-emerald-600">
-                    Ready to download
-                  </span>
-                </div>
-                <div
-                  id="application-preview"
-                  className="rounded-2xl border border-slate-100 bg-white p-4 shadow-inner"
-                >
-                  <ApplicationPreview userData={userData} />
-                </div>
-                <div className="flex flex-wrap justify-center gap-4 sm:justify-end">
-                  <Button
-                    className="w-full sm:w-[185px]"
-                    onClick={generatePDF}
-                    type="button"
-                  >
-                    <Text
-                      text="Download PDF"
-                      className="text-[16px] font-semibold"
-                    />
-                  </Button>
-                  <Button
-                    theme="secondary"
-                    className="w-full sm:w-[185px]"
-                    onClick={() => navigate.push("/leave")}
-                    type="button"
-                  >
-                    <Text
-                      text="Back to Leave"
-                      className="text-[16px] font-semibold"
-                    />
-                  </Button>
-                </div>
-              </div>
-            )}
+                </>
+              )}
+            </aside>
           </div>
         </section>
       </div>
