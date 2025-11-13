@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   title: "NDI HR Management",
   description:
     "A modern workspace to track attendance, manage leave, and stay connected with your team.",
+  icons: {
+    icon: "/logo/ndi.logo.png",
+  },
 };
 
 export default function RootLayout({

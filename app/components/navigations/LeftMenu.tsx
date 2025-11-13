@@ -3,13 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BiChevronDown, BiChevronUp, BiLogOut } from "react-icons/bi";
 import {
   FaBell,
   FaCalendarCheck,
   FaClipboardList,
   FaEdit,
+  FaEnvelopeOpenText,
   FaEye,
   FaFileInvoice,
   FaUser,
@@ -85,62 +86,51 @@ const menuItems = [
       },
     ],
   },
+  { label: "Messages", icon: <FaEnvelopeOpenText />, href: "/messages" },
   { label: "Notification", icon: <FaBell />, href: "/notification" },
   { label: "Invoice", icon: <FaFileInvoice />, href: "/invoice" },
   { label: "Settings", icon: <FiSettings />, href: "/settings" },
 ];
+
+type DropdownKey = "profile" | "leave" | "daily" | "monthly" | null;
 
 const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
   const router = useRouter();
   const pathname = usePathname();
   const currentPath = pathname ?? "/";
 
-  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(
-    currentPath.startsWith("/profile")
-  );
-  const [isLeaveDropdownOpen, setIsLeaveDropdownOpen] = useState(
-    currentPath.startsWith("/leave")
-  );
+  const deriveSectionFromPath = (path: string): DropdownKey => {
+    if (path.startsWith("/profile")) return "profile";
+    if (path.startsWith("/leave")) return "leave";
+    if (path.startsWith("/report/daily")) return "daily";
+    if (path.startsWith("/report/monthly")) return "monthly";
+    return null;
+  };
 
-  const [isDailyReportDropdownOpen, setIsDailyReportDropdownOpen] = useState(
-    currentPath.startsWith("/report/daily")
+  const [openDropdown, setOpenDropdown] = useState<DropdownKey>(
+    deriveSectionFromPath(currentPath)
   );
-
-  const [isMonthlyReportDropdownOpen, setIsMonthlyReportDropdownOpen] =
-    useState(currentPath.startsWith("/report/monthly"));
   const [isOpenModal, setIsOpenModal] = useState<boolean>(false);
 
-  const profileDropdownOpen =
-    isProfileDropdownOpen || currentPath.startsWith("/profile");
-  const leaveDropdownOpen =
-    isLeaveDropdownOpen || currentPath.startsWith("/leave");
-  const dailyReportDropdownOpen =
-    isDailyReportDropdownOpen || currentPath.startsWith("/report/daily");
-  const monthlyReportDropdownOpen =
-    isMonthlyReportDropdownOpen || currentPath.startsWith("/report/monthly");
+  useEffect(() => {
+    setOpenDropdown(deriveSectionFromPath(currentPath));
+  }, [currentPath]);
 
-  const toggleProfileDropdown = () => {
-    setIsProfileDropdownOpen((prev) => !prev);
-  };
+  const profileDropdownOpen = openDropdown === "profile";
+  const leaveDropdownOpen = openDropdown === "leave";
+  const dailyReportDropdownOpen = openDropdown === "daily";
+  const monthlyReportDropdownOpen = openDropdown === "monthly";
 
-  const toggleLeaveDropdown = () => {
-    setIsLeaveDropdownOpen((prev) => !prev);
-  };
-
-  const toggleDailyReportDropDownOpen = () => {
-    setIsDailyReportDropdownOpen((prev) => !prev);
-  };
-
-  const toggleMonthlyReportDropDownOpen = () => {
-    setIsMonthlyReportDropdownOpen((prev) => !prev);
+  const toggleDropdown = (key: Exclude<DropdownKey, null>) => {
+    setOpenDropdown((prev) => (prev === key ? null : key));
   };
 
   const getNavClasses = (isActive: boolean) =>
     [
       "flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200",
       isActive
-        ? "bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 text-white shadow-lg shadow-indigo-500/30 dark:shadow-sky-900/40"
-        : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-slate-100",
+        ? "bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 text-white shadow-lg shadow-indigo-500/30 dark:shadow-sky-900/40 rounded"
+        : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-slate-100 rounded",
     ].join(" ");
 
   const getSubNavClasses = (isActive: boolean) =>
@@ -159,7 +149,7 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
   };
 
   const containerClasses = [
-    "flex min-h-full w-full flex-col gap-6 rounded-[32px] border border-white/60 bg-white/90 p-6 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur transition-colors duration-200 lg:min-w-[18rem]",
+    "flex min-h-full w-full flex-col gap-4 rounded-[32px] border border-white/60 bg-white/90 p-6 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur transition-colors duration-200 lg:min-w-[18rem]",
     "dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:shadow-slate-900/60",
     className,
   ]
@@ -168,46 +158,33 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
 
   return (
     <div className={containerClasses}>
-      <div className="flex flex-col items-center gap-4 text-center">
-        <Image
-          src="/demo_logo.png"
-          alt="Demo Logo"
-          width={160}
-          height={70}
-          className="h-auto w-40"
-          priority
-        />
-        <div className="relative h-28 w-28 rounded-3xl border-4 border-white shadow-lg shadow-indigo-200 dark:border-slate-700/80 dark:shadow-slate-900/60">
+      <div className="sticky top-0 z-20 flex flex-col items-center gap-3 rounded-[24px] bg-white/95 px-4 pb-3 text-center backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:text-left dark:bg-slate-900/85">
+        <div className="flex flex-row items-center justify-center gap-3 sm:justify-start">
           <Image
-            src="/dp.png"
-            alt="Profile preview"
-            fill
-            sizes="(max-width: 768px) 112px, 112px"
-            className="rounded-2xl object-cover"
+            src="/logo/ndi.logo.png"
+            alt="Demo Logo"
+            width={160}
+            height={70}
+            className="h-auto w-10"
             priority
           />
-        </div>
-        <div className="space-y-1">
-          <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Md. Rafidul Islam
-          </p>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Software Engineer
+          <p
+            className="text-base font-semibold"
+            style={{ color: "#5874A8" }}
+          >
+            Ninja Digital Innovations
           </p>
         </div>
-        <span className="rounded-full bg-indigo-50 px-4 py-1 text-xs font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200">
-          Member since 2023
-        </span>
       </div>
 
-      <nav className="flex flex-col">
+      <nav className="flex flex-1 flex-col">
         <ul className="mt-4 space-y-2">
           {menuItems.map((item) => (
             <li key={item.label}>
               {item.label === "Profile" ? (
                 <div>
                   <button
-                    onClick={toggleProfileDropdown}
+                    onClick={() => toggleDropdown("profile")}
                     className={getNavClasses(currentPath.startsWith("/profile"))}
                   >
                     {item.icon}
@@ -253,7 +230,7 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
               ) : item.label === "Leave" ? (
                 <div>
                   <button
-                    onClick={toggleLeaveDropdown}
+                    onClick={() => toggleDropdown("leave")}
                     className={getNavClasses(currentPath.startsWith("/leave"))}
                   >
                     {item.icon}
@@ -319,7 +296,7 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
               ) : item.label === "Daily Report" ? (
                 <div>
                   <button
-                    onClick={toggleDailyReportDropDownOpen}
+                    onClick={() => toggleDropdown("daily")}
                     className={getNavClasses(
                       currentPath.startsWith("/report/daily")
                     )}
@@ -369,7 +346,7 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
               ) : item.label === "Monthly Report" ? (
                 <div>
                   <button
-                    onClick={toggleMonthlyReportDropDownOpen}
+                    onClick={() => toggleDropdown("monthly")}
                     className={getNavClasses(
                       currentPath.startsWith("/report/monthly")
                     )}
@@ -448,7 +425,7 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
         <button
           type="button"
           onClick={() => setIsOpenModal(true)}
-          className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-400 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200 transition-transform hover:scale-[1.01] dark:from-rose-500 dark:via-amber-500 dark:to-orange-400 dark:shadow-rose-900/50"
+          className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-400 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200 transition-transform hover:scale-[1.01] dark:from-rose-500 dark:via-amber-500 dark:to-orange-400 dark:shadow-rose-900/50 rounded"
         >
           <BiLogOut className="text-lg" />
           Logout
