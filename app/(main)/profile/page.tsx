@@ -253,10 +253,10 @@ function ProfilePage() {
       </section>
 
       <div className="flex flex-wrap gap-4">
-        <Button theme="secondary" onClick={() => router.push("/profile/edit")}>
+        <Button theme="primary" onClick={() => router.push("/profile/edit")}>
           Edit Profile
         </Button>
-        <Button onClick={() => setIsModalOpen(true)}>Change Password</Button>
+        <Button theme="cancel" onClick={() => setIsModalOpen(true)}>Change Password</Button>
       </div>
 
       <Modal
