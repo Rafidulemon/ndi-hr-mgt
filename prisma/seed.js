@@ -1,20 +1,20 @@
 /* eslint-disable no-console */
 const { PrismaClient } = require("@prisma/client");
+const bcrypt = require("bcryptjs");
 
 const prisma = new PrismaClient();
 
-const PASSWORD_HASHES = {
-  superuser: "$2b$10$cu0pn4noXBSiyUgkyfDbf.QZhodNYBLyzrmHJOT55eHNV5V8sAl2K",
-  hr: "$2b$10$ITo9TErayIn1BQ4lL616Z.3HifotLBY.DL7Ombvwi5QF2vZCfbfKe",
-  lead: "$2b$10$h.k1IIe./96UQWl2b8gMfu32xZjdZzV08N1XT0n/8/HSGj05fE0oK",
-  test: "$2b$10$VtmpEf9o2ysBfu.Z0XJEtuWZtT1AMZ8DyhCPA1JPAn4sMawDVB5Tm",
+const hashPassword = (password) => {
+  if (!password) {
+    throw new Error("Password is required for hashing");
+  }
+  return bcrypt.hash(password, 10);
 };
 
 const organizations = [
   {
     id: "1",
     name: "Ninja Digital Innovations",
-    legalName: "Ninja Digital Innovations Ltd.",
     domain: "ninja-digital-innovations.com",
     timezone: "Asia/Dhaka",
     locale: "en-US",
@@ -22,12 +22,16 @@ const organizations = [
   {
     id: "2",
     name: "Brand Cloud",
-    legalName: "Brand Cloud Ltd.",
     domain: "brandcloud.com",
     timezone: "Asia/Tokyo",
     locale: "en-US",
   },
 ];
+
+const organizationNameById = organizations.reduce((acc, org) => {
+  acc[org.id] = org.name;
+  return acc;
+}, {});
 
 const orgTeams = {
   "1": [
@@ -90,8 +94,8 @@ const usersToCreate = [
   {
     id: "1",
     organizationId: "1",
-    email: "superuser@@ninja-digital-innovations.com",
-    passwordHash: PASSWORD_HASHES.superuser,
+    email: "superuser@ninja-digital-innovations.com",
+    password: "Superuser@123",
     role: "SUPER_ADMIN",
     firstName: "Superuser",
     lastName: "Admin",
@@ -107,8 +111,8 @@ const usersToCreate = [
   {
     id: "2",
     organizationId: "1",
-    email: "hr@@ninja-digital-innovations.com",
-    passwordHash: PASSWORD_HASHES.hr,
+    email: "hr@ninja-digital-innovations.com",
+    password: "HrPartner@123",
     role: "HR_ADMIN",
     firstName: "HR",
     lastName: "Partner",
@@ -124,8 +128,8 @@ const usersToCreate = [
   {
     id: "3",
     organizationId: "1",
-    email: "lead_user@@ninja-digital-innovations.com",
-    passwordHash: PASSWORD_HASHES.lead,
+    email: "lead_user@ninja-digital-innovations.com",
+    password: "LeadUser@123",
     role: "MANAGER",
     firstName: "Lead",
     lastName: "User",
@@ -141,8 +145,8 @@ const usersToCreate = [
   {
     id: "4",
     organizationId: "1",
-    email: "test_user@@ninja-digital-innovations.com",
-    passwordHash: PASSWORD_HASHES.test,
+    email: "test_user@ninja-digital-innovations.com",
+    password: "TestUser@123",
     role: "EMPLOYEE",
     firstName: "Test",
     lastName: "User",
@@ -157,23 +161,28 @@ const usersToCreate = [
   },
 ];
 
-async function createUser({
-  id,
-  organizationId,
-  email,
-  passwordHash,
-  role,
-  firstName,
-  lastName,
-  preferredName,
-  designation,
-  employeeCode,
-  teamId = null,
-  workModel = "HYBRID",
-  workPhone = null,
-  personalPhone = null,
-  reportingManagerId = null,
-}) {
+async function createUser(userConfig) {
+  const {
+    id,
+    organizationId,
+    email,
+    password,
+    role,
+    firstName,
+    lastName,
+    preferredName,
+    designation,
+    employeeCode,
+    teamId = null,
+    workModel = "HYBRID",
+    workPhone = null,
+    personalPhone = null,
+    reportingManagerId = null,
+  } = userConfig;
+
+  const passwordHash = await hashPassword(password);
+  const organizationName = organizationNameById[organizationId] || "the organization";
+
   const user = await prisma.user.create({
     data: {
       id,
@@ -182,6 +191,7 @@ async function createUser({
       passwordHash,
       role,
       status: "ACTIVE",
+      phone: workPhone || personalPhone,
     },
   });
 
@@ -198,7 +208,7 @@ async function createUser({
       personalPhone,
       currentAddress: "Dhaka, Bangladesh",
       permanentAddress: "Dhaka, Bangladesh",
-      bio: `${designation} at ${organizationId === "1" ? "Ninja Digital Innovations" : "Brand Cloud"}.`,
+      bio: `${designation} at ${organizationName}.`,
     },
   });
 
@@ -219,28 +229,7 @@ async function createUser({
     },
   });
 
-  if (teamId) {
-    await prisma.teamMember.create({
-      data: {
-        id: `${id}-team-member`,
-        teamId,
-        userId: id,
-        role: designation,
-      },
-    });
-  }
-
-  await prisma.userPreference.create({
-    data: {
-      id: `${id}-preferences`,
-      userId: id,
-      theme: "SYSTEM",
-      emailNotifications: true,
-      pushNotifications: true,
-      dailyDigest: role !== "SUPER_ADMIN",
-      timezone: "Asia/Dhaka",
-    },
-  });
+  const accountSuffix = id.toString().padStart(4, "0");
 
   await prisma.employeeBankAccount.create({
     data: {
@@ -248,12 +237,14 @@ async function createUser({
       userId: id,
       accountHolder: `${firstName} ${lastName}`,
       bankName: "Eastern Bank Ltd.",
-      accountNumber: `ACC-${id.slice(-4).toUpperCase()}`,
+      accountNumber: `ACC-${accountSuffix}`,
       branch: "Gulshan",
       swiftCode: "EBLDBDDH",
       isPrimary: true,
     },
   });
+
+  const emergencyEmailDomain = email.split("@")[1] || "noreply.example";
 
   await prisma.emergencyContact.create({
     data: {
@@ -262,7 +253,7 @@ async function createUser({
       name: `${firstName} Emergency`,
       relationship: "Family",
       phone: personalPhone || "+8801700000000",
-      email: `${firstName.toLowerCase()}-emergency@ninja-digital-innovations.com`,
+      email: `${firstName.toLowerCase()}-emergency@${emergencyEmailDomain}`,
     },
   });
 
@@ -325,28 +316,6 @@ async function main() {
       status: "ACTIVE",
       startDate: new Date("2025-01-01"),
       projectManager: "Lead User",
-      members: {
-        create: [
-          {
-            id: "pmember-ndi-lead",
-            userId: "3",
-            role: "Project Manager",
-            allocatedPercent: 80,
-          },
-          {
-            id: "pmember-ndi-test",
-            userId: "4",
-            role: "Backend Engineer",
-            allocatedPercent: 100,
-          },
-          {
-            id: "pmember-ndi-hr",
-            userId: "2",
-            role: "Stakeholder",
-            allocatedPercent: 25,
-          },
-        ],
-      },
     },
   });
 
@@ -380,7 +349,7 @@ async function main() {
     },
   });
 
-  console.log("Seeded organizations, users, teams, and projects without skill data.");
+  console.log("Seeded organizations, users, teams, and projects with hashed credentials.");
 }
 
 main()
