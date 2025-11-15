@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import AuthLayout from "../_components/AuthLayout";
 import Button from "../../../components/atoms/buttons/Button";
@@ -12,13 +13,14 @@ import ImageInput from "../../../components/atoms/inputs/ImageInput";
 import PasswordInput from "../../../components/atoms/inputs/PasswordInput";
 import Text from "../../../components/atoms/Text/Text";
 import TextInput from "../../../components/atoms/inputs/TextInput";
+import { trpc } from "@/trpc/client";
 
 const schema = z
   .object({
-    id: z.string().nonempty("Employee ID is required"),
+    employeeId: z.string().nonempty("Employee ID is required"),
     department: z.string().nonempty("Employee Department is required"),
-    first_name: z.string().nonempty("Employee First Name is required"),
-    last_name: z.string().nonempty("Employee Last Name is required"),
+    firstName: z.string().nonempty("Employee First Name is required"),
+    lastName: z.string().nonempty("Employee Last Name is required"),
     designation: z.string().nonempty("Employee Designation is required"),
     email: z
       .string()
@@ -39,6 +41,8 @@ type FormData = z.infer<typeof schema>;
 
 function SignupPage() {
   const router = useRouter();
+  const [serverMessage, setServerMessage] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -46,14 +50,34 @@ function SignupPage() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
+  const registerMutation = trpc.auth.register.useMutation({
+    onSuccess: () => {
+      setServerError(null);
+      setServerMessage("Account created! Sign in using your new credentials.");
+      router.push("/auth/login");
+    },
+    onError: (error) => {
+      setServerMessage(null);
+      setServerError(error.message || "Unable to create the account.");
+    },
+  });
 
   const handleLoginButton = () => {
     router.push("/auth/login");
   };
 
   const handleOnSubmit = (data: FormData) => {
-    console.log("Signup submitted:", data);
-    router.push("/auth/login");
+    setServerError(null);
+    setServerMessage(null);
+    registerMutation.mutate({
+      employeeId: data.employeeId,
+      department: data.department,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      designation: data.designation,
+      email: data.email,
+      password: data.password,
+    });
   };
 
   return (
@@ -94,8 +118,8 @@ function SignupPage() {
             isRequired
             placeholder="1234564798"
             register={register}
-            name="id"
-            error={errors.id}
+            name="employeeId"
+            error={errors.employeeId}
           />
           <TextInput
             label="Department"
@@ -110,16 +134,16 @@ function SignupPage() {
             isRequired
             placeholder="Md. Rafidul"
             register={register}
-            name="first_name"
-            error={errors.first_name}
+            name="firstName"
+            error={errors.firstName}
           />
           <TextInput
             label="Last Name"
             isRequired
             placeholder="Islam"
             register={register}
-            name="last_name"
-            error={errors.last_name}
+            name="lastName"
+            error={errors.lastName}
           />
           <TextInput
             label="Designation"
@@ -168,8 +192,22 @@ function SignupPage() {
           />
         </div>
 
-        <Button type="submit" theme="primary" isWidthFull>
-          <Text text="Create account" className="text-[16px] font-semibold" />
+        {serverError ? (
+          <p className="rounded-2xl border border-rose-200 bg-rose-50/60 px-4 py-3 text-sm text-rose-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+            {serverError}
+          </p>
+        ) : null}
+        {serverMessage ? (
+          <p className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">
+            {serverMessage}
+          </p>
+        ) : null}
+
+        <Button type="submit" theme="primary" isWidthFull disabled={registerMutation.isPending}>
+          <Text
+            text={registerMutation.isPending ? "Creating account..." : "Create account"}
+            className="text-[16px] font-semibold"
+          />
         </Button>
       </form>
     </AuthLayout>

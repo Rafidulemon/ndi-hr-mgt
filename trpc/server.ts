@@ -11,9 +11,9 @@ const createCaller = createCallerFactory(appRouter);
 export const api = cache(async () => {
   const resolvedHeaders = await headers();
 
-  return createCaller(
-    createTRPCContext({
-      headers: resolvedHeaders,
-    }),
-  );
+  const ctx = await createTRPCContext({
+    headers: resolvedHeaders,
+  });
+
+  return createCaller(ctx);
 });

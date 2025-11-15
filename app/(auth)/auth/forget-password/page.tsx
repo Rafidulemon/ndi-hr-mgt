@@ -4,11 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import AuthLayout from "../_components/AuthLayout";
 import Button from "../../../components/atoms/buttons/Button";
 import EmailInput from "../../../components/atoms/inputs/EmailInput";
 import Text from "../../../components/atoms/Text/Text";
+import { trpc } from "@/trpc/client";
 
 const schema = z.object({
   email: z
@@ -21,6 +23,9 @@ type FormData = z.infer<typeof schema>;
 
 function ForgetPasswordPage() {
   const router = useRouter();
+  const [serverMessage, setServerMessage] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
   const {
     handleSubmit,
@@ -28,6 +33,22 @@ function ForgetPasswordPage() {
     register,
   } = useForm<FormData>({
     resolver: zodResolver(schema),
+  });
+  const resetMutation = trpc.auth.requestPasswordReset.useMutation({
+    onSuccess: (payload) => {
+      setServerError(null);
+      const demoToken =
+        "token" in payload && typeof payload.token === "string"
+          ? payload.token
+          : null;
+      setResetToken(demoToken);
+      setServerMessage(payload.message);
+    },
+    onError: (error) => {
+      setServerMessage(null);
+      setResetToken(null);
+      setServerError(error.message || "Unable to process the request.");
+    },
   });
 
   const handleSignUpButton = () => {
@@ -39,7 +60,10 @@ function ForgetPasswordPage() {
   };
 
   const handleSubmitForm = (data: FormData) => {
-    console.log("Password reset requested:", data);
+    setServerMessage(null);
+    setServerError(null);
+    setResetToken(null);
+    resetMutation.mutate({ email: data.email });
   };
 
   return (
@@ -78,8 +102,27 @@ function ForgetPasswordPage() {
           placeholder="you@ndi.team"
           isRequired
         />
-        <Button type="submit" theme="primary" isWidthFull>
-          <Text text="Send reset link" className="text-[16px] font-semibold" />
+        {serverError ? (
+          <p className="rounded-2xl border border-rose-200 bg-rose-50/60 px-4 py-3 text-sm text-rose-600 dark:border-rose-500/50 dark:bg-rose-500/10 dark:text-rose-200">
+            {serverError}
+          </p>
+        ) : null}
+        {serverMessage ? (
+          <div className="space-y-2 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">
+            <p>{serverMessage}</p>
+            {resetToken ? (
+              <p className="break-all text-xs text-emerald-900 dark:text-emerald-200">
+                Demo reset token: <span className="font-mono">{resetToken}</span>
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        <Button type="submit" theme="primary" isWidthFull disabled={resetMutation.isPending}>
+          <Text
+            text={resetMutation.isPending ? "Sending link..." : "Send reset link"}
+            className="text-[16px] font-semibold"
+          />
         </Button>
       </form>
     </AuthLayout>

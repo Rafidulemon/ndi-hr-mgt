@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BiChevronDown, BiChevronUp, BiLogOut } from "react-icons/bi";
 import {
   FaBell,
@@ -22,11 +22,14 @@ import { HiOutlineDocumentText } from "react-icons/hi";
 import { IoIosPaper } from "react-icons/io";
 import { FiSettings } from "react-icons/fi";
 import { Modal } from "../atoms/frame/Modal";
+import { trpc } from "@/trpc/client";
 
 type Props = {
   isLeader?: boolean;
   isAdmin?: boolean;
   className?: string;
+  organizationName?: string;
+  userFullName?: string;
 };
 
 const menuItems = [
@@ -94,7 +97,12 @@ const menuItems = [
 
 type DropdownKey = "profile" | "leave" | "daily" | "monthly" | null;
 
-const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
+const LeftMenu = ({
+  isLeader = false,
+  className = "",
+  organizationName = "Ninja Digital Innovations",
+  userFullName,
+}: Props) => {
   const router = useRouter();
   const pathname = usePathname();
   const currentPath = pathname ?? "/";
@@ -111,8 +119,25 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
     deriveSectionFromPath(currentPath)
   );
   const [isOpenModal, setIsOpenModal] = useState<boolean>(false);
+  const logoutMutation = trpc.auth.logout.useMutation({
+    onSuccess: () => {
+      router.push("/auth/login");
+    },
+    onSettled: () => {
+      setIsOpenModal(false);
+    },
+  });
+
+  const nameFallback = useMemo(() => {
+    if (userFullName && userFullName.trim().length > 0) {
+      return userFullName;
+    }
+    return "Team Member";
+  }, [userFullName]);
 
   useEffect(() => {
+    // Keep dropdown state aligned with the current route selection.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpenDropdown(deriveSectionFromPath(currentPath));
   }, [currentPath]);
 
@@ -159,23 +184,27 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
   return (
     <div className={containerClasses}>
       <div className="sticky top-0 z-20 flex flex-col items-center gap-3 rounded-[24px] bg-white/95 px-4 pb-3 text-center backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:text-left dark:bg-slate-900/85">
-        <div className="flex flex-row items-center justify-center gap-3 sm:justify-start">
-          <Image
-            src="/logo/ndi.logo.png"
-            alt="Demo Logo"
-            width={160}
-            height={70}
-            className="h-auto w-10"
-            priority
-          />
+      <div className="flex flex-row items-center justify-center gap-3 sm:justify-start">
+        <Image
+          src="/logo/ndi.logo.png"
+          alt="Demo Logo"
+          width={160}
+          height={70}
+          className="h-auto w-10"
+          priority
+        />
+        <div>
           <p
-            className="text-base font-semibold"
-            style={{ color: "#5874A8" }}
+            className="text-base font-semibold text-indigo-700 dark:text-slate-100"
           >
-            Ninja Digital Innovations
+            {organizationName}
+          </p>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+            {nameFallback}
           </p>
         </div>
       </div>
+    </div>
 
       <nav className="flex flex-1 flex-col">
         <ul className="mt-4 space-y-2">
@@ -425,11 +454,17 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
         <button
           type="button"
           onClick={() => setIsOpenModal(true)}
-          className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-400 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200 transition-transform hover:scale-[1.01] dark:from-rose-500 dark:via-amber-500 dark:to-orange-400 dark:shadow-rose-900/50 rounded"
+          disabled={logoutMutation.isPending}
+          className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-400 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200 transition-transform hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70 dark:from-rose-500 dark:via-amber-500 dark:to-orange-400 dark:shadow-rose-900/50 rounded"
         >
           <BiLogOut className="text-lg" />
           Logout
         </button>
+        {logoutMutation.error ? (
+          <p className="mt-3 rounded-2xl border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs text-rose-600 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+            {logoutMutation.error.message}
+          </p>
+        ) : null}
       </div>
 
       <Modal
@@ -442,7 +477,10 @@ const LeftMenu = ({ isLeader = false, className = "" }: Props) => {
         title="Log Out ?"
         buttonWidth="120px"
         buttonHeight="40px"
-        onDoneClick={() => router.push("/auth/login")}
+        onDoneClick={() => {
+          if (logoutMutation.isPending) return;
+          logoutMutation.mutate();
+        }}
         closeOnClick={() => setIsOpenModal(false)}
       >
         <div>Are you sure you would like to log out?</div>
