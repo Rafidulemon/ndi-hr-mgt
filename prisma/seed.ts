@@ -1,17 +1,26 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
-const { PrismaClient } = require("@prisma/client");
-const bcrypt = require("bcryptjs");
+import { PrismaClient, WorkModel as WorkModelEnum } from "@prisma/client";
+import type { Gender, WorkModel, UserRole } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-const hashPassword = (password) => {
+const hashPassword = async (password: string) => {
   if (!password) {
     throw new Error("Password is required for hashing");
   }
+
   return bcrypt.hash(password, 10);
 };
 
-const organizations = [
+type SeedOrganization = {
+  id: string;
+  name: string;
+  domain: string;
+  timezone: string;
+  locale: string;
+};
+
+const organizations: SeedOrganization[] = [
   {
     id: "1",
     name: "Ninja Digital Innovations",
@@ -28,12 +37,18 @@ const organizations = [
   },
 ];
 
-const organizationNameById = organizations.reduce((acc, org) => {
+const organizationNameById = organizations.reduce<Record<string, string>>((acc, org) => {
   acc[org.id] = org.name;
   return acc;
 }, {});
 
-const orgTeams = {
+type SeedTeam = {
+  id: string;
+  name: string;
+  description: string;
+};
+
+const orgTeams: Record<string, SeedTeam[]> = {
   "1": [
     {
       id: "1",
@@ -90,7 +105,26 @@ const orgTeams = {
   ],
 };
 
-const usersToCreate = [
+type SeedUserConfig = {
+  id: string;
+  organizationId: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  firstName: string;
+  lastName: string;
+  preferredName: string;
+  designation: string;
+  employeeCode: string;
+  teamId?: string | null;
+  workModel?: WorkModel;
+  workPhone?: string | null;
+  personalPhone?: string | null;
+  reportingManagerId?: string | null;
+  gender?: Gender;
+};
+
+const usersToCreate: SeedUserConfig[] = [
   {
     id: "1",
     organizationId: "1",
@@ -159,9 +193,27 @@ const usersToCreate = [
     personalPhone: "+8801700001104",
     reportingManagerId: "3",
   },
+  {
+    id: "5",
+    organizationId: "1",
+    email: "rafidul@ninja-digital-innovations.com",
+    password: "Rafidul@123",
+    role: "EMPLOYEE",
+    firstName: "Md. Rafidul",
+    lastName: "Islam",
+    preferredName: "Rafidul",
+    designation: "Software Engineer",
+    employeeCode: "NDI-1005",
+    teamId: "2",
+    workModel: "ONSITE",
+    workPhone: "+8801300001105",
+    personalPhone: "+8801700001105",
+    reportingManagerId: "3",
+    gender: "MALE",
+  },
 ];
 
-async function createUser(userConfig) {
+async function createUser(userConfig: SeedUserConfig) {
   const {
     id,
     organizationId,
@@ -174,10 +226,11 @@ async function createUser(userConfig) {
     designation,
     employeeCode,
     teamId = null,
-    workModel = "HYBRID",
+    workModel = WorkModelEnum.HYBRID,
     workPhone = null,
     personalPhone = null,
     reportingManagerId = null,
+    gender = null,
   } = userConfig;
 
   const passwordHash = await hashPassword(password);
@@ -203,6 +256,7 @@ async function createUser(userConfig) {
       lastName,
       preferredName,
       workModel,
+      gender,
       workEmail: email,
       workPhone,
       personalPhone,

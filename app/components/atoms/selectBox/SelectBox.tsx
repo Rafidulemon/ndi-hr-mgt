@@ -13,6 +13,8 @@ type SelectBoxProps = {
   isRequired?: boolean;
   register?: UseFormRegister<any>;
   error?: FieldError | undefined;
+  includePlaceholder?: boolean;
+  placeholderLabel?: string;
 };
 
 export default function SelectBox({
@@ -23,8 +25,11 @@ export default function SelectBox({
   isRequired = false,
   error,
   register,
+  includePlaceholder = true,
+  placeholderLabel = "Select Any",
 }: SelectBoxProps) {
-  const allOptions = [{ label: "Select Any", value: "default" }, ...options];
+  const placeholderOptions = includePlaceholder ? [{ label: placeholderLabel, value: "" }] : [];
+  const allOptions = [...placeholderOptions, ...options];
   return (
     <div className="flex flex-col">
       <div className="mb-2 flex flex-row gap-1">

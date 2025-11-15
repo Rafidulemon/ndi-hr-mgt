@@ -13,6 +13,9 @@ type Props = {
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   name?: string;
   register?: UseFormRegister<any>;
+  readOnly?: boolean;
+  disabled?: boolean;
+  type?: string;
 };
 
 function TextInput(props: Props) {
@@ -28,6 +31,9 @@ function TextInput(props: Props) {
     value,
     error,
     onChange,
+    readOnly = false,
+    disabled = false,
+    type = "text",
   } = props;
 
   return (
@@ -45,12 +51,14 @@ function TextInput(props: Props) {
       </div>
       <input
         id={id}
-        type="text"
+        type={type}
         className="mb-2 h-[40px] w-full rounded-[5px] bg-white px-4 text-text_primary shadow-sm shadow-slate-200/70 transition-colors duration-200 focus:outline-none dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:shadow-slate-900/40"
         defaultValue={defaultValue}
         value={value}
         placeholder={placeholder}
         onChange={onChange}
+        readOnly={readOnly}
+        disabled={disabled}
         {...register?.(name)}
       />
       {error && (

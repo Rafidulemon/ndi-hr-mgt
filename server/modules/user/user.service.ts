@@ -1,6 +1,8 @@
 import { TRPCError } from "@trpc/server";
+import { EmploymentType, Gender, WorkModel } from "@prisma/client";
 
 import type { TRPCContext } from "@/server/api/trpc";
+import type { UpdateProfileInput } from "./user.validation";
 
 export type UserProfileResponse = {
   id: string;
@@ -24,7 +26,7 @@ export type UserProfileResponse = {
       workPhone: string | null;
       profilePhotoUrl: string | null;
       bio: string | null;
-    } | null;
+  } | null;
   employment: {
     employeeCode: string | null;
     designation: string;
@@ -34,11 +36,13 @@ export type UserProfileResponse = {
     departmentName: string | null;
     teamName: string | null;
     managerName: string | null;
+    primaryLocation: string | null;
   } | null;
   emergencyContact: {
     name: string;
     phone: string;
     relationship: string;
+    alternatePhone: string | null;
   } | null;
   bankAccount: {
     bankName: string;
@@ -46,6 +50,7 @@ export type UserProfileResponse = {
     accountNumber: string;
     branch: string | null;
     swiftCode: string | null;
+    taxId: string | null;
   } | null;
 };
 
@@ -93,6 +98,7 @@ export const userService = {
             employmentType: true,
             startDate: true,
             status: true,
+            primaryLocation: true,
             department: {
               select: {
                 name: true,
@@ -123,6 +129,7 @@ export const userService = {
             name: true,
             phone: true,
             relationship: true,
+            alternatePhone: true,
           },
         },
         bankAccounts: {
@@ -134,6 +141,7 @@ export const userService = {
             accountNumber: true,
             branch: true,
             swiftCode: true,
+            taxId: true,
           },
         },
       },
@@ -170,10 +178,176 @@ export const userService = {
               ]
                 .filter(Boolean)
                 .join(" ") || null),
+            primaryLocation: user.employment.primaryLocation ?? null,
           }
         : null,
-      emergencyContact: emergencyContact ?? null,
-      bankAccount: bankAccount ?? null,
+      emergencyContact: emergencyContact
+        ? {
+            ...emergencyContact,
+          }
+        : null,
+      bankAccount: bankAccount
+        ? {
+            ...bankAccount,
+          }
+        : null,
     };
+  },
+
+  async updateProfile(ctx: TRPCContext, input: UpdateProfileInput) {
+    if (!ctx.session) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    const parsed = input;
+    const userId = ctx.session.user.id;
+    const organizationId = ctx.session.user.organizationId;
+
+    await ctx.prisma.$transaction(async (tx) => {
+      await tx.employeeProfile.upsert({
+        where: { userId },
+        update: {
+          firstName: parsed.profile.firstName,
+          lastName: parsed.profile.lastName,
+          preferredName: parsed.profile.preferredName ?? null,
+          gender: (parsed.profile.gender as Gender | null) ?? null,
+          dateOfBirth: parsed.profile.dateOfBirth ?? null,
+          nationality: parsed.profile.nationality ?? null,
+          currentAddress: parsed.profile.currentAddress ?? null,
+          permanentAddress: parsed.profile.permanentAddress ?? null,
+          workModel: (parsed.profile.workModel as WorkModel | null) ?? null,
+          personalEmail: parsed.profile.personalEmail ?? null,
+          workEmail: parsed.profile.workEmail,
+          personalPhone: parsed.profile.personalPhone ?? null,
+          workPhone: parsed.profile.workPhone ?? null,
+          bio: parsed.profile.bio ?? null,
+        },
+        create: {
+          userId,
+          firstName: parsed.profile.firstName,
+          lastName: parsed.profile.lastName,
+          preferredName: parsed.profile.preferredName ?? null,
+          gender: (parsed.profile.gender as Gender | null) ?? null,
+          dateOfBirth: parsed.profile.dateOfBirth ?? null,
+          nationality: parsed.profile.nationality ?? null,
+          currentAddress: parsed.profile.currentAddress ?? null,
+          permanentAddress: parsed.profile.permanentAddress ?? null,
+          workModel: (parsed.profile.workModel as WorkModel | null) ?? null,
+          personalEmail: parsed.profile.personalEmail ?? null,
+          workEmail: parsed.profile.workEmail,
+          personalPhone: parsed.profile.personalPhone ?? null,
+          workPhone: parsed.profile.workPhone ?? null,
+          bio: parsed.profile.bio ?? null,
+        },
+      });
+
+      let departmentId: string | null | undefined;
+      if (parsed.employment.departmentName) {
+        const department = await tx.department.upsert({
+          where: {
+            organizationId_name: {
+              organizationId,
+              name: parsed.employment.departmentName,
+            },
+          },
+          update: {},
+          create: {
+            organizationId,
+            name: parsed.employment.departmentName,
+          },
+        });
+        departmentId = department.id;
+      }
+
+      await tx.employmentDetail.upsert({
+        where: { userId },
+        update: {
+          employeeCode: parsed.employment.employeeCode,
+          designation: parsed.employment.designation,
+          employmentType: parsed.employment.employmentType as EmploymentType,
+          startDate: parsed.employment.startDate ?? undefined,
+          departmentId: departmentId ?? undefined,
+          primaryLocation: parsed.employment.primaryLocation ?? null,
+        },
+        create: {
+          userId,
+          organizationId,
+          employeeCode: parsed.employment.employeeCode,
+          designation: parsed.employment.designation,
+          employmentType: parsed.employment.employmentType as EmploymentType,
+          status: "ACTIVE",
+          startDate: parsed.employment.startDate ?? new Date(),
+          departmentId: departmentId ?? undefined,
+          primaryLocation: parsed.employment.primaryLocation ?? null,
+        },
+      });
+
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          phone: parsed.profile.workPhone ?? parsed.profile.personalPhone ?? null,
+        },
+      });
+
+      const existingEmergency = await tx.emergencyContact.findFirst({
+        where: { userId },
+        orderBy: { createdAt: "asc" },
+      });
+
+      if (existingEmergency) {
+        await tx.emergencyContact.update({
+          where: { id: existingEmergency.id },
+          data: {
+            name: parsed.emergencyContact.name,
+            relationship: parsed.emergencyContact.relationship,
+            phone: parsed.emergencyContact.phone,
+            alternatePhone: parsed.emergencyContact.alternatePhone ?? null,
+          },
+        });
+      } else {
+        await tx.emergencyContact.create({
+          data: {
+            userId,
+            name: parsed.emergencyContact.name,
+            relationship: parsed.emergencyContact.relationship,
+            phone: parsed.emergencyContact.phone,
+            alternatePhone: parsed.emergencyContact.alternatePhone ?? null,
+          },
+        });
+      }
+
+      const existingBank = await tx.employeeBankAccount.findFirst({
+        where: { userId },
+        orderBy: { createdAt: "asc" },
+      });
+
+      if (existingBank) {
+        await tx.employeeBankAccount.update({
+          where: { id: existingBank.id },
+          data: {
+            bankName: parsed.bankAccount.bankName,
+            accountHolder: parsed.bankAccount.accountHolder,
+            accountNumber: parsed.bankAccount.accountNumber,
+            branch: parsed.bankAccount.branch ?? null,
+            swiftCode: parsed.bankAccount.swiftCode ?? null,
+            taxId: parsed.bankAccount.taxId ?? null,
+          },
+        });
+      } else {
+        await tx.employeeBankAccount.create({
+          data: {
+            userId,
+            bankName: parsed.bankAccount.bankName,
+            accountHolder: parsed.bankAccount.accountHolder,
+            accountNumber: parsed.bankAccount.accountNumber,
+            branch: parsed.bankAccount.branch ?? null,
+            swiftCode: parsed.bankAccount.swiftCode ?? null,
+            taxId: parsed.bankAccount.taxId ?? null,
+          },
+        });
+      }
+    });
+
+    return this.getProfile(ctx);
   },
 };
