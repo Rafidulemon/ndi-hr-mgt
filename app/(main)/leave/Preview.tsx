@@ -8,11 +8,13 @@ interface ApplicationPreviewProps {
     employeeId: string;
     department: string;
     designation: string;
-    leave_type: string;
+    leaveType: string;
     reason: string;
     from: string;
     to: string;
+    note?: string;
     date: string;
+    organization: string;
   };
 }
 
@@ -34,9 +36,8 @@ function ApplicationPreview({ userData }: ApplicationPreviewProps) {
 
         <div className="flex flex-col gap-0">
           <Text text="To" />
-          <Text text="Shahriar Mahmud" />
           <Text text="HR" />
-          <Text text="Demo Company" />
+          <Text text={`${userData.organization}`}/>
         </div>
 
         <div className="flex flex-col gap-4">
@@ -45,7 +46,7 @@ function ApplicationPreview({ userData }: ApplicationPreviewProps) {
             <Text
               text={
                 <>
-                  I am writing to request leave from work for 2 days, from{" "}
+                  I am writing to request leave from work from{" "}
                   <span className="font-bold">{userData.from}</span> to{" "}
                   <span className="font-bold">{userData.to}</span>.
                 </>
@@ -53,12 +54,18 @@ function ApplicationPreview({ userData }: ApplicationPreviewProps) {
             />
             <div className="flex flex-row gap-2">
               <Text text="Leave type: " />
-              <Text text={`${userData.leave_type}`} isBold />
+              <Text text={userData.leaveType} isBold />
             </div>
             <div className="flex flex-row gap-2">
               <Text text="Reason: " />
-              <Text text={`${userData.reason}`} isBold />
+              <Text text={userData.reason} isBold />
             </div>
+            {userData.note && (
+              <div className="flex flex-row gap-2">
+                <Text text="Additional note: " />
+                <Text text={userData.note} isBold />
+              </div>
+            )}
           </div>
           <Text
             className="text-justify"
@@ -81,7 +88,7 @@ function ApplicationPreview({ userData }: ApplicationPreviewProps) {
             <Text text="Department: " />
             <Text text={`${userData.department}`} isBold />
           </div>
-          <Text text="Demo Company" />
+          <Text text={`${userData.organization}`} />
         </div>
       </div>
     </div>

@@ -1,122 +1,18 @@
 "use client";
 
+import type { ReactElement } from "react";
 import { useMemo, useState } from "react";
 import { MdKeyboardArrowLeft, MdKeyboardArrowRight } from "react-icons/md";
 import { useRouter } from "next/navigation";
+
 import Table from "../../components/atoms/tables/Table";
 import { EmployeeHeader } from "../../components/layouts/EmployeeHeader";
-
-type LeaveStatus = "Pending" | "Approved" | "Denied" | "Processing";
-
-type LeaveRow = {
-  id: string;
-  appliedOn: string;
-  leaveType: string;
-  from: string;
-  to: string;
-  days: number;
-  status: LeaveStatus;
-  year: number;
-  note: string;
-};
-
-const leaveRows: LeaveRow[] = [
-  {
-    id: "APL-10021",
-    appliedOn: "12 Dec 2024",
-    leaveType: "Casual",
-    from: "15 Dec 2024",
-    to: "17 Dec 2024",
-    days: 3,
-    status: "Pending",
-    year: 2024,
-    note: "Family visit",
-  },
-  {
-    id: "APL-10018",
-    appliedOn: "28 Nov 2024",
-    leaveType: "Sick",
-    from: "29 Nov 2024",
-    to: "30 Nov 2024",
-    days: 2,
-    status: "Approved",
-    year: 2024,
-    note: "Flu recovery",
-  },
-  {
-    id: "APL-10011",
-    appliedOn: "16 Oct 2024",
-    leaveType: "Annual",
-    from: "21 Oct 2024",
-    to: "24 Oct 2024",
-    days: 4,
-    status: "Denied",
-    year: 2024,
-    note: "Project freeze window",
-  },
-  {
-    id: "APL-09991",
-    appliedOn: "07 Sep 2024",
-    leaveType: "Casual",
-    from: "09 Sep 2024",
-    to: "09 Sep 2024",
-    days: 1,
-    status: "Approved",
-    year: 2024,
-    note: "Govt. errand",
-  },
-  {
-    id: "APL-09940",
-    appliedOn: "14 Aug 2024",
-    leaveType: "Paternity/Maternity",
-    from: "20 Aug 2024",
-    to: "30 Aug 2024",
-    days: 11,
-    status: "Processing",
-    year: 2024,
-    note: "Awaiting HR clearance",
-  },
-  {
-    id: "APL-09875",
-    appliedOn: "12 Jun 2024",
-    leaveType: "Annual",
-    from: "01 Jul 2024",
-    to: "05 Jul 2024",
-    days: 5,
-    status: "Approved",
-    year: 2024,
-    note: "Eid holiday",
-  },
-  {
-    id: "APL-09811",
-    appliedOn: "22 May 2024",
-    leaveType: "Casual",
-    from: "24 May 2024",
-    to: "24 May 2024",
-    days: 1,
-    status: "Denied",
-    year: 2024,
-    note: "Peak release window",
-  },
-  {
-    id: "APL-09560",
-    appliedOn: "02 Dec 2023",
-    leaveType: "Annual",
-    from: "18 Dec 2023",
-    to: "23 Dec 2023",
-    days: 6,
-    status: "Approved",
-    year: 2023,
-    note: "Year-end vacation",
-  },
-];
-
-const leaveBalances = [
-  { type: "Casual", allocated: 15, used: 8 },
-  { type: "Sick", allocated: 10, used: 5 },
-  { type: "Annual", allocated: 18, used: 14 },
-  { type: "Paternity/Maternity", allocated: 30, used: 10 },
-];
+import {
+  leaveTypeOptionMap,
+  leaveTypeValues,
+  type LeaveTypeValue,
+} from "@/lib/leave-types";
+import { trpc } from "@/trpc/client";
 
 const headers = [
   "Application ID",
@@ -128,74 +24,153 @@ const headers = [
   "Status",
 ];
 
-const statusFilters: Array<LeaveStatus | "All"> = [
-  "All",
-  "Pending",
-  "Processing",
-  "Approved",
-  "Denied",
-];
+const backendStatuses = [
+  "PENDING",
+  "PROCESSING",
+  "APPROVED",
+  "DENIED",
+  "CANCELLED",
+  "DRAFT",
+] as const;
 
-const statusClasses: Record<LeaveStatus, string> = {
-  Pending:
-    "bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200",
-  Approved:
-    "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-200",
-  Denied:
-    "bg-rose-50 text-rose-600 dark:bg-rose-500/20 dark:text-rose-300",
-  Processing:
-    "bg-sky-50 text-sky-600 dark:bg-sky-500/20 dark:text-sky-200",
+type BackendLeaveStatus = (typeof backendStatuses)[number];
+type StatusFilter = BackendLeaveStatus | "All";
+
+const statusFilters: StatusFilter[] = ["All", ...backendStatuses];
+
+const statusMeta: Record<BackendLeaveStatus, { label: string; chipClass: string }> = {
+  PENDING: {
+    label: "Pending",
+    chipClass: "bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200",
+  },
+  PROCESSING: {
+    label: "Processing",
+    chipClass: "bg-sky-50 text-sky-600 dark:bg-sky-500/20 dark:text-sky-200",
+  },
+  APPROVED: {
+    label: "Approved",
+    chipClass:
+      "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-200",
+  },
+  DENIED: {
+    label: "Denied",
+    chipClass: "bg-rose-50 text-rose-600 dark:bg-rose-500/20 dark:text-rose-200",
+  },
+  CANCELLED: {
+    label: "Cancelled",
+    chipClass: "bg-slate-100 text-slate-600 dark:bg-slate-800/40 dark:text-slate-200",
+  },
+  DRAFT: {
+    label: "Draft",
+    chipClass: "bg-slate-50 text-slate-500 dark:bg-slate-800/30 dark:text-slate-200",
+  },
 };
+
+const isBackendStatus = (status: string): status is BackendLeaveStatus =>
+  backendStatuses.includes(status as BackendLeaveStatus);
+
+const formatDate = (iso: string) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+};
+
+const formatApplicationId = (id: string) =>
+  `APP-${id.replace(/-/g, "").slice(0, 6).toUpperCase()}`;
+
+const getYearFromIso = (iso: string) => {
+  const parsed = new Date(iso);
+  return Number.isNaN(parsed.getTime()) ? new Date().getFullYear() : parsed.getFullYear();
+};
+
+type TableRow = Record<string, string | number | ReactElement>;
 
 export default function EmployeeLeavePage() {
   const router = useRouter();
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
-  const [statusFilter, setStatusFilter] = useState<LeaveStatus | "All">("All");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [searchTerm, setSearchTerm] = useState("");
 
-  const filteredRows = useMemo(() => {
-    return leaveRows
-      .filter((row) => row.year === year)
-      .filter((row) => statusFilter === "All" || row.status === statusFilter)
-      .filter((row) => {
-        if (!searchTerm) return true;
-        const value = searchTerm.toLowerCase();
-        return (
-          row.id.toLowerCase().includes(value) ||
-          row.leaveType.toLowerCase().includes(value) ||
-          row.note.toLowerCase().includes(value)
-        );
-      });
-  }, [year, statusFilter, searchTerm]);
+  const summaryQuery = trpc.leave.summary.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
 
-  const tableRows = filteredRows.map((row) => ({
-    "Application ID": row.id,
-    "Applied On": row.appliedOn,
-    "Leave Type": row.leaveType,
-    From: row.from,
-    To: row.to,
-    Days: `${row.days} day${row.days > 1 ? "s" : ""}`,
-    Status: (
-      <span
-        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusClasses[row.status]}`}
-      >
-        {row.status}
-      </span>
-    ),
-  }));
+  const balances = summaryQuery.data?.balances ?? [];
 
-  const upcoming = filteredRows
-    .filter((row) => row.status === "Pending" || row.status === "Processing")
-    .slice(0, 4);
+  const filteredRequests = useMemo(
+    () =>
+      (summaryQuery.data?.requests ?? [])
+        .filter((request) => getYearFromIso(request.startDate) === year)
+        .filter((request) =>
+          statusFilter === "All" ? true : request.status === statusFilter,
+        )
+        .filter((request) => {
+          const value = searchTerm.trim().toLowerCase();
+          if (!value) return true;
+          return (
+            formatApplicationId(request.id).toLowerCase().includes(value) ||
+            request.leaveTypeLabel.toLowerCase().includes(value) ||
+            (request.reason ?? "").toLowerCase().includes(value)
+          );
+        }),
+    [summaryQuery.data?.requests, year, statusFilter, searchTerm],
+  );
 
-  const decrementYear = () => {
-    setYear((prevYear) => prevYear - 1);
-  };
+  const tableRows = useMemo<TableRow[]>(
+    () =>
+      filteredRequests.map((request) => {
+        const normalizedStatus = isBackendStatus(request.status)
+          ? request.status
+          : "PENDING";
+        const status = statusMeta[normalizedStatus];
+        const leaveType =
+          leaveTypeOptionMap[request.leaveType as LeaveTypeValue]?.shortLabel ??
+          request.leaveTypeLabel;
 
-  const incrementYear = () => {
-    setYear((prevYear) => prevYear + 1);
-  };
+        return {
+          "Application ID": formatApplicationId(request.id),
+          "Applied On": formatDate(request.createdAt),
+          "Leave Type": leaveType,
+          From: formatDate(request.startDate),
+          To: formatDate(request.endDate),
+          Days: `${request.totalDays} day${request.totalDays > 1 ? "s" : ""}`,
+          Status: (
+            <span
+              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${status.chipClass}`}
+            >
+              {status.label}
+            </span>
+          ),
+        };
+      }),
+    [filteredRequests],
+  );
+
+  const upcoming = useMemo(
+    () =>
+      filteredRequests
+        .filter((request) => {
+          if (!isBackendStatus(request.status)) return false;
+          const status = request.status;
+          if (status !== "PENDING" && status !== "PROCESSING") {
+            return false;
+          }
+          const start = new Date(request.startDate);
+          return start.getFullYear() === year;
+        })
+        .slice(0, 4),
+    [filteredRequests, year],
+  );
+
+  const decrementYear = () => setYear((prevYear) => prevYear - 1);
+  const incrementYear = () => setYear((prevYear) => prevYear + 1);
 
   return (
     <div className="px-4 py-8 sm:px-6 lg:px-8">
@@ -219,7 +194,7 @@ export default function EmployeeLeavePage() {
                 Track allocations at a glance
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Balances update automatically after every approved request.
+                Balances sync automatically whenever you submit a request.
               </p>
             </div>
             <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70">
@@ -243,21 +218,28 @@ export default function EmployeeLeavePage() {
             </div>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {leaveBalances.map((balance) => {
-              const remaining = Math.max(balance.allocated - balance.used, 0);
+            {leaveTypeValues.map((type) => {
+              const option = leaveTypeOptionMap[type];
+              const balance = balances.find(
+                (entry) => (entry.type as LeaveTypeValue) === type,
+              );
+              const allocation = option.defaultAllocationDays;
+              const remaining = balance?.remaining ?? allocation;
+              const used = Math.max(0, allocation - remaining);
+
               return (
                 <div
-                  key={balance.type}
+                  key={type}
                   className="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
                 >
                   <p className="text-xs uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
-                    {balance.type}
+                    {option.shortLabel}
                   </p>
                   <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">
                     {remaining}
                   </p>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
-                    of {balance.allocated} days · {balance.used} used
+                    of {allocation} days · {used} used
                   </p>
                 </div>
               );
@@ -299,13 +281,17 @@ export default function EmployeeLeavePage() {
                       : "border border-slate-200 bg-white text-slate-600 transition-colors duration-150 hover:border-primary_dark/40 hover:text-primary_dark dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-300 dark:hover:border-sky-500/50 dark:hover:text-sky-400"
                   }`}
                 >
-                  {filter}
+                  {filter === "All" ? "All" : statusMeta[filter].label}
                 </button>
               ))}
             </div>
 
             <div className="mt-6 rounded-3xl border border-slate-100 bg-white transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/70">
-              {tableRows.length > 0 ? (
+              {summaryQuery.isLoading ? (
+                <div className="p-10 text-center text-sm text-slate-500 dark:text-slate-400">
+                  Loading leave applications…
+                </div>
+              ) : tableRows.length > 0 ? (
                 <Table headers={headers} rows={tableRows} />
               ) : (
                 <div className="p-10 text-center text-sm text-slate-500 dark:text-slate-400">
@@ -325,31 +311,39 @@ export default function EmployeeLeavePage() {
               </p>
             </div>
             <ul className="space-y-3">
-              {upcoming.map((request) => (
-                <li
-                  key={request.id}
-                  className="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {request.leaveType}
+              {upcoming.map((request) => {
+                const normalizedStatus = isBackendStatus(request.status)
+                  ? request.status
+                  : "PENDING";
+                const status = statusMeta[normalizedStatus];
+                return (
+                  <li
+                    key={request.id}
+                    className="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {request.leaveTypeLabel}
+                      </p>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${status.chipClass}`}
+                      >
+                        {status.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {formatDate(request.startDate)} → {formatDate(request.endDate)} ·{" "}
+                      {request.totalDays} day{request.totalDays > 1 ? "s" : ""}
                     </p>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClasses[request.status]}`}
-                    >
-                      {request.status}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {request.from} → {request.to} · {request.days} day
-                    {request.days > 1 ? "s" : ""}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    {request.note}
-                  </p>
-                </li>
-              ))}
-              {upcoming.length === 0 && (
+                    {request.reason && (
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                        {request.reason}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+              {!summaryQuery.isLoading && upcoming.length === 0 && (
                 <li className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500 transition-colors duration-200 dark:border-slate-700/60 dark:text-slate-400">
                   You have no pending requests this year.
                 </li>

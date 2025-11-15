@@ -1,4 +1,4 @@
-import { PrismaClient, WorkModel as WorkModelEnum } from "@prisma/client";
+import { Prisma, PrismaClient, WorkModel as WorkModelEnum } from "@prisma/client";
 import type { Gender, WorkModel, UserRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
@@ -212,6 +212,13 @@ const usersToCreate: SeedUserConfig[] = [
     gender: "MALE",
   },
 ];
+
+const defaultLeaveBalances = {
+  casual: new Prisma.Decimal(10),
+  sick: new Prisma.Decimal(7),
+  annual: new Prisma.Decimal(14),
+  parental: new Prisma.Decimal(30),
+};
 
 async function createUser(userConfig: SeedUserConfig) {
   const {

@@ -61,6 +61,13 @@ enum LeaveStatus {
   CANCELLED
 }
 
+enum LeaveType {
+  CASUAL
+  SICK
+  ANNUAL
+  PATERNITY_MATERNITY
+}
+
 enum ProjectStatus {
   ACTIVE
   ON_HOLD
@@ -97,7 +104,6 @@ model Organization {
   departments       Department[]
   employmentDetails EmploymentDetail[]
   teams             Team[]
-  leaveTypes        LeaveType[]
   projects          Project[]
   notifications     Notification[]
 
@@ -127,7 +133,6 @@ model User {
   attendanceRecords     AttendanceRecord[]
   leaveRequests         LeaveRequest[]        @relation("LeaveAuthor")
   reviewedLeaveRequests LeaveRequest[]        @relation("LeaveReviewer")
-  leaveBalances         LeaveBalance[]
   notificationsSent     Notification[]        @relation("NotificationSender")
   headedDepartments     Department[]          @relation("DepartmentHead")
   ledTeams              Team[]                @relation("TeamLead")
@@ -243,6 +248,10 @@ model EmploymentDetail {
   primaryLocation    String?
   workHours          String?
   currentProjectNote String?
+  casualLeaveBalance   Decimal   @default(0) @db.Decimal(5, 2)
+  sickLeaveBalance     Decimal   @default(0) @db.Decimal(5, 2)
+  annualLeaveBalance   Decimal   @default(0) @db.Decimal(5, 2)
+  parentalLeaveBalance Decimal   @default(0) @db.Decimal(5, 2)
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
@@ -322,84 +331,27 @@ model AttendanceRecord {
   @@index([employeeId])
 }
 
-model LeaveType {
-  id               String   @id @default(uuid())
-  organizationId   String
-  name             String
-  code             String?
-  category         String?
-  description      String?
-  requiresApproval Boolean  @default(true)
-  isPaid           Boolean  @default(true)
-  maxPerRequest    Decimal? @db.Decimal(5, 2)
-  maxPerYear       Decimal? @db.Decimal(5, 2)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  organization  Organization   @relation(fields: [organizationId], references: [id])
-  leaveRequests LeaveRequest[]
-  leaveBalances LeaveBalance[]
-
-  @@unique([organizationId, name])
-  @@unique([organizationId, code])
-  @@index([organizationId])
-}
-
 model LeaveRequest {
   id          String      @id @default(uuid())
   employeeId  String
-  leaveTypeId String
+  leaveType   LeaveType
   startDate   DateTime
   endDate     DateTime
   totalDays   Decimal     @db.Decimal(5, 2)
   status      LeaveStatus @default(PENDING)
   reason      String?
   note        String?
+  attachments Json?
   reviewerId  String?
   reviewedAt  DateTime?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
   employee    User              @relation("LeaveAuthor", fields: [employeeId], references: [id])
-  leaveType   LeaveType         @relation(fields: [leaveTypeId], references: [id])
   reviewer    User?             @relation("LeaveReviewer", fields: [reviewerId], references: [id])
-  attachments LeaveAttachment[]
 
   @@index([employeeId, startDate])
   @@index([status])
-}
-
-model LeaveAttachment {
-  id             String   @id @default(uuid())
-  leaveRequestId String
-  filename       String
-  fileUrl        String
-  mimeType       String?
-  sizeBytes      Int?
-  createdAt      DateTime @default(now())
-
-  leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id])
-
-  @@index([leaveRequestId])
-}
-
-model LeaveBalance {
-  id          String    @id @default(uuid())
-  employeeId  String
-  leaveTypeId String
-  year        Int
-  allocated   Decimal   @default(0) @db.Decimal(6, 2)
-  used        Decimal   @default(0) @db.Decimal(6, 2)
-  carriedOver Decimal   @default(0) @db.Decimal(6, 2)
-  expiresOn   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  employee  User      @relation(fields: [employeeId], references: [id])
-  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
-
-  @@unique([employeeId, leaveTypeId, year])
-  @@index([employeeId])
 }
 
 model Project {
