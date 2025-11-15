@@ -2,341 +2,190 @@
 
 import { ReactElement, useMemo, useState } from "react";
 import { MdKeyboardArrowLeft, MdKeyboardArrowRight } from "react-icons/md";
+
 import Table from "../../../components/atoms/tables/Table";
 import Pagination from "../../../components/pagination/Pagination";
 import { months } from "../../../utils/dateAndMonth";
+import { trpc } from "@/trpc/client";
 
-type AttendanceStatus = "Present" | "Late" | "Half Day" | "Absent";
+const backendStatuses = [
+  "PRESENT",
+  "LATE",
+  "HALF_DAY",
+  "ABSENT",
+  "REMOTE",
+  "HOLIDAY",
+] as const;
 
-type AttendanceRecord = {
-  date: string;
-  day: string;
-  checkIn: string;
-  checkOut: string;
-  hours: string;
-  hoursValue: number;
-  status: AttendanceStatus;
-  note: string;
-  monthIndex: number;
-  year: number;
+type BackendAttendanceStatus = (typeof backendStatuses)[number];
+type StatusFilter = "All" | BackendAttendanceStatus;
+
+const headers = ["Date", "Day", "Check-in", "Check-out", "Working Hours", "Status"];
+
+const statusMeta: Record<BackendAttendanceStatus, { label: string; chipClass: string }> = {
+  PRESENT: {
+    label: "Present",
+    chipClass:
+      "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300",
+  },
+  LATE: {
+    label: "Late",
+    chipClass: "bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200",
+  },
+  HALF_DAY: {
+    label: "Half Day",
+    chipClass: "bg-sky-50 text-sky-600 dark:bg-sky-500/20 dark:text-sky-200",
+  },
+  ABSENT: {
+    label: "Absent",
+    chipClass: "bg-rose-50 text-rose-600 dark:bg-rose-500/20 dark:text-rose-200",
+  },
+  REMOTE: {
+    label: "Remote",
+    chipClass: "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200",
+  },
+  HOLIDAY: {
+    label: "Holiday",
+    chipClass: "bg-violet-50 text-violet-600 dark:bg-violet-500/20 dark:text-violet-200",
+  },
 };
 
-const attendanceRecords: AttendanceRecord[] = [
-  {
-    date: "03 Nov 2025",
-    day: "Monday",
-    checkIn: "09:02",
-    checkOut: "17:30",
-    hours: "8h 28m",
-    hoursValue: 8.46,
-    status: "Present",
-    note: "HQ stand-up",
-    monthIndex: 10,
-    year: 2025,
-  },
-  {
-    date: "04 Nov 2025",
-    day: "Tuesday",
-    checkIn: "09:18",
-    checkOut: "17:05",
-    hours: "7h 47m",
-    hoursValue: 7.78,
-    status: "Late",
-    note: "Rain delay",
-    monthIndex: 10,
-    year: 2025,
-  },
-  {
-    date: "05 Nov 2025",
-    day: "Wednesday",
-    checkIn: "—",
-    checkOut: "—",
-    hours: "0h",
-    hoursValue: 0,
-    status: "Absent",
-    note: "Approved sick leave",
-    monthIndex: 10,
-    year: 2025,
-  },
-  {
-    date: "06 Nov 2025",
-    day: "Thursday",
-    checkIn: "09:05",
-    checkOut: "17:40",
-    hours: "8h 35m",
-    hoursValue: 8.58,
-    status: "Present",
-    note: "Product sync",
-    monthIndex: 10,
-    year: 2025,
-  },
-  {
-    date: "08 Nov 2025",
-    day: "Saturday",
-    checkIn: "09:00",
-    checkOut: "13:00",
-    hours: "4h",
-    hoursValue: 4,
-    status: "Half Day",
-    note: "Half-day support",
-    monthIndex: 10,
-    year: 2025,
-  },
-  {
-    date: "10 Nov 2025",
-    day: "Monday",
-    checkIn: "08:58",
-    checkOut: "17:15",
-    hours: "8h 17m",
-    hoursValue: 8.28,
-    status: "Present",
-    note: "Field visit",
-    monthIndex: 10,
-    year: 2025,
-  },
-  {
-    date: "03 Jan 2025",
-    day: "Friday",
-    checkIn: "09:02",
-    checkOut: "17:32",
-    hours: "8h 30m",
-    hoursValue: 8.5,
-    status: "Present",
-    note: "Dhaka HQ",
-    monthIndex: 0,
-    year: 2025,
-  },
-  {
-    date: "04 Jan 2025",
-    day: "Saturday",
-    checkIn: "09:04",
-    checkOut: "17:20",
-    hours: "8h 16m",
-    hoursValue: 8.3,
-    status: "Present",
-    note: "Client review call",
-    monthIndex: 0,
-    year: 2025,
-  },
-  {
-    date: "05 Jan 2025",
-    day: "Sunday",
-    checkIn: "09:18",
-    checkOut: "17:05",
-    hours: "7h 47m",
-    hoursValue: 7.8,
-    status: "Late",
-    note: "Traffic delay",
-    monthIndex: 0,
-    year: 2025,
-  },
-  {
-    date: "08 Jan 2025",
-    day: "Wednesday",
-    checkIn: "09:00",
-    checkOut: "13:00",
-    hours: "4h",
-    hoursValue: 4,
-    status: "Half Day",
-    note: "Medical appointment",
-    monthIndex: 0,
-    year: 2025,
-  },
-  {
-    date: "09 Jan 2025",
-    day: "Thursday",
-    checkIn: "—",
-    checkOut: "—",
-    hours: "0h",
-    hoursValue: 0,
-    status: "Absent",
-    note: "Sick leave",
-    monthIndex: 0,
-    year: 2025,
-  },
-  {
-    date: "02 Feb 2025",
-    day: "Sunday",
-    checkIn: "08:55",
-    checkOut: "17:10",
-    hours: "8h 15m",
-    hoursValue: 8.25,
-    status: "Present",
-    note: "Office",
-    monthIndex: 1,
-    year: 2025,
-  },
-  {
-    date: "05 Feb 2025",
-    day: "Wednesday",
-    checkIn: "09:12",
-    checkOut: "17:02",
-    hours: "7h 50m",
-    hoursValue: 7.83,
-    status: "Late",
-    note: "School drop-off",
-    monthIndex: 1,
-    year: 2025,
-  },
-  {
-    date: "12 Feb 2025",
-    day: "Wednesday",
-    checkIn: "09:00",
-    checkOut: "12:30",
-    hours: "3h 30m",
-    hoursValue: 3.5,
-    status: "Half Day",
-    note: "Visa interview",
-    monthIndex: 1,
-    year: 2025,
-  },
-  {
-    date: "01 Mar 2025",
-    day: "Saturday",
-    checkIn: "09:03",
-    checkOut: "17:41",
-    hours: "8h 38m",
-    hoursValue: 8.63,
-    status: "Present",
-    note: "Sprint demo",
-    monthIndex: 2,
-    year: 2025,
-  },
-  {
-    date: "04 Mar 2025",
-    day: "Tuesday",
-    checkIn: "09:16",
-    checkOut: "17:08",
-    hours: "7h 52m",
-    hoursValue: 7.86,
-    status: "Late",
-    note: "Rain delay",
-    monthIndex: 2,
-    year: 2025,
-  },
-  {
-    date: "07 Mar 2025",
-    day: "Friday",
-    checkIn: "—",
-    checkOut: "—",
-    hours: "0h",
-    hoursValue: 0,
-    status: "Absent",
-    note: "Family event",
-    monthIndex: 2,
-    year: 2025,
-  },
-];
+const statusFilters: StatusFilter[] = ["All", ...backendStatuses];
 
-const headers = [
-  "Date",
-  "Day",
-  "Check-in",
-  "Check-out",
-  "Working Hours",
-  "Status",
-];
+const isBackendStatus = (status: string): status is BackendAttendanceStatus =>
+  backendStatuses.includes(status as BackendAttendanceStatus);
 
-const statusFilters: Array<AttendanceStatus | "All"> = [
-  "All",
-  "Present",
-  "Late",
-  "Half Day",
-  "Absent",
-];
+const formatDateLabel = (date: Date) =>
+  new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
 
-const statusChipClasses: Record<AttendanceStatus, string> = {
-  Present:
-    "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300",
-  Late: "bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200",
-  "Half Day":
-    "bg-sky-50 text-sky-600 dark:bg-sky-500/20 dark:text-sky-200",
-  Absent:
-    "bg-rose-50 text-rose-600 dark:bg-rose-500/20 dark:text-rose-200",
+const formatDayLabel = (date: Date) =>
+  new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date);
+
+const formatTimeLabel = (isoDate: string | null) => {
+  if (!isoDate) return "—";
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+};
+
+const formatDuration = (seconds: number) => {
+  if (!seconds) return "0h";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const parts: string[] = [];
+  if (hours > 0) {
+    parts.push(`${hours}h`);
+  }
+  if (minutes > 0) {
+    parts.push(`${minutes}m`);
+  }
+  return parts.length > 0 ? parts.join(" ") : "0m";
+};
+
+type DisplayRecord = {
+  id: string;
+  dateLabel: string;
+  dayLabel: string;
+  checkIn: string;
+  checkOut: string;
+  hoursLabel: string;
+  hoursValue: number;
+  status: BackendAttendanceStatus;
+  statusLabel: string;
+  chipClass: string;
+  note: string | null;
 };
 
 export default function AttendanceHistory() {
-  const latestRecord = attendanceRecords.reduce<AttendanceRecord | null>(
-    (latest, record) => {
-      if (!latest) return record;
-      if (record.year > latest.year) return record;
-      if (record.year === latest.year && record.monthIndex > latest.monthIndex) {
-        return record;
-      }
-      return latest;
-    },
-    null
-  );
-
   const today = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(
-    latestRecord?.monthIndex ?? today.getMonth()
-  );
-  const [selectedYear, setSelectedYear] = useState(
-    latestRecord?.year ?? today.getFullYear()
-  );
-  const [selectedStatus, setSelectedStatus] =
-    useState<AttendanceStatus | "All">("All");
+  const [selectedPeriod, setSelectedPeriod] = useState(() => ({
+    month: today.getMonth(),
+    year: today.getFullYear(),
+  }));
+  const selectedMonth = selectedPeriod.month;
+  const selectedYear = selectedPeriod.year;
+  const [selectedStatus, setSelectedStatus] = useState<StatusFilter>("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPageData, setCurrentPageData] = useState<
     Array<Record<string, string | number | ReactElement>>
   >([]);
 
-  const monthRecords = useMemo(
-    () =>
-      attendanceRecords.filter(
-        (record) =>
-          record.monthIndex === selectedMonth && record.year === selectedYear
-      ),
-    [selectedMonth, selectedYear]
-  );
+  const historyQuery = trpc.attendance.history.useQuery({
+    month: selectedMonth,
+    year: selectedYear,
+  });
+
+  const displayRecords = useMemo<DisplayRecord[]>(() => {
+    const records = historyQuery.data?.records ?? [];
+    return records.map((record) => {
+      const attendanceDate = new Date(record.attendanceDate);
+      const normalizedStatus = isBackendStatus(record.status)
+        ? record.status
+        : "PRESENT";
+      const meta = statusMeta[normalizedStatus];
+      const totalWorkSeconds = Math.max(0, record.totalWorkSeconds ?? 0);
+
+      return {
+        id: record.id,
+        dateLabel: formatDateLabel(attendanceDate),
+        dayLabel: formatDayLabel(attendanceDate),
+        checkIn: formatTimeLabel(record.checkInAt),
+        checkOut: formatTimeLabel(record.checkOutAt),
+        hoursLabel: formatDuration(totalWorkSeconds),
+        hoursValue: totalWorkSeconds / 3600,
+        status: normalizedStatus,
+        statusLabel: meta.label,
+        chipClass: meta.chipClass,
+        note: record.note ?? null,
+      };
+    });
+  }, [historyQuery.data?.records]);
 
   const filteredRecords = useMemo(() => {
-    return monthRecords.filter((record) => {
+    const term = searchTerm.trim().toLowerCase();
+    return displayRecords.filter((record) => {
       const matchesStatus =
         selectedStatus === "All" || record.status === selectedStatus;
-      const matchesSearch =
-        record.date.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        record.day.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = term
+        ? `${record.dateLabel} ${record.dayLabel}`.toLowerCase().includes(term)
+        : true;
       return matchesStatus && matchesSearch;
     });
-  }, [monthRecords, searchTerm, selectedStatus]);
+  }, [displayRecords, searchTerm, selectedStatus]);
 
   const tableRows = useMemo(
     () =>
       filteredRecords.map((record) => ({
-        Date: record.date,
-        Day: record.day,
+        Date: record.dateLabel,
+        Day: record.dayLabel,
         "Check-in": record.checkIn,
         "Check-out": record.checkOut,
-        "Working Hours": record.hours,
+        "Working Hours": record.hoursLabel,
         Status: (
           <span
-            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusChipClasses[record.status]}`}
+            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${record.chipClass}`}
           >
-            {record.status}
+            {record.statusLabel}
           </span>
         ),
       })),
-    [filteredRecords]
+    [filteredRecords],
   );
 
-  const presentDays = monthRecords.filter(
-    (record) => record.status === "Present"
+  const presentDays = displayRecords.filter(
+    (record) => record.status === "PRESENT" || record.status === "REMOTE",
   ).length;
-  const lateDays = monthRecords.filter(
-    (record) => record.status === "Late"
-  ).length;
-  const halfDays = monthRecords.filter(
-    (record) => record.status === "Half Day"
-  ).length;
-  const absentDays = monthRecords.filter(
-    (record) => record.status === "Absent"
-  ).length;
-  const totalHours = monthRecords.reduce(
-    (sum, record) => sum + record.hoursValue,
-    0
-  );
+  const lateDays = displayRecords.filter((record) => record.status === "LATE").length;
+  const halfDays = displayRecords.filter((record) => record.status === "HALF_DAY").length;
+  const absentDays = displayRecords.filter((record) => record.status === "ABSENT").length;
+  const totalHours = displayRecords.reduce((sum, record) => sum + record.hoursValue, 0);
 
   const summaryCards = [
     {
@@ -361,24 +210,26 @@ export default function AttendanceHistory() {
     },
   ];
 
-  const timelineEntries = monthRecords.slice(0, 6);
+  const timelineEntries = displayRecords.slice(0, 6);
 
   const shiftMonth = (direction: "prev" | "next") => {
-    setSelectedMonth((prev) => {
+    setSelectedPeriod((prev) => {
+      const { month, year } = prev;
       if (direction === "prev") {
-        if (prev === 0) {
-          setSelectedYear((year) => year - 1);
-          return 11;
+        if (month === 0) {
+          return { month: 11, year: year - 1 };
         }
-        return prev - 1;
+        return { month: month - 1, year };
       }
-      if (prev === 11) {
-        setSelectedYear((year) => year + 1);
-        return 0;
+      if (month === 11) {
+        return { month: 0, year: year + 1 };
       }
-      return prev + 1;
+      return { month: month + 1, year };
     });
   };
+
+  const isLoading = historyQuery.isLoading;
+  const hasError = Boolean(historyQuery.error);
 
   return (
     <div className="space-y-6">
@@ -446,25 +297,37 @@ export default function AttendanceHistory() {
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            {statusFilters.map((filter) => (
-              <button
-                key={filter}
-                type="button"
-                onClick={() => setSelectedStatus(filter)}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                  selectedStatus === filter
-                    ? "bg-primary_dark text-white shadow dark:bg-sky-600"
-                    : "border border-slate-200 bg-white text-slate-600 transition-colors duration-150 hover:border-primary_dark/40 hover:text-primary_dark dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-300 dark:hover:border-sky-500/50 dark:hover:text-sky-400"
-                }`}
-              >
-                {filter}
-              </button>
-            ))}
+            {statusFilters.map((filter) => {
+              const isActive = selectedStatus === filter;
+              const label = filter === "All" ? "All" : statusMeta[filter].label;
+              return (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setSelectedStatus(filter)}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                    isActive
+                      ? "bg-primary_dark text-white shadow dark:bg-sky-600"
+                      : "border border-slate-200 bg-white text-slate-600 transition-colors duration-150 hover:border-primary_dark/40 hover:text-primary_dark dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-300 dark:hover:border-sky-500/50 dark:hover:text-sky-400"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         <div className="mt-6 rounded-3xl border border-slate-100 bg-white shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/70 dark:shadow-slate-900/60">
-          {filteredRecords.length > 0 ? (
+          {isLoading ? (
+            <div className="p-10 text-center text-sm text-slate-500 dark:text-slate-400">
+              Loading attendance history...
+            </div>
+          ) : hasError ? (
+            <div className="p-10 text-center text-sm text-rose-500">
+              Unable to load attendance history. Please try again.
+            </div>
+          ) : filteredRecords.length > 0 ? (
             <>
               <Table
                 headers={headers}
@@ -480,7 +343,7 @@ export default function AttendanceHistory() {
               />
             </>
           ) : (
-            <div className="p-10 text-center text-sm text-slate-500 dark:text-slate-400">
+            <div className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">
               No attendance entries match the current filters.
             </div>
           )}
@@ -488,46 +351,58 @@ export default function AttendanceHistory() {
       </section>
 
       <section className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Recent timeline
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
+              Highlights
+            </p>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+              Recent check-ins
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Exceptions and highlights for {months[0]}.
+              Quick view of the last 6 attendance updates.
             </p>
           </div>
-          <span className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
-            {timelineEntries.length} entries
-          </span>
         </div>
-        <ul className="mt-6 space-y-3">
-          {timelineEntries.map((entry) => (
-            <li
-              key={`${entry.date}-${entry.day}`}
-              className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
-            >
-              <div>
-                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {entry.date}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {entry.day} · {entry.note}
-                </p>
-              </div>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${statusChipClasses[entry.status]}`}
+        <div className="mt-6 space-y-4">
+          {timelineEntries.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500 dark:border-slate-700/60 dark:text-slate-400">
+              {isLoading
+                ? "Loading timeline..."
+                : "No attendance records found for this month."}
+            </div>
+          ) : (
+            timelineEntries.map((entry) => (
+              <div
+                key={entry.id}
+                className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
               >
-                {entry.status}
-              </span>
-            </li>
-          ))}
-          {timelineEntries.length === 0 && (
-            <li className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500 dark:border-slate-700/60 dark:text-slate-400">
-              No timeline events for this month.
-            </li>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {entry.dateLabel}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{entry.dayLabel}</p>
+                </div>
+                <div className="flex flex-col text-sm text-slate-600 dark:text-slate-300">
+                  <span>
+                    Check-in: <strong>{entry.checkIn}</strong>
+                  </span>
+                  <span>
+                    Check-out: <strong>{entry.checkOut}</strong>
+                  </span>
+                </div>
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {entry.hoursLabel}
+                </div>
+                <span
+                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${entry.chipClass}`}
+                >
+                  {entry.statusLabel}
+                </span>
+              </div>
+            ))
           )}
-        </ul>
+        </div>
       </section>
     </div>
   );
