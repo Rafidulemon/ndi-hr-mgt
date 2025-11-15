@@ -1251,6 +1251,18 @@
   dependencies:
     tslib "^2.8.0"
 
+"@tanstack/query-core@5.90.9":
+  version "5.90.9"
+  resolved "https://registry.npmjs.org/@tanstack/query-core/-/query-core-5.90.9.tgz"
+  integrity sha512-UFOCQzi6pRGeVTVlPNwNdnAvT35zugcIydqjvFUzG62dvz2iVjElmNp/hJkUoM5eqbUPfSU/GJIr/wbvD8bTUw==
+
+"@tanstack/react-query@^5.80.3", "@tanstack/react-query@^5.90.9":
+  version "5.90.9"
+  resolved "https://registry.npmjs.org/@tanstack/react-query/-/react-query-5.90.9.tgz"
+  integrity sha512-Zke2AaXiaSfnG8jqPZR52m8SsclKT2d9//AgE/QIzyNvbpj/Q2ln+FsZjb1j69bJZUouBvX2tg9PHirkTm8arw==
+  dependencies:
+    "@tanstack/query-core" "5.90.9"
+
 "@tanstack/react-table@^8.9.2":
   version "8.21.3"
   resolved "https://registry.npmjs.org/@tanstack/react-table/-/react-table-8.21.3.tgz"
@@ -1274,6 +1286,21 @@
   version "3.13.12"
   resolved "https://registry.npmjs.org/@tanstack/virtual-core/-/virtual-core-3.13.12.tgz"
   integrity sha512-1YBOJfRHV4sXUmWsFSf5rQor4Ss82G8dQWLRbnk3GA4jeP8hQt1hxXh0tmflpC0dz3VgEv/1+qwPyLeWkQuPFA==
+
+"@trpc/client@^11.7.1", "@trpc/client@11.7.1":
+  version "11.7.1"
+  resolved "https://registry.npmjs.org/@trpc/client/-/client-11.7.1.tgz"
+  integrity sha512-uOnAjElKI892/U6aQMcBHYs3x7mme3Cvv1F87ytBL56rBvs7+DyK7r43zgaXKf13+GtPEI6ex5xjVUfyDW8XcQ==
+
+"@trpc/react-query@^11.7.1":
+  version "11.7.1"
+  resolved "https://registry.npmjs.org/@trpc/react-query/-/react-query-11.7.1.tgz"
+  integrity sha512-dEHDjIqSTzO8nLlCbtiFBMBwhbSkK1QP7aYVo3nP3sYBna0b+iCtrPXdxVPCSopr9/aIqDTEh+dMRZa7yBgjfQ==
+
+"@trpc/server@^11.7.1", "@trpc/server@11.7.1":
+  version "11.7.1"
+  resolved "https://registry.npmjs.org/@trpc/server/-/server-11.7.1.tgz"
+  integrity sha512-N3U8LNLIP4g9C7LJ/sLkjuPHwqlvE3bnspzC4DEFVdvx2+usbn70P80E3wj5cjOTLhmhRiwJCSXhlB+MHfGeCw==
 
 "@tsconfig/node16@^1.0.3":
   version "1.0.4"
@@ -4225,7 +4252,7 @@ react-style-singleton@^2.2.2, react-style-singleton@^2.2.3:
     get-nonce "^1.0.0"
     tslib "^2.0.0"
 
-react@*, "react@^16 || ^17 || ^18 || ^19", "react@^16.8 || ^17 || ^18", "react@^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc", "react@^16.8.0 || ^17 || ^18 || ^19", "react@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0 || ^19.0.0-rc", "react@^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1", "react@^16.9.0 || ^17 || ^18 || ^19 || ^19.0.0-rc", "react@^18 || ^19 || ^19.0.0-rc", "react@^18.2.0 || 19.0.0-rc-de68d2f4-20241204 || ^19.0.0", react@^19.2.0, "react@>= 0.14.0", "react@>= 16 || ^19.0.0-rc", "react@>= 16.0.0", "react@>= 16.8.0 || 17.x.x || ^18.0.0-0 || ^19.0.0-0", react@>=16, react@>=16.8, react@>=16.8.0, react@>=17, react@>=17.0.0, react@>=18, react@>=18.2.0, react@19.2.0:
+react@*, "react@^16 || ^17 || ^18 || ^19", "react@^16.8 || ^17 || ^18", "react@^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc", "react@^16.8.0 || ^17 || ^18 || ^19", "react@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0 || ^19.0.0-rc", "react@^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1", "react@^16.9.0 || ^17 || ^18 || ^19 || ^19.0.0-rc", "react@^18 || ^19", "react@^18 || ^19 || ^19.0.0-rc", "react@^18.2.0 || 19.0.0-rc-de68d2f4-20241204 || ^19.0.0", react@^19.2.0, "react@>= 0.14.0", "react@>= 16 || ^19.0.0-rc", "react@>= 16.0.0", "react@>= 16.8.0 || 17.x.x || ^18.0.0-0 || ^19.0.0-0", react@>=16, react@>=16.8, react@>=16.8.0, react@>=17, react@>=17.0.0, react@>=18, react@>=18.2.0, react@19.2.0:
   version "19.2.0"
   resolved "https://registry.npmjs.org/react/-/react-19.2.0.tgz"
   integrity sha512-tmbWg6W31tQLeB5cdIBOicJDJRR2KzXsV7uSK9iNfLWQ5bIZfxuPEHp7M8wiHyHnn0DD1i7w3Zmin0FtkrwoCQ==
@@ -4948,7 +4975,7 @@ typescript-eslint@^8.46.0:
     "@typescript-eslint/typescript-estree" "8.46.4"
     "@typescript-eslint/utils" "8.46.4"
 
-typescript@^5, typescript@>=3.3.1, typescript@>=4, typescript@>=4.8.4, "typescript@>=4.8.4 <6.0.0", typescript@>=5.1.0:
+typescript@^5, typescript@>=3.3.1, typescript@>=4, typescript@>=4.8.4, "typescript@>=4.8.4 <6.0.0", typescript@>=5.1.0, typescript@>=5.7.2:
   version "5.9.3"
   resolved "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz"
   integrity sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==

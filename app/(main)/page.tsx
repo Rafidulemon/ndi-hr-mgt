@@ -49,7 +49,7 @@ const monthSnapshot = [
   { label: "Leaves taken", value: "01" },
 ];
 
-function Index() {
+function HomePage() {
   return (
     <div className="space-y-8">
       <section className="grid gap-6 xl:grid-cols-[2fr_1fr]">
@@ -231,4 +231,4 @@ function Index() {
   );
 }
 
-export default Index;
+export default HomePage;
