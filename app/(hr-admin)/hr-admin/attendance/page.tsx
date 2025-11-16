@@ -4,43 +4,24 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { FiCalendar, FiDownload, FiPlus } from "react-icons/fi";
 
 import CustomDatePicker from "@/app/components/atoms/inputs/DatePicker";
-
-type AttendanceStatus = "On time" | "Late" | "On leave" | "Absent";
-type AttendanceLog = {
-  id: string;
-  employeeId: string;
-  name: string;
-  squad: string;
-  checkIn: string;
-  checkOut: string;
-  status: AttendanceStatus;
-  source?: "Manual" | "System";
-};
+import { trpc } from "@/trpc/client";
+import type { HrAttendanceCalendarSignal, HrAttendanceStatus } from "@/types/hr-attendance";
 
 type ManualFormState = {
   employeeId: string;
   checkIn: string;
   checkOut: string;
-  status: AttendanceStatus;
+  status: HrAttendanceStatus;
 };
 
-type DaySignal = "ontime" | "late" | "leave" | "absent" | "none";
+type DaySignal = HrAttendanceCalendarSignal;
 
 type LogFilters = {
   query: string;
-  status: "all" | AttendanceStatus;
+  status: "all" | HrAttendanceStatus;
 };
 
-const employees = [
-  { id: "emp-1", name: "Mahia Ahmed", squad: "Growth" },
-  { id: "emp-2", name: "Raul Castro", squad: "Mobile" },
-  { id: "emp-3", name: "Sara Islam", squad: "CX" },
-  { id: "emp-4", name: "Imran Hossain", squad: "Platform" },
-  { id: "emp-5", name: "Farzana Rahman", squad: "People Ops" },
-  { id: "emp-6", name: "Noor Hasan", squad: "Design" },
-] as const;
-
-const badgeVariant: Record<AttendanceStatus, string> = {
+const badgeVariant: Record<HrAttendanceStatus, string> = {
   "On time":
     "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200",
   Late: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200",
@@ -48,7 +29,7 @@ const badgeVariant: Record<AttendanceStatus, string> = {
   Absent: "bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200",
 };
 
-const statusColorScale: Record<AttendanceStatus, string> = {
+const statusColorScale: Record<HrAttendanceStatus, string> = {
   "On time": "#22c55e",
   Late: "#f97316",
   "On leave": "#38bdf8",
@@ -57,29 +38,12 @@ const statusColorScale: Record<AttendanceStatus, string> = {
 
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const weeklyTrend = [
-  { label: "Mon", present: 92 },
-  { label: "Tue", present: 88 },
-  { label: "Wed", present: 95 },
-  { label: "Thu", present: 90 },
-  { label: "Fri", present: 97 },
-];
-
 const formatDateKey = (date: Date) =>
   new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(date);
-
-const formatTimeLabel = (value: string) => {
-  if (!value) return "—";
-  const [hour, minute] = value.split(":").map(Number);
-  const date = new Date();
-  date.setHours(hour);
-  date.setMinutes(minute);
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-};
 
 const parseTimeLabelToMinutes = (value: string) => {
   const match = value.match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i);
@@ -120,189 +84,11 @@ const parseMonthInputValue = (value: string) => {
   return new Date(year, month - 1, 1);
 };
 
-const parseDateKeyToDate = (key: string) => {
-  const [year, month, day] = key.split("-").map(Number);
-  return new Date(year, (month ?? 1) - 1, day ?? 1);
-};
-
 const todayRef = new Date();
 const startOfToday = new Date(todayRef);
 startOfToday.setHours(0, 0, 0, 0);
 const startOfCurrentMonth = new Date(todayRef.getFullYear(), todayRef.getMonth(), 1);
 const maxMonthValue = buildMonthInputValue(todayRef);
-
-const attendanceHistory: Record<string, AttendanceLog[]> = {
-  [formatDateKey(todayRef)]: [
-    {
-      id: "t-1",
-      employeeId: "emp-1",
-      name: "Mahia Ahmed",
-      squad: "Growth",
-      checkIn: "09:01 AM",
-      checkOut: "—",
-      status: "Late",
-    },
-    {
-      id: "t-2",
-      employeeId: "emp-2",
-      name: "Raul Castro",
-      squad: "Mobile",
-      checkIn: "08:45 AM",
-      checkOut: "—",
-      status: "On time",
-    },
-    {
-      id: "t-3",
-      employeeId: "emp-3",
-      name: "Sara Islam",
-      squad: "CX",
-      checkIn: "—",
-      checkOut: "—",
-      status: "On leave",
-    },
-    {
-      id: "t-4",
-      employeeId: "emp-4",
-      name: "Imran Hossain",
-      squad: "Platform",
-      checkIn: "10:02 AM",
-      checkOut: "—",
-      status: "Late",
-    },
-    {
-      id: "t-5",
-      employeeId: "emp-5",
-      name: "Farzana Rahman",
-      squad: "People Ops",
-      checkIn: "08:58 AM",
-      checkOut: "—",
-      status: "On time",
-    },
-    {
-      id: "t-6",
-      employeeId: "emp-6",
-      name: "Noor Hasan",
-      squad: "Design",
-      checkIn: "—",
-      checkOut: "—",
-      status: "Absent",
-    },
-  ],
-  [formatDateKey(new Date(todayRef.getFullYear(), todayRef.getMonth(), todayRef.getDate() - 1))]: [
-    {
-      id: "y-1",
-      employeeId: "emp-1",
-      name: "Mahia Ahmed",
-      squad: "Growth",
-      checkIn: "08:57 AM",
-      checkOut: "05:08 PM",
-      status: "On time",
-    },
-    {
-      id: "y-2",
-      employeeId: "emp-2",
-      name: "Raul Castro",
-      squad: "Mobile",
-      checkIn: "09:10 AM",
-      checkOut: "05:45 PM",
-      status: "Late",
-    },
-    {
-      id: "y-3",
-      employeeId: "emp-3",
-      name: "Sara Islam",
-      squad: "CX",
-      checkIn: "—",
-      checkOut: "—",
-      status: "On leave",
-    },
-    {
-      id: "y-4",
-      employeeId: "emp-4",
-      name: "Imran Hossain",
-      squad: "Platform",
-      checkIn: "09:05 AM",
-      checkOut: "—",
-      status: "Late",
-    },
-    {
-      id: "y-5",
-      employeeId: "emp-5",
-      name: "Farzana Rahman",
-      squad: "People Ops",
-      checkIn: "08:51 AM",
-      checkOut: "05:05 PM",
-      status: "On time",
-    },
-  ],
-  [formatDateKey(new Date(todayRef.getFullYear(), todayRef.getMonth(), todayRef.getDate() - 2))]: [
-    {
-      id: "td2-1",
-      employeeId: "emp-1",
-      name: "Mahia Ahmed",
-      squad: "Growth",
-      checkIn: "08:49 AM",
-      checkOut: "05:10 PM",
-      status: "On time",
-    },
-    {
-      id: "td2-2",
-      employeeId: "emp-2",
-      name: "Raul Castro",
-      squad: "Mobile",
-      checkIn: "08:44 AM",
-      checkOut: "05:30 PM",
-      status: "On time",
-    },
-    {
-      id: "td2-3",
-      employeeId: "emp-4",
-      name: "Imran Hossain",
-      squad: "Platform",
-      checkIn: "09:30 AM",
-      checkOut: "06:05 PM",
-      status: "Late",
-    },
-    {
-      id: "td2-4",
-      employeeId: "emp-6",
-      name: "Noor Hasan",
-      squad: "Design",
-      checkIn: "—",
-      checkOut: "—",
-      status: "Absent",
-    },
-  ],
-  [formatDateKey(new Date(todayRef.getFullYear(), todayRef.getMonth(), todayRef.getDate() - 5))]: [
-    {
-      id: "lw-1",
-      employeeId: "emp-1",
-      name: "Mahia Ahmed",
-      squad: "Growth",
-      checkIn: "08:52 AM",
-      checkOut: "05:00 PM",
-      status: "On time",
-    },
-    {
-      id: "lw-2",
-      employeeId: "emp-3",
-      name: "Sara Islam",
-      squad: "CX",
-      checkIn: "—",
-      checkOut: "—",
-      status: "On leave",
-    },
-    {
-      id: "lw-3",
-      employeeId: "emp-5",
-      name: "Farzana Rahman",
-      squad: "People Ops",
-      checkIn: "09:12 AM",
-      checkOut: "05:36 PM",
-      status: "Late",
-    },
-  ],
-};
 
 const calendarSignalColor: Record<Exclude<DaySignal, "none">, string> = {
   ontime: "bg-emerald-400",
@@ -315,7 +101,7 @@ const escapeForCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
 
 const buildCalendarCells = (
   referenceDate: Date,
-  manualEntries: Record<string, AttendanceLog[]>
+  daySignals: Record<string, DaySignal>,
 ) => {
   const year = referenceDate.getFullYear();
   const month = referenceDate.getMonth();
@@ -332,7 +118,7 @@ const buildCalendarCells = (
   for (let day = 1; day <= daysInMonth; day += 1) {
     const dateInstance = new Date(year, month, day);
     const key = formatDateKey(dateInstance);
-    cells.push({ date: dateInstance, key, signal: getDaySignal(key, manualEntries) });
+    cells.push({ date: dateInstance, key, signal: getDaySignal(key, daySignals) });
   }
 
   while (cells.length % 7 !== 0) {
@@ -342,21 +128,8 @@ const buildCalendarCells = (
   return cells;
 };
 
-const getDaySignal = (
-  dateKey: string | null,
-  manualEntries: Record<string, AttendanceLog[]>
-): DaySignal => {
-  if (!dateKey) return "none";
-  const baseLogs = attendanceHistory[dateKey] ?? [];
-  const manualLogs = manualEntries[dateKey] ?? [];
-  const logs = [...baseLogs, ...manualLogs];
-
-  if (!logs.length) return "none";
-  if (logs.some((log) => log.status === "Absent")) return "absent";
-  if (logs.some((log) => log.status === "Late")) return "late";
-  if (logs.some((log) => log.status === "On leave")) return "leave";
-  return "ontime";
-};
+const getDaySignal = (dateKey: string | null, daySignals: Record<string, DaySignal>): DaySignal =>
+  dateKey ? daySignals[dateKey] ?? "none" : "none";
 
 const isFutureDate = (date: Date) => {
   const normalized = new Date(date);
@@ -367,17 +140,17 @@ const isFutureDate = (date: Date) => {
 export default function HrAdminAttendancePage() {
   const [selectedDate, setSelectedDate] = useState<Date>(todayRef);
   const [manualDate, setManualDate] = useState<Date>(todayRef);
-  const [manualEntries, setManualEntries] = useState<Record<string, AttendanceLog[]>>({});
   const [manualForm, setManualForm] = useState<ManualFormState>({
-    employeeId: employees[0]?.id ?? "",
+    employeeId: "",
     checkIn: "",
     checkOut: "",
     status: "On time",
   });
   const [formFeedback, setFormFeedback] = useState<string | null>(null);
   const [logFilters, setLogFilters] = useState<LogFilters>({ query: "", status: "all" });
-  const [historyEmployeeId, setHistoryEmployeeId] = useState<string>(employees[0]?.id ?? "");
+  const [historyEmployeeId, setHistoryEmployeeId] = useState<string>("");
   const [historyMonth, setHistoryMonth] = useState<Date>(startOfCurrentMonth);
+  const utils = trpc.useUtils();
 
   useEffect(() => {
     if (!formFeedback) return undefined;
@@ -385,57 +158,69 @@ export default function HrAdminAttendancePage() {
     return () => window.clearTimeout(timeoutId);
   }, [formFeedback]);
 
-  const combinedHistory = useMemo(() => {
-    const mergedKeys = new Set([
-      ...Object.keys(attendanceHistory),
-      ...Object.keys(manualEntries),
-    ]);
-    const result: Record<string, AttendanceLog[]> = {};
-
-    mergedKeys.forEach((key) => {
-      result[key] = [...(attendanceHistory[key] ?? []), ...(manualEntries[key] ?? [])];
-    });
-
-    return result;
-  }, [manualEntries]);
-
   const selectedDayKey = formatDateKey(selectedDate);
+  const overviewQuery = trpc.hrAttendance.overview.useQuery({ date: selectedDayKey });
+  const employees = useMemo(
+    () => overviewQuery.data?.employees ?? [],
+    [overviewQuery.data?.employees],
+  );
+  const dayLogs = useMemo(
+    () => overviewQuery.data?.dayLogs ?? [],
+    [overviewQuery.data?.dayLogs],
+  );
+  const statusStats = useMemo(
+    () =>
+      overviewQuery.data?.statusCounts ?? {
+        "On time": 0,
+        Late: 0,
+        "On leave": 0,
+        Absent: 0,
+      },
+    [overviewQuery.data?.statusCounts],
+  );
+  const weeklyTrend = overviewQuery.data?.weeklyTrend ?? [];
+  const calendarEntries = useMemo(
+    () => overviewQuery.data?.calendar ?? [],
+    [overviewQuery.data?.calendar],
+  );
+  const calendarSignalMap = useMemo(() => {
+    const map: Record<string, DaySignal> = {};
+    calendarEntries.forEach((entry) => {
+      map[entry.date] = entry.signal;
+    });
+    return map;
+  }, [calendarEntries]);
 
-  const dayLogs = useMemo(() => {
-    const baseLogs = attendanceHistory[selectedDayKey] ?? [];
-    const manualForDay = manualEntries[selectedDayKey] ?? [];
-    return [...baseLogs, ...manualForDay].sort((a, b) => a.name.localeCompare(b.name));
-  }, [manualEntries, selectedDayKey]);
+  const resolvedManualEmployeeId = useMemo(() => {
+    if (manualForm.employeeId && employees.some((employee) => employee.id === manualForm.employeeId)) {
+      return manualForm.employeeId;
+    }
+    return employees[0]?.id ?? "";
+  }, [employees, manualForm.employeeId]);
+
+  const resolvedHistoryEmployeeId = useMemo(() => {
+    if (historyEmployeeId && employees.some((employee) => employee.id === historyEmployeeId)) {
+      return historyEmployeeId;
+    }
+    return employees[0]?.id ?? "";
+  }, [employees, historyEmployeeId]);
 
   const filteredDayLogs = useMemo(() => {
     return dayLogs.filter((log) => {
-      const matchesQuery = log.name.toLowerCase().includes(logFilters.query.toLowerCase()) ||
-        log.squad.toLowerCase().includes(logFilters.query.toLowerCase());
+      const matchesQuery =
+        log.name.toLowerCase().includes(logFilters.query.toLowerCase()) ||
+        (log.squad ?? "").toLowerCase().includes(logFilters.query.toLowerCase());
       const matchesStatus =
         logFilters.status === "all" ? true : log.status === logFilters.status;
       return matchesQuery && matchesStatus;
     });
   }, [dayLogs, logFilters]);
 
-  const statusStats = useMemo(() => {
-    const template: Record<AttendanceStatus, number> = {
-      "On time": 0,
-      Late: 0,
-      "On leave": 0,
-      Absent: 0,
-    };
-
-    dayLogs.forEach((log) => {
-      template[log.status] += 1;
-    });
-
-    return template;
-  }, [dayLogs]);
-
   const totalLogs = dayLogs.length;
   const onTimeRate = totalLogs
     ? Math.round((statusStats["On time"] / totalLogs) * 100)
     : 0;
+  const manualUpdatesForDay = dayLogs.filter((log) => log.source === "Manual").length;
 
   const summaryCards = useMemo(
     () => [
@@ -456,16 +241,72 @@ export default function HrAdminAttendancePage() {
       },
       {
         label: "Manual updates",
-        value: (manualEntries[selectedDayKey]?.length ?? 0).toString(),
+        value: manualUpdatesForDay.toString(),
         detail: "Adjustments for this day",
       },
     ],
-    [manualEntries, onTimeRate, selectedDayKey, statusStats, totalLogs]
+    [manualUpdatesForDay, onTimeRate, statusStats, totalLogs]
   );
+
+  const historyQuery = trpc.hrAttendance.history.useQuery(
+    {
+      employeeId: resolvedHistoryEmployeeId,
+      month: historyMonth.getMonth(),
+      year: historyMonth.getFullYear(),
+    },
+    {
+      enabled: Boolean(resolvedHistoryEmployeeId),
+    },
+  );
+
+  const monthlyHistoryRows = useMemo(() => {
+    if (!historyQuery.data) {
+      return [] as Array<{
+        date: Date;
+        checkIn: string;
+        checkOut: string;
+        status: HrAttendanceStatus;
+        source: "Manual" | "System";
+        workingHours: string;
+      }>;
+    }
+
+    return historyQuery.data.rows
+      .map((row) => {
+        const date = new Date(row.date);
+        return {
+          date,
+          checkIn: row.checkIn,
+          checkOut: row.checkOut,
+          status: row.status,
+          source: row.source,
+          workingHours: calculateWorkingHours(row.checkIn, row.checkOut),
+        };
+      })
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [historyQuery.data]);
+
+  const manualEntryMutation = trpc.hrAttendance.recordManualEntry.useMutation({
+    onSuccess: (data) => {
+      setFormFeedback(`Manual attendance saved for ${data.name}.`);
+      utils.hrAttendance.overview.invalidate({ date: selectedDayKey });
+      if (resolvedHistoryEmployeeId === data.employeeId) {
+        utils.hrAttendance.history.invalidate({
+          employeeId: data.employeeId,
+          month: historyMonth.getMonth(),
+          year: historyMonth.getFullYear(),
+        });
+      }
+      setManualForm((prev) => ({ ...prev, checkIn: "", checkOut: "", status: "On time" }));
+    },
+    onError: (error) => {
+      setFormFeedback(error.message || "Unable to save manual attendance.");
+    },
+  });
 
   const statusBreakdown = useMemo(
     () =>
-      (Object.keys(statusStats) as AttendanceStatus[]).map((key) => ({
+      (Object.keys(statusStats) as HrAttendanceStatus[]).map((key) => ({
         label: key,
         value: statusStats[key],
         color: statusColorScale[key],
@@ -495,8 +336,8 @@ export default function HrAdminAttendancePage() {
   }, [statusBreakdown]);
 
   const calendarCells = useMemo(
-    () => buildCalendarCells(selectedDate, manualEntries),
-    [manualEntries, selectedDate]
+    () => buildCalendarCells(selectedDate, calendarSignalMap),
+    [calendarSignalMap, selectedDate],
   );
 
   const selectedDateLabel = selectedDate.toLocaleDateString(undefined, {
@@ -506,11 +347,14 @@ export default function HrAdminAttendancePage() {
   });
 
   const trendMax =
-    weeklyTrend.reduce((max, entry) => Math.max(max, entry.present), 0) || 1;
+    weeklyTrend.reduce(
+      (max, entry) => Math.max(max, entry.presentPercentage),
+      0,
+    ) || 1;
   const trendSteps = Math.max(weeklyTrend.length - 1, 1);
   const trendPoints = weeklyTrend.map((entry, index) => {
     const x = (index / trendSteps) * 100;
-    const y = 100 - (entry.present / trendMax) * 100;
+    const y = 100 - (entry.presentPercentage / trendMax) * 100;
     return `${x},${y}`;
   });
   const areaPathD = `M0,100 ${trendPoints.join(" ")} L100,100 Z`;
@@ -520,48 +364,6 @@ export default function HrAdminAttendancePage() {
     month: "long",
     year: "numeric",
   });
-
-  const monthlyHistoryRows = useMemo(() => {
-    const targetMonth = historyMonth.getMonth();
-    const targetYear = historyMonth.getFullYear();
-
-    const rows: Array<{
-      date: Date;
-      checkIn: string;
-      checkOut: string;
-      status: AttendanceStatus;
-      source: string;
-      workingHours: string;
-    }> = [];
-
-    Object.entries(combinedHistory).forEach(([dateKey, logs]) => {
-      const date = parseDateKeyToDate(dateKey);
-      if (date.getMonth() !== targetMonth || date.getFullYear() !== targetYear) {
-        return;
-      }
-
-      const manualRecord = logs.find(
-        (log) => log.employeeId === historyEmployeeId && log.source === "Manual"
-      );
-      const systemRecord = logs.find(
-        (log) => log.employeeId === historyEmployeeId && log.source !== "Manual"
-      );
-      const record = manualRecord ?? systemRecord;
-
-      if (!record) return;
-
-      rows.push({
-        date,
-        checkIn: record.checkIn,
-        checkOut: record.checkOut,
-        status: record.status,
-        source: record.source ?? "System",
-        workingHours: calculateWorkingHours(record.checkIn, record.checkOut),
-      });
-    });
-
-    return rows.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [combinedHistory, historyEmployeeId, historyMonth]);
 
   const updateSelectedDate = (date: Date) => {
     setSelectedDate(date);
@@ -580,32 +382,19 @@ export default function HrAdminAttendancePage() {
     }
   };
 
-  const handleManualSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleManualSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!manualForm.employeeId || !manualDate) return;
+    if (!resolvedManualEmployeeId || !manualDate || manualEntryMutation.isPending) {
+      return;
+    }
 
-    const employee = employees.find((emp) => emp.id === manualForm.employeeId);
-    if (!employee) return;
-
-    const dateKey = formatDateKey(manualDate);
-    const newLog: AttendanceLog = {
-      id: `manual-${dateKey}-${Date.now()}`,
-      employeeId: manualForm.employeeId,
-      name: employee.name,
-      squad: employee.squad,
-      checkIn: formatTimeLabel(manualForm.checkIn),
-      checkOut: formatTimeLabel(manualForm.checkOut),
+    await manualEntryMutation.mutateAsync({
+      employeeId: resolvedManualEmployeeId,
+      date: formatDateKey(manualDate),
+      checkIn: manualForm.checkIn || undefined,
+      checkOut: manualForm.checkOut || undefined,
       status: manualForm.status,
-      source: "Manual",
-    };
-
-    setManualEntries((previous) => ({
-      ...previous,
-      [dateKey]: [...(previous[dateKey] ?? []), newLog],
-    }));
-
-    setManualForm((prev) => ({ ...prev, checkIn: "", checkOut: "", status: "On time" }));
-    setFormFeedback(`Manual attendance saved for ${employee.name}.`);
+    });
   };
 
   const handleExport = () => {
@@ -623,12 +412,12 @@ export default function HrAdminAttendancePage() {
       ],
       ...filteredDayLogs.map((log) => [
         log.name,
-        log.squad,
+        log.squad ?? "—",
         log.checkIn,
         log.checkOut,
         calculateWorkingHours(log.checkIn, log.checkOut),
         log.status,
-        log.source ?? "System",
+        log.source,
       ]),
     ];
 
@@ -648,7 +437,7 @@ export default function HrAdminAttendancePage() {
   const handleMonthlyExport = () => {
     if (!monthlyHistoryRows.length) return;
 
-    const employee = employees.find((emp) => emp.id === historyEmployeeId);
+    const employee = employees.find((emp) => emp.id === resolvedHistoryEmployeeId);
     const rows = [
       ["Date", "Check-in", "Check-out", "Total working hour", "Status", "Source"],
       ...monthlyHistoryRows.map((row) => [
@@ -675,6 +464,29 @@ export default function HrAdminAttendancePage() {
     link.click();
     URL.revokeObjectURL(url);
   };
+
+  if (overviewQuery.isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center text-slate-500">
+        Loading attendance overview...
+      </div>
+    );
+  }
+
+  if (overviewQuery.isError) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center text-slate-600">
+        <p>We couldn&apos;t load the attendance dashboard right now.</p>
+        <button
+          type="button"
+          onClick={() => overviewQuery.refetch()}
+          className="inline-flex items-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -811,7 +623,7 @@ export default function HrAdminAttendancePage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-4">{log.squad}</td>
+                      <td className="px-4 py-4">{log.squad ?? "—"}</td>
                       <td className="px-4 py-4">{log.checkIn}</td>
                       <td className="px-4 py-4">{log.checkOut}</td>
                       <td className="px-4 py-4">
@@ -964,14 +776,20 @@ export default function HrAdminAttendancePage() {
                       />
                     </svg>
                     <div className="mt-2 grid grid-cols-5 gap-2 text-center text-xs font-semibold text-slate-500 dark:text-slate-300">
-                      {weeklyTrend.map((entry) => (
-                        <div key={entry.label}>
-                          <p>{entry.label}</p>
-                          <p className="text-sm text-slate-900 dark:text-slate-100">
-                            {entry.present}%
-                          </p>
-                        </div>
-                      ))}
+                      {weeklyTrend.length ? (
+                        weeklyTrend.map((entry) => (
+                          <div key={entry.date}>
+                            <p>{entry.label}</p>
+                            <p className="text-sm text-slate-900 dark:text-slate-100">
+                              {entry.presentPercentage}%
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="col-span-5 text-center text-xs text-slate-400">
+                          No trend data yet
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -994,11 +812,11 @@ export default function HrAdminAttendancePage() {
           <button
             type="button"
             onClick={handleMonthlyExport}
-            disabled={!monthlyHistoryRows.length}
+            disabled={!monthlyHistoryRows.length || historyQuery.isFetching}
             className="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:border-indigo-400 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200"
           >
             <FiDownload />
-            Export Excel
+            {historyQuery.isFetching ? "Preparing..." : "Export Excel"}
           </button>
         </div>
 
@@ -1006,15 +824,21 @@ export default function HrAdminAttendancePage() {
           <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-400">
             Employee
             <select
-              value={historyEmployeeId}
+              value={resolvedHistoryEmployeeId}
+              disabled={!employees.length}
               onChange={(event) => setHistoryEmployeeId(event.target.value)}
               className="mt-2 h-[46px] rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             >
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.name} — {employee.squad}
-                </option>
-              ))}
+              {employees.length ? (
+                employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.name}
+                    {employee.squad ? ` — ${employee.squad}` : ""}
+                  </option>
+                ))
+              ) : (
+                <option value="">No employees available</option>
+              )}
             </select>
           </label>
 
@@ -1048,7 +872,16 @@ export default function HrAdminAttendancePage() {
               </tr>
             </thead>
             <tbody>
-              {monthlyHistoryRows.length ? (
+              {historyQuery.isLoading ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-12 text-center text-slate-500 dark:text-slate-400"
+                  >
+                    Loading history...
+                  </td>
+                </tr>
+              ) : monthlyHistoryRows.length ? (
                 monthlyHistoryRows.map((row) => (
                   <tr
                     key={row.date.toISOString()}
@@ -1111,16 +944,22 @@ export default function HrAdminAttendancePage() {
             Employee
             <select
               className="mt-2 h-[46px] rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              value={manualForm.employeeId}
+              value={resolvedManualEmployeeId}
+              disabled={!employees.length}
               onChange={(event) =>
                 setManualForm((prev) => ({ ...prev, employeeId: event.target.value }))
               }
             >
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.name} — {employee.squad}
-                </option>
-              ))}
+              {employees.length ? (
+                employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.name}
+                    {employee.squad ? ` — ${employee.squad}` : ""}
+                  </option>
+                ))
+              ) : (
+                <option value="">No employees available</option>
+              )}
             </select>
           </label>
 
@@ -1164,7 +1003,7 @@ export default function HrAdminAttendancePage() {
               onChange={(event) =>
                 setManualForm((prev) => ({
                   ...prev,
-                  status: event.target.value as AttendanceStatus,
+                  status: event.target.value as HrAttendanceStatus,
                 }))
               }
             >
@@ -1178,10 +1017,11 @@ export default function HrAdminAttendancePage() {
           <div className="md:col-span-2 lg:col-span-4">
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-3xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+              disabled={!resolvedManualEmployeeId || manualEntryMutation.isPending}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-3xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-indigo-500 dark:hover:bg-indigo-400"
             >
               <FiPlus />
-              Save manual attendance
+              {manualEntryMutation.isPending ? "Saving..." : "Save manual attendance"}
             </button>
           </div>
         </form>

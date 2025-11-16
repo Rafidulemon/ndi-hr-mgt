@@ -1,6 +1,5 @@
-export type EmployeeStatus = "Active" | "On Leave" | "Probation" | "Pending";
-
-export type EmployeeDocumentStatus = "Signed" | "Pending" | "Missing";
+import type { EmployeeStatus, EmployeeDocumentStatus, PendingApproval } from "@/types/hr-admin";
+export type { EmployeeStatus } from "@/types/hr-admin";
 
 export type EmployeeDocument = {
   name: string;
@@ -43,21 +42,6 @@ export type Employee = {
     sick: number;
     casual: number;
   };
-};
-
-export type PendingApprovalStatus = "Awaiting Review" | "Documents Pending" | "Ready";
-
-export type PendingApproval = {
-  id: string;
-  name: string;
-  role: string;
-  department: string;
-  requestedAt: string;
-  experience: string;
-  email: string;
-  channel: "Manual signup" | "Email invite" | "Self signup" | "Referral";
-  note: string;
-  status: PendingApprovalStatus;
 };
 
 export const employeeDirectory: Employee[] = [
@@ -297,36 +281,4 @@ export const pendingApprovals: PendingApproval[] = [
   },
 ];
 
-export const employeeStatusStyles: Record<
-  EmployeeStatus,
-  { bg: string; text: string }
-> = {
-  Active: {
-    bg: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200",
-    text: "text-emerald-700 dark:text-emerald-200",
-  },
-  "On Leave": {
-    bg: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200",
-    text: "text-amber-700 dark:text-amber-200",
-  },
-  Probation: {
-    bg: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-200",
-    text: "text-indigo-700 dark:text-indigo-200",
-  },
-  Pending: {
-    bg: "bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-200",
-    text: "text-purple-700 dark:text-purple-200",
-  },
-};
-
-export const pendingApprovalStatusStyles: Record<
-  PendingApprovalStatus,
-  string
-> = {
-  "Awaiting Review":
-    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200",
-  "Documents Pending":
-    "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200",
-  Ready:
-    "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200",
-};
+export { employeeStatusStyles, pendingApprovalStatusStyles } from "./statusStyles";

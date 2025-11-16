@@ -1,16 +1,17 @@
+"use client";
+
 import Link from "next/link";
+import { useMemo } from "react";
 
 import TextArea from "../../../components/atoms/inputs/TextArea";
 import TextInput from "../../../components/atoms/inputs/TextInput";
 
-import {
-  employeeDirectory,
-  employeeStatusStyles,
-  pendingApprovalStatusStyles,
-  pendingApprovals,
-} from "./data";
+import { employeeStatusStyles, pendingApprovalStatusStyles } from "./statusStyles";
+import { trpc } from "@/trpc/client";
+import type { EmployeeDirectoryEntry } from "@/types/hr-admin";
 
-const formatDate = (value: string) => {
+const formatDate = (value?: string | null) => {
+  if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-US", {
@@ -20,7 +21,8 @@ const formatDate = (value: string) => {
   }).format(date);
 };
 
-const formatRelativeTime = (value: string) => {
+const formatRelativeTime = (value?: string | null) => {
+  if (!value) return "moments ago";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "moments ago";
   const diffMs = Date.now() - date.getTime();
@@ -32,10 +34,14 @@ const formatRelativeTime = (value: string) => {
   return `${diffDays}d ago`;
 };
 
-const countNewHiresInDays = (days: number) => {
+const countNewHiresInDays = (
+  employees: EmployeeDirectoryEntry[],
+  days: number,
+) => {
   const now = Date.now();
   const msInDay = 1000 * 60 * 60 * 24;
-  return employeeDirectory.filter((employee) => {
+  return employees.filter((employee) => {
+    if (!employee.startDate) return false;
     const start = new Date(employee.startDate).getTime();
     if (Number.isNaN(start)) return false;
     const diffDays = Math.floor((now - start) / msInDay);
@@ -61,43 +67,88 @@ const locationOptions = [
 const employmentTypes = ["Full-time", "Part-time", "Contract"];
 
 export default function EmployeeManagementPage() {
+  const dashboardQuery = trpc.hrEmployees.dashboard.useQuery();
+  const employeeDirectory = dashboardQuery.data?.directory ?? [];
+  const pendingApprovals = dashboardQuery.data?.pendingApprovals ?? [];
+
   const totalEmployees = employeeDirectory.length;
   const activeEmployees = employeeDirectory.filter(
-    (employee) => employee.status === "Active"
+    (employee) => employee.status === "Active",
   ).length;
   const pendingEmployees = employeeDirectory.filter(
-    (employee) => employee.status === "Pending"
+    (employee) => employee.status === "Pending",
   ).length;
-  const remoteHybridEmployees = employeeDirectory.filter((employee) =>
-    ["Remote", "Hybrid"].includes(employee.workArrangement)
-  ).length;
-  const newHires = countNewHiresInDays(60);
+  const remoteHybridEmployees = employeeDirectory.filter((employee) => {
+    const arrangement = employee.workArrangement?.toLowerCase();
+    return arrangement === "remote" || arrangement === "hybrid";
+  }).length;
+  const newHires = countNewHiresInDays(employeeDirectory, 60);
   const readyApprovals = pendingApprovals.filter(
-    (request) => request.status === "Ready"
+    (request) => request.status === "Ready",
   ).length;
 
-  const overviewCards = [
-    {
-      label: "Total employees",
-      value: totalEmployees.toString().padStart(2, "0"),
-      helper: `+${newHires} joined last 60 days`,
-    },
-    {
-      label: "Active workforce",
-      value: `${activeEmployees}`,
-      helper: `${Math.round((activeEmployees / totalEmployees) * 100)}% of total`,
-    },
-    {
-      label: "Signup approvals",
-      value: pendingApprovals.length.toString(),
-      helper: `${readyApprovals} ready to approve`,
-    },
-    {
-      label: "Remote + hybrid",
-      value: remoteHybridEmployees.toString(),
-      helper: `${Math.round((remoteHybridEmployees / totalEmployees) * 100)}% flexible`,
-    },
-  ];
+  const overviewCards = useMemo(
+    () => [
+      {
+        label: "Total employees",
+        value: totalEmployees.toString().padStart(2, "0"),
+        helper: `+${newHires} joined last 60 days`,
+      },
+      {
+        label: "Active workforce",
+        value: `${activeEmployees}`,
+        helper:
+          totalEmployees > 0
+            ? `${Math.round((activeEmployees / totalEmployees) * 100)}% of total`
+            : "No records yet",
+      },
+      {
+        label: "Signup approvals",
+        value: pendingApprovals.length.toString(),
+        helper: `${readyApprovals} ready to approve`,
+      },
+      {
+        label: "Remote + hybrid",
+        value: remoteHybridEmployees.toString(),
+        helper:
+          totalEmployees > 0
+            ? `${Math.round((remoteHybridEmployees / totalEmployees) * 100)}% flexible`
+            : "—",
+      },
+    ],
+    [
+      totalEmployees,
+      newHires,
+      activeEmployees,
+      pendingApprovals.length,
+      readyApprovals,
+      remoteHybridEmployees,
+    ],
+  );
+
+  if (dashboardQuery.isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center text-slate-500">
+        Loading employees...
+      </div>
+    );
+  }
+
+  if (dashboardQuery.isError) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center text-slate-600">
+        <p>We couldn&apos;t load the employee directory right now.</p>
+        <button
+          type="button"
+          onClick={() => dashboardQuery.refetch()}
+          disabled={dashboardQuery.isFetching}
+          className="inline-flex items-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 disabled:opacity-70 dark:bg-white dark:text-slate-900"
+        >
+          {dashboardQuery.isFetching ? "Refreshing..." : "Retry"}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -191,11 +242,14 @@ export default function EmployeeManagementPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {employeeDirectory.map((employee) => (
-                <tr
-                  key={employee.id}
-                  className="transition hover:bg-slate-50/60 dark:hover:bg-slate-800/50"
-                >
+              {employeeDirectory.map((employee) => {
+                const statusStyles =
+                  employeeStatusStyles[employee.status] ?? employeeStatusStyles.Active;
+                return (
+                  <tr
+                    key={employee.id}
+                    className="transition hover:bg-slate-50/60 dark:hover:bg-slate-800/50"
+                  >
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 text-sm font-semibold uppercase text-white shadow-lg shadow-slate-900/20 dark:from-indigo-500 dark:to-sky-500">
@@ -216,23 +270,23 @@ export default function EmployeeManagementPage() {
                       {employee.role}
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {employee.squad}
+                      {employee.squad ?? "—"}
                     </p>
                   </td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">
-                    {employee.department}
+                    {employee.department ?? "—"}
                   </td>
                   <td className="px-4 py-4">
                     <span
-                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${employeeStatusStyles[employee.status].bg}`}
+                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusStyles.bg}`}
                     >
                       {employee.status}
                     </span>
                   </td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">
-                    {employee.manager}
+                    {employee.manager ?? "—"}
                     <span className="block text-xs text-slate-400">
-                      {employee.workArrangement}
+                      {employee.workArrangement ?? "—"}
                     </span>
                   </td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-300">
@@ -245,7 +299,7 @@ export default function EmployeeManagementPage() {
                     <div className="flex flex-wrap justify-end gap-2">
                       <Link
                         href={`/hr-admin/employees/view?employeeId=${encodeURIComponent(
-                          employee.id
+                          employee.id,
                         )}`}
                         className="inline-flex items-center rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
                       >
@@ -253,7 +307,7 @@ export default function EmployeeManagementPage() {
                       </Link>
                       <Link
                         href={`/hr-admin/employees/edit?employeeId=${encodeURIComponent(
-                          employee.id
+                          employee.id,
                         )}`}
                         className="inline-flex items-center rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm shadow-slate-900/20 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
                       >
@@ -262,7 +316,8 @@ export default function EmployeeManagementPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -442,91 +497,96 @@ export default function EmployeeManagementPage() {
         </div>
 
         <div className="mt-6 grid gap-4">
-          {pendingApprovals.map((request) => (
-            <div
-              key={request.id}
-              className="grid gap-4 rounded-[28px] border border-slate-100 p-5 text-sm shadow-sm shadow-white/40 transition hover:border-slate-200 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-200"
-            >
-              <div className="flex flex-wrap items-center gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                    {request.id}
-                  </p>
-                  <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                    {request.name}
-                  </p>
-                </div>
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${pendingApprovalStatusStyles[request.status]}`}
-                >
-                  {request.status}
-                </span>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800/70 dark:text-slate-300">
-                  {request.channel}
-                </span>
-                <p className="ml-auto text-xs text-slate-500 dark:text-slate-400">
-                  {formatRelativeTime(request.requestedAt)}
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-slate-400">Role</p>
-                  <p className="font-semibold text-slate-900 dark:text-white">
-                    {request.role}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-slate-400">
-                    Department
-                  </p>
-                  <p className="font-semibold text-slate-900 dark:text-white">
-                    {request.department}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-slate-400">
-                    Experience
-                  </p>
-                  <p className="font-semibold text-slate-900 dark:text-white">
-                    {request.experience}
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-slate-400">
-                    Email
-                  </p>
-                  <p className="font-mono text-sm text-slate-700 dark:text-slate-200">
-                    {request.email}
-                  </p>
-                </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {request.note}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
+          {pendingApprovals.map((request) => {
+            const approvalStatusClass =
+              pendingApprovalStatusStyles[request.status] ??
+              pendingApprovalStatusStyles["Awaiting Review"];
+            return (
+              <div
+                key={request.id}
+                className="grid gap-4 rounded-[28px] border border-slate-100 p-5 text-sm shadow-sm shadow-white/40 transition hover:border-slate-200 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-200"
+              >
+                <div className="flex flex-wrap items-center gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      {request.id}
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                      {request.name}
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${approvalStatusClass}`}
                   >
-                    Request update
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-2xl border border-emerald-400/60 bg-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-emerald-500/40 transition hover:bg-emerald-600"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-2xl border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-200"
-                  >
-                    Reject
-                  </button>
+                    {request.status}
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800/70 dark:text-slate-300">
+                    {request.channel}
+                  </span>
+                  <p className="ml-auto text-xs text-slate-500 dark:text-slate-400">
+                    {formatRelativeTime(request.requestedAt)}
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-slate-400">Role</p>
+                    <p className="font-semibold text-slate-900 dark:text-white">
+                      {request.role}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-slate-400">
+                      Department
+                    </p>
+                    <p className="font-semibold text-slate-900 dark:text-white">
+                      {request.department ?? "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-slate-400">
+                      Experience
+                    </p>
+                    <p className="font-semibold text-slate-900 dark:text-white">
+                      {request.experience}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-slate-400">
+                      Email
+                    </p>
+                    <p className="font-mono text-sm text-slate-700 dark:text-slate-200">
+                      {request.email}
+                    </p>
+                  </div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {request.note}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
+                    >
+                      Request update
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-2xl border border-emerald-400/60 bg-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-emerald-500/40 transition hover:bg-emerald-600"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-2xl border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-200"
+                    >
+                      Reject
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
     </div>

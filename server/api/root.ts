@@ -4,6 +4,8 @@ import { authRouter } from "@/server/modules/auth/auth.route";
 import { userRouter } from "@/server/modules/user/user.route";
 import { attendanceRouter } from "@/server/modules/attendance/attendance.route";
 import { leaveRouter } from "@/server/modules/leave/leave.route";
+import { hrEmployeesRouter } from "@/server/modules/hr/employees/employees.route";
+import { hrAttendanceRouter } from "@/server/modules/hr/attendance/attendance.route";
 
 export const appRouter = createTRPCRouter({
   health: healthRouter,
@@ -11,6 +13,8 @@ export const appRouter = createTRPCRouter({
   user: userRouter,
   attendance: attendanceRouter,
   leave: leaveRouter,
+  hrEmployees: hrEmployeesRouter,
+  hrAttendance: hrAttendanceRouter,
 });
 
 export type AppRouter = typeof appRouter;
