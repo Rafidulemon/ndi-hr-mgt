@@ -1,20 +1,17 @@
+'use client';
+
 import Link from "next/link";
+import { useMemo } from "react";
+import { usePathname } from "next/navigation";
 
-import Text from "../../../../components/atoms/Text/Text";
-import Button from "../../../../components/atoms/buttons/Button";
-import { EmployeeHeader } from "../../../../components/layouts/EmployeeHeader";
-
+import Text from "@/app/components/atoms/Text/Text";
+import Button from "@/app/components/atoms/buttons/Button";
+import { EmployeeHeader } from "@/app/components/layouts/EmployeeHeader";
 import {
   employeeDirectory,
   employeeStatusStyles,
   type Employee,
-} from "../data";
-
-type PageProps = {
-  searchParams?: {
-    employeeId?: string | string[];
-  };
-};
+} from "@/app/(hr-admin)/hr-admin/employees/data";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -36,17 +33,24 @@ const formatDate = (value?: string) => {
 const formatValue = (value?: string | null, fallback = "—") =>
   value && value.trim().length > 0 ? value : fallback;
 
+const extractEmployeeId = (pathname: string | null) => {
+  if (!pathname) return null;
+  const segments = pathname.split("/").filter(Boolean);
+  const last = segments.at(-1);
+  if (!last || last === "view") {
+    return null;
+  }
+  return decodeURIComponent(last);
+};
+
 const resolveEmployee = (
-  searchParams: PageProps["searchParams"]
+  pathname: string | null
 ): { employee: Employee | null; isFallback: boolean } => {
   if (!employeeDirectory.length) {
     return { employee: null, isFallback: false };
   }
 
-  const employeeParam = searchParams?.employeeId;
-  const employeeId = Array.isArray(employeeParam)
-    ? employeeParam[0]
-    : employeeParam;
+  const employeeId = extractEmployeeId(pathname);
 
   if (!employeeId) {
     return { employee: employeeDirectory[0], isFallback: true };
@@ -77,8 +81,12 @@ const documentStatusColor: Record<string, string> = {
     "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200",
 };
 
-export default function EmployeeProfilePage({ searchParams }: PageProps) {
-  const { employee, isFallback } = resolveEmployee(searchParams);
+export default function EmployeeProfilePage() {
+  const pathname = usePathname();
+  const { employee, isFallback } = useMemo(
+    () => resolveEmployee(pathname),
+    [pathname],
+  );
 
   if (!employee) {
     return (
@@ -188,7 +196,7 @@ export default function EmployeeProfilePage({ searchParams }: PageProps) {
         />
         <div className="flex flex-wrap gap-3">
           <Link
-            href={`/hr-admin/employees/edit?employeeId=${encodeURIComponent(employee.id)}`}
+            href={`/hr-admin/employees/edit/${encodeURIComponent(employee.id)}`}
             className="inline-flex items-center rounded-xl border border-transparent bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:from-indigo-600 hover:via-sky-600 hover:to-cyan-500"
           >
             Edit Profile

@@ -1,21 +1,18 @@
+'use client';
+
 import Link from "next/link";
+import { useMemo } from "react";
+import { usePathname } from "next/navigation";
 
-import Button from "../../../../components/atoms/buttons/Button";
-import TextArea from "../../../../components/atoms/inputs/TextArea";
-import TextInput from "../../../../components/atoms/inputs/TextInput";
-import { EmployeeHeader } from "../../../../components/layouts/EmployeeHeader";
-
+import Button from "@/app/components/atoms/buttons/Button";
+import TextArea from "@/app/components/atoms/inputs/TextArea";
+import TextInput from "@/app/components/atoms/inputs/TextInput";
+import { EmployeeHeader } from "@/app/components/layouts/EmployeeHeader";
 import {
   employeeDirectory,
   type Employee,
   type EmployeeStatus,
-} from "../data";
-
-type PageProps = {
-  searchParams?: {
-    employeeId?: string | string[];
-  };
-};
+} from "@/app/(hr-admin)/hr-admin/employees/data";
 
 const statusOptions: EmployeeStatus[] = [
   "Active",
@@ -26,25 +23,26 @@ const statusOptions: EmployeeStatus[] = [
 
 const employmentTypes = ["Full-time", "Part-time", "Contract"];
 const workArrangements = ["Remote", "Hybrid", "On-site"];
-const departmentOptions = [
-  "Engineering",
-  "Product",
-  "People",
-  "Finance",
-  "Operations",
-];
+const departmentOptions = ["Engineering", "Design", "Management"];
+
+const extractEmployeeId = (pathname: string | null) => {
+  if (!pathname) return null;
+  const segments = pathname.split("/").filter(Boolean);
+  const last = segments.at(-1);
+  if (!last || last === "edit") {
+    return null;
+  }
+  return decodeURIComponent(last);
+};
 
 const resolveEmployee = (
-  searchParams: PageProps["searchParams"]
+  pathname: string | null
 ): { employee: Employee | null; isFallback: boolean } => {
   if (!employeeDirectory.length) {
     return { employee: null, isFallback: false };
   }
 
-  const employeeParam = searchParams?.employeeId;
-  const employeeId = Array.isArray(employeeParam)
-    ? employeeParam[0]
-    : employeeParam;
+  const employeeId = extractEmployeeId(pathname);
 
   if (!employeeId) {
     return { employee: employeeDirectory[0], isFallback: true };
@@ -66,8 +64,12 @@ const resolveEmployee = (
   return { employee: match, isFallback: false };
 };
 
-export default function EditEmployeePage({ searchParams }: PageProps) {
-  const { employee, isFallback } = resolveEmployee(searchParams);
+export default function EditEmployeePage() {
+  const pathname = usePathname();
+  const { employee, isFallback } = useMemo(
+    () => resolveEmployee(pathname),
+    [pathname],
+  );
 
   if (!employee) {
     return (
@@ -107,7 +109,7 @@ export default function EditEmployeePage({ searchParams }: PageProps) {
         />
         <div className="flex flex-wrap gap-3">
           <Link
-            href={`/hr-admin/employees/view?employeeId=${encodeURIComponent(employee.id)}`}
+            href={`/hr-admin/employees/view/${encodeURIComponent(employee.id)}`}
             className="inline-flex items-center rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
           >
             View profile
@@ -333,10 +335,10 @@ export default function EditEmployeePage({ searchParams }: PageProps) {
         </div>
 
         <div className="flex flex-wrap justify-end gap-3">
-          <Link
-            href={`/hr-admin/employees/view?employeeId=${encodeURIComponent(employee.id)}`}
-            className="inline-flex items-center rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
-          >
+            <Link
+              href={`/hr-admin/employees/view/${encodeURIComponent(employee.id)}`}
+              className="inline-flex items-center rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
+            >
             Cancel
           </Link>
           <Button>Save changes</Button>

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from "next/link";
 import { type ReactNode } from "react";
 
 type ButtonTheme =
@@ -18,6 +19,7 @@ type Props = {
   isWidthFull?: boolean;
   type?: "button" | "submit" | "reset";
   disabled?: boolean;
+  href?: string;
 };
 
 const themeClasses: Record<ButtonTheme, string> = {
@@ -43,12 +45,24 @@ function Button({
   isWidthFull = false,
   type = "button",
   disabled = false,
+  href,
 }: Props) {
   const baseClasses =
     "inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60 rounded";
 
   const widthClass = isWidthFull ? "w-full" : "w-fit";
   const themeClass = themeClasses[theme] ?? themeClasses.primary;
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className={`${widthClass} ${baseClasses} ${themeClass} ${className}`}
+      >
+        {children}
+      </Link>
+    );
+  }
 
   return (
     <button

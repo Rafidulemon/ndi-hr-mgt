@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import Button from "../../../components/atoms/buttons/Button";
 import TextArea from "../../../components/atoms/inputs/TextArea";
 import TextInput from "../../../components/atoms/inputs/TextInput";
 
@@ -154,6 +154,11 @@ export default function EmployeeManagementPage() {
       ? `${totalEmployees} records · Export-ready and synced with payroll`
       : `${filteredDirectory.length} of ${totalEmployees} records match your filters`;
 
+  const handleScrollToManualSignup = () => {
+    const manualSignupSection = document.getElementById("manual-signup");
+    manualSignupSection?.scrollIntoView({ behavior: "smooth" });
+  };
+
   if (dashboardQuery.isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center text-slate-500">
@@ -166,14 +171,13 @@ export default function EmployeeManagementPage() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center text-slate-600">
         <p>We couldn&apos;t load the employee directory right now.</p>
-        <button
-          type="button"
+        <Button
           onClick={() => dashboardQuery.refetch()}
           disabled={dashboardQuery.isFetching}
-          className="inline-flex items-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 disabled:opacity-70 dark:bg-white dark:text-slate-900"
+          className="px-6 py-3 text-sm"
         >
           {dashboardQuery.isFetching ? "Refreshing..." : "Retry"}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -202,12 +206,12 @@ export default function EmployeeManagementPage() {
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
-              <a
-                href="#manual-signup"
-                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
+              <Button
+                onClick={handleScrollToManualSignup}
+                className="px-6 py-3 text-sm"
               >
                 + Add employee
-              </a>
+              </Button>
             </div>
           </div>
 
@@ -349,22 +353,23 @@ export default function EmployeeManagementPage() {
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex flex-wrap justify-end gap-2">
-                          <Link
-                            href={`/hr-admin/employees/view?employeeId=${encodeURIComponent(
+                          <Button
+                            href={`/hr-admin/employees/view/${encodeURIComponent(
                               employee.id,
                             )}`}
-                            className="inline-flex items-center rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
+                            theme="white"
+                            className="px-4 py-2 text-xs"
                           >
                             View
-                          </Link>
-                          <Link
-                            href={`/hr-admin/employees/edit?employeeId=${encodeURIComponent(
+                          </Button>
+                          <Button
+                            href={`/hr-admin/employees/edit/${encodeURIComponent(
                               employee.id,
                             )}`}
-                            className="inline-flex items-center rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm shadow-slate-900/20 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
+                            className="px-4 py-2 text-xs"
                           >
                             Edit
-                          </Link>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -471,18 +476,15 @@ export default function EmployeeManagementPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-3 md:col-span-2">
-              <button
-                type="button"
-                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
-              >
+              <Button className="px-6 py-3 text-sm">
                 Create pending profile
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
+              </Button>
+              <Button
+                theme="white"
+                className="px-6 py-3 text-sm"
               >
                 Save draft
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -534,18 +536,15 @@ export default function EmployeeManagementPage() {
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              className="rounded-2xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-600 dark:text-slate-100"
+            <Button
+              theme="white"
+              className="px-5 py-2.5 text-sm"
             >
               Download spreadsheet
-            </button>
-            <button
-              type="button"
-              className="rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-slate-900/20 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
-            >
+            </Button>
+            <Button className="px-5 py-2.5 text-sm">
               Approve all ready
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -617,24 +616,21 @@ export default function EmployeeManagementPage() {
                     {request.note}
                   </p>
                   <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
+                    <Button
+                      theme="secondary"
+                      className="px-4 py-2 text-xs"
                     >
                       Request update
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-2xl border border-emerald-400/60 bg-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-emerald-500/40 transition hover:bg-emerald-600"
-                    >
+                    </Button>
+                    <Button className="px-4 py-2 text-xs">
                       Approve
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-2xl border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-200"
+                    </Button>
+                    <Button
+                      theme="cancel-secondary"
+                      className="px-4 py-2 text-xs"
                     >
                       Reject
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
