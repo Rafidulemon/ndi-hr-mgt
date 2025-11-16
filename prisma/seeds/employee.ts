@@ -93,8 +93,10 @@ export const seedEmployees = async (prisma: PrismaClient) => {
   }
 
   const teamLeadAssignments = [
-    { teamId: "1", leadId: "1" },
-    { teamId: "2", leadId: "3" },
+    { teamId: "1", leadId: "0099" },
+    { teamId: "2", leadId: "0003" },
+    { teamId: "3", leadId: "0001" },
+    { teamId: "4", leadId: "0009" },
   ];
 
   for (const assignment of teamLeadAssignments) {
