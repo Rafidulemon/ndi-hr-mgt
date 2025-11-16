@@ -1,10 +1,16 @@
 import { EmploymentStatus, EmploymentType, Prisma, WorkModel } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 
 import type { TRPCContext } from "@/server/api/trpc";
 import type {
   EmployeeDirectoryEntry,
   EmployeeStatus,
   HrEmployeeDashboardResponse,
+  HrEmployeeForm,
+  HrEmployeeFormResponse,
+  HrEmployeeProfile,
+  HrEmployeeProfileResponse,
+  HrEmployeeUpdateInput,
   PendingApproval,
   PendingApprovalStatus,
 } from "@/types/hr-admin";
@@ -112,6 +118,76 @@ const pendingApprovalSelect = {
 } as const satisfies Prisma.UserSelect;
 
 type PendingRecord = Prisma.UserGetPayload<{ select: typeof pendingApprovalSelect }>;
+
+const employeeDetailSelect = {
+  id: true,
+  email: true,
+  phone: true,
+  status: true,
+  profile: {
+    select: {
+      firstName: true,
+      lastName: true,
+      preferredName: true,
+      workModel: true,
+      currentAddress: true,
+      permanentAddress: true,
+      workEmail: true,
+      workPhone: true,
+    },
+  },
+  employment: {
+    select: {
+      employeeCode: true,
+      designation: true,
+      employmentType: true,
+      status: true,
+      startDate: true,
+      primaryLocation: true,
+      department: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      team: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      manager: {
+        select: {
+          id: true,
+          profile: {
+            select: {
+              firstName: true,
+              lastName: true,
+              preferredName: true,
+            },
+          },
+        },
+      },
+      casualLeaveBalance: true,
+      sickLeaveBalance: true,
+      annualLeaveBalance: true,
+    },
+  },
+  emergencyContacts: {
+    select: {
+      id: true,
+      name: true,
+      relationship: true,
+      phone: true,
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+    take: 1,
+  },
+} as const satisfies Prisma.UserSelect;
+
+type EmployeeDetailRecord = Prisma.UserGetPayload<{ select: typeof employeeDetailSelect }>;
 
 type NameLikeProfile = {
   firstName: string | null;
@@ -270,6 +346,138 @@ const mapPendingRecord = (record: PendingRecord): PendingApproval => {
   };
 };
 
+const employmentStatusFromLabel = (status: EmployeeStatus): EmploymentStatus => {
+  const match = Object.entries(employmentStatusToDirectoryStatus).find(
+    ([, label]) => label === status,
+  );
+  return (match?.[0] as EmploymentStatus) ?? EmploymentStatus.ACTIVE;
+};
+
+const decimalToNumber = (value?: Prisma.Decimal | null) =>
+  value ? Number(value) : 0;
+
+const findEmploymentTypeByLabel = (label?: string | null) => {
+  if (!label) {
+    return EmploymentType.FULL_TIME;
+  }
+
+  const entry = Object.entries(employmentTypeLabels).find(
+    ([, value]) => value.toLowerCase() === label.toLowerCase(),
+  );
+
+  return (entry?.[0] as EmploymentType) ?? EmploymentType.FULL_TIME;
+};
+
+const findWorkModelByLabel = (label?: string | null) => {
+  if (!label) {
+    return null;
+  }
+
+  const entry = Object.entries(workModelLabels).find(
+    ([, value]) => value.toLowerCase() === label.toLowerCase(),
+  );
+
+  return (entry?.[0] as WorkModel) ?? null;
+};
+
+const splitFullName = (fullName: string) => {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 0) {
+    return { firstName: fullName.trim() || "Employee", lastName: "" };
+  }
+
+  if (parts.length === 1) {
+    return { firstName: parts[0]!, lastName: "" };
+  }
+
+  return {
+    firstName: parts.slice(0, -1).join(" "),
+    lastName: parts.at(-1) ?? "",
+  };
+};
+
+const mapEmployeeProfileDetail = (record: EmployeeDetailRecord): HrEmployeeProfile => {
+  const profile = record.profile;
+  const employment = record.employment;
+  const emergencyContact = record.emergencyContacts?.[0];
+
+  return {
+    id: record.id,
+    employeeCode: employment?.employeeCode ?? null,
+    name: buildFullName(profile, record.email),
+    role: employment?.designation ?? "Team member",
+    department: employment?.department?.name ?? null,
+    squad: employment?.team?.name ?? null,
+    location: employment?.primaryLocation ?? profile?.currentAddress ?? null,
+    status: mapEmploymentStatus(employment?.status ?? record.status),
+    startDate: formatDateToIso(employment?.startDate),
+    email: profile?.workEmail ?? record.email,
+    phone: record.phone ?? profile?.workPhone ?? null,
+    manager: formatManagerName(employment?.manager) ?? null,
+    employmentType: employment ? employmentTypeLabels[employment.employmentType] : "Full-time",
+    workArrangement: profile?.workModel ? workModelLabels[profile.workModel] : null,
+    avatarInitials: buildInitials(profile, record.email),
+    experience: formatExperience(employment?.startDate),
+    address: profile?.currentAddress ?? profile?.permanentAddress ?? null,
+    emergencyContact: emergencyContact
+      ? {
+          name: emergencyContact.name,
+          phone: emergencyContact.phone,
+          relation: emergencyContact.relationship,
+        }
+      : null,
+    leaveBalances: {
+      annual: decimalToNumber(employment?.annualLeaveBalance),
+      sick: decimalToNumber(employment?.sickLeaveBalance),
+      casual: decimalToNumber(employment?.casualLeaveBalance),
+    },
+    tags: [],
+    skills: [],
+    documents: [],
+    salaryBand: null,
+    annualSalary: null,
+    lastReview: null,
+    nextReview: null,
+  };
+};
+
+const mapEmployeeForm = (record: EmployeeDetailRecord): HrEmployeeForm => {
+  const profile = record.profile;
+  const employment = record.employment;
+  const emergencyContact = record.emergencyContacts?.[0];
+
+  const fullNameParts = [profile?.firstName, profile?.lastName].filter(Boolean);
+  const fullName = fullNameParts.length
+    ? fullNameParts.join(" ")
+    : buildFullName(profile, record.email);
+
+  return {
+    id: record.id,
+    employeeCode: employment?.employeeCode ?? null,
+    fullName,
+    preferredName: profile?.preferredName ?? null,
+    email: profile?.workEmail ?? record.email,
+    phone: record.phone ?? profile?.workPhone ?? null,
+    address: profile?.currentAddress ?? profile?.permanentAddress ?? null,
+    role: employment?.designation ?? "",
+    department: employment?.department?.name ?? null,
+    employmentType: employment
+      ? employmentTypeLabels[employment.employmentType]
+      : employmentTypeLabels[EmploymentType.FULL_TIME],
+    workArrangement: profile?.workModel ? workModelLabels[profile.workModel] : null,
+    workLocation: employment?.primaryLocation ?? null,
+    startDate: formatDateToIso(employment?.startDate),
+    status: mapEmploymentStatus(employment?.status ?? record.status),
+    emergencyContact: emergencyContact
+      ? {
+          name: emergencyContact.name,
+          phone: emergencyContact.phone,
+          relation: emergencyContact.relationship,
+        }
+      : null,
+  };
+};
+
 export const hrEmployeesService = {
   async getDashboard(ctx: TRPCContext): Promise<HrEmployeeDashboardResponse> {
     const user = requireHrAdmin(ctx);
@@ -303,5 +511,176 @@ export const hrEmployeesService = {
       directory: employees.map(mapEmployeeRecord),
       pendingApprovals: pendingApprovals.map(mapPendingRecord),
     };
+  },
+
+  async getEmployeeProfile(
+    ctx: TRPCContext,
+    employeeId: string,
+  ): Promise<HrEmployeeProfileResponse> {
+    const sessionUser = requireHrAdmin(ctx);
+
+    const record = await ctx.prisma.user.findFirst({
+      where: {
+        id: employeeId,
+        organizationId: sessionUser.organizationId,
+      },
+      select: employeeDetailSelect,
+    });
+
+    if (!record) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
+    }
+
+    return { profile: mapEmployeeProfileDetail(record) };
+  },
+
+  async getEmployeeForm(
+    ctx: TRPCContext,
+    employeeId: string,
+  ): Promise<HrEmployeeFormResponse> {
+    const sessionUser = requireHrAdmin(ctx);
+
+    const record = await ctx.prisma.user.findFirst({
+      where: {
+        id: employeeId,
+        organizationId: sessionUser.organizationId,
+      },
+      select: employeeDetailSelect,
+    });
+
+    if (!record) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
+    }
+
+    return { form: mapEmployeeForm(record) };
+  },
+
+  async updateEmployee(
+    ctx: TRPCContext,
+    input: HrEmployeeUpdateInput,
+  ): Promise<HrEmployeeFormResponse> {
+    const sessionUser = requireHrAdmin(ctx);
+    const existing = await ctx.prisma.user.findFirst({
+      where: {
+        id: input.employeeId,
+        organizationId: sessionUser.organizationId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!existing) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
+    }
+
+    const { firstName, lastName } = splitFullName(input.fullName);
+    const employmentType = findEmploymentTypeByLabel(input.employmentType);
+    const workModel = findWorkModelByLabel(input.workArrangement);
+    const employmentStatus = employmentStatusFromLabel(input.status);
+
+    let departmentId: string | null = null;
+    const normalizedDepartment = input.department?.trim();
+    if (normalizedDepartment) {
+      const department = await ctx.prisma.department.findFirst({
+        where: {
+          organizationId: sessionUser.organizationId,
+          name: normalizedDepartment,
+        },
+      });
+
+      if (department) {
+        departmentId = department.id;
+      } else {
+        const createdDepartment = await ctx.prisma.department.create({
+          data: {
+            organizationId: sessionUser.organizationId,
+            name: normalizedDepartment,
+          },
+        });
+        departmentId = createdDepartment.id;
+      }
+    }
+
+    let parsedStartDate: Date | null = null;
+    if (input.startDate) {
+      const candidate = new Date(input.startDate);
+      if (Number.isNaN(candidate.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid start date." });
+      }
+      parsedStartDate = candidate;
+    }
+
+    await ctx.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: input.employeeId },
+        data: {
+          email: input.email,
+          phone: input.phone,
+        },
+      });
+
+      await tx.employeeProfile.update({
+        where: { userId: input.employeeId },
+        data: {
+          firstName,
+          lastName,
+          preferredName: input.preferredName,
+          workEmail: input.email,
+          workPhone: input.phone,
+          currentAddress: input.address,
+          workModel,
+        },
+      });
+
+      await tx.employmentDetail.update({
+        where: { userId: input.employeeId },
+        data: {
+          designation: input.role,
+          employmentType,
+          primaryLocation: input.workLocation,
+          startDate: parsedStartDate ?? undefined,
+          departmentId,
+          status: employmentStatus,
+        },
+      });
+
+      const hasEmergencyValues =
+        Boolean(input.emergencyName?.trim()) ||
+        Boolean(input.emergencyPhone?.trim()) ||
+        Boolean(input.emergencyRelation?.trim());
+
+      if (hasEmergencyValues) {
+        const existingContact = await tx.emergencyContact.findFirst({
+          where: { userId: input.employeeId },
+        });
+
+        const emergencyData = {
+          name: input.emergencyName?.trim() || "Emergency contact",
+          phone: input.emergencyPhone?.trim() || "",
+          relationship: input.emergencyRelation?.trim() || "Family",
+        };
+
+        if (existingContact) {
+          await tx.emergencyContact.update({
+            where: { id: existingContact.id },
+            data: emergencyData,
+          });
+        } else {
+          await tx.emergencyContact.create({
+            data: {
+              userId: input.employeeId,
+              ...emergencyData,
+            },
+          });
+        }
+      } else {
+        await tx.emergencyContact.deleteMany({
+          where: { userId: input.employeeId },
+        });
+      }
+    });
+
+    return this.getEmployeeForm(ctx, input.employeeId);
   },
 };

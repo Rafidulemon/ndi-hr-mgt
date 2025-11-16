@@ -1,29 +1,61 @@
 'use client';
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
+import { useForm } from "react-hook-form";
 
 import Button from "@/app/components/atoms/buttons/Button";
 import TextArea from "@/app/components/atoms/inputs/TextArea";
 import TextInput from "@/app/components/atoms/inputs/TextInput";
 import { EmployeeHeader } from "@/app/components/layouts/EmployeeHeader";
-import {
-  employeeDirectory,
-  type Employee,
-  type EmployeeStatus,
-} from "@/app/(hr-admin)/hr-admin/employees/data";
+import { trpc } from "@/trpc/client";
+import type { HrEmployeeForm } from "@/types/hr-admin";
 
-const statusOptions: EmployeeStatus[] = [
-  "Active",
-  "On Leave",
-  "Probation",
-  "Pending",
-];
+const employmentTypes = ["Full-time", "Part-time", "Contract", "Intern"] as const;
+const workArrangements = ["Remote", "Hybrid", "On-site"] as const;
+const departmentOptions = ["Engineering", "Design", "Management"] as const;
+const statusOptions = ["Active", "On Leave", "Probation", "Pending"] as const;
 
-const employmentTypes = ["Full-time", "Part-time", "Contract"];
-const workArrangements = ["Remote", "Hybrid", "On-site"];
-const departmentOptions = ["Engineering", "Design", "Management"];
+type EmploymentTypeOption = (typeof employmentTypes)[number];
+type WorkArrangementOption = (typeof workArrangements)[number];
+type StatusOption = (typeof statusOptions)[number];
+
+type EmployeeFormValues = {
+  fullName: string;
+  preferredName: string;
+  email: string;
+  phone: string;
+  address: string;
+  role: string;
+  department: string;
+  employmentType: EmploymentTypeOption;
+  workArrangement: WorkArrangementOption | "";
+  workLocation: string;
+  startDate: string;
+  status: StatusOption;
+  emergencyName: string;
+  emergencyPhone: string;
+  emergencyRelation: string;
+};
+
+const defaultValues: EmployeeFormValues = {
+  fullName: "",
+  preferredName: "",
+  email: "",
+  phone: "",
+  address: "",
+  role: "",
+  department: "",
+  employmentType: employmentTypes[0]!,
+  workArrangement: "",
+  workLocation: "",
+  startDate: "",
+  status: statusOptions[0]!,
+  emergencyName: "",
+  emergencyPhone: "",
+  emergencyRelation: "",
+};
 
 const extractEmployeeId = (pathname: string | null) => {
   if (!pathname) return null;
@@ -35,95 +67,147 @@ const extractEmployeeId = (pathname: string | null) => {
   return decodeURIComponent(last);
 };
 
-const resolveEmployee = (
-  pathname: string | null
-): { employee: Employee | null; isFallback: boolean } => {
-  if (!employeeDirectory.length) {
-    return { employee: null, isFallback: false };
-  }
+const toFormValues = (form: HrEmployeeForm): EmployeeFormValues => ({
+  fullName: form.fullName,
+  preferredName: form.preferredName ?? "",
+  email: form.email,
+  phone: form.phone ?? "",
+  address: form.address ?? "",
+  role: form.role,
+  department: form.department ?? "",
+  employmentType: employmentTypes.includes(form.employmentType as EmploymentTypeOption)
+    ? (form.employmentType as EmploymentTypeOption)
+    : employmentTypes[0],
+  workArrangement: workArrangements.includes(form.workArrangement as WorkArrangementOption)
+    ? (form.workArrangement as WorkArrangementOption)
+    : "",
+  workLocation: form.workLocation ?? "",
+  startDate: form.startDate ? form.startDate.split("T")[0] ?? "" : "",
+  status: statusOptions.includes(form.status as typeof statusOptions[number])
+    ? (form.status as typeof statusOptions[number])
+    : statusOptions[0],
+  emergencyName: form.emergencyContact?.name ?? "",
+  emergencyPhone: form.emergencyContact?.phone ?? "",
+  emergencyRelation: form.emergencyContact?.relation ?? "",
+});
 
-  const employeeId = extractEmployeeId(pathname);
+const sanitizePayload = (values: EmployeeFormValues) => ({
+  fullName: values.fullName.trim(),
+  preferredName: values.preferredName.trim() || null,
+  email: values.email.trim(),
+  phone: values.phone.trim() || null,
+  address: values.address.trim() || null,
+  role: values.role.trim(),
+  department: values.department.trim() || null,
+  employmentType: values.employmentType,
+  workArrangement: values.workArrangement ? values.workArrangement : null,
+  workLocation: values.workLocation.trim() || null,
+  startDate: values.startDate || null,
+  status: values.status,
+  emergencyName: values.emergencyName.trim() || null,
+  emergencyPhone: values.emergencyPhone.trim() || null,
+  emergencyRelation: values.emergencyRelation.trim() || null,
+});
 
-  if (!employeeId) {
-    return { employee: employeeDirectory[0], isFallback: true };
-  }
-
-  const normalizedId = employeeId.trim().toLowerCase();
-  if (!normalizedId) {
-    return { employee: employeeDirectory[0], isFallback: true };
-  }
-
-  const match = employeeDirectory.find(
-    (person) => person.id.toLowerCase() === normalizedId
-  );
-
-  if (!match) {
-    return { employee: employeeDirectory[0], isFallback: true };
-  }
-
-  return { employee: match, isFallback: false };
-};
+const EmptyState = ({ message }: { message: string }) => (
+  <section className="rounded-[32px] border border-dashed border-slate-200 bg-white/95 p-10 text-center shadow-xl shadow-indigo-100 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300">
+    <p className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-500 dark:text-indigo-200">
+      Employee management
+    </p>
+    <h1 className="mt-3 text-3xl font-semibold text-slate-900 dark:text-white">
+      Nothing to edit yet
+    </h1>
+    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{message}</p>
+    <Link
+      href="/hr-admin/employees"
+      className="mt-6 inline-flex items-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
+    >
+      Back to directory
+    </Link>
+  </section>
+);
 
 export default function EditEmployeePage() {
   const pathname = usePathname();
-  const { employee, isFallback } = useMemo(
-    () => resolveEmployee(pathname),
-    [pathname],
-  );
+  const employeeId = useMemo(() => extractEmployeeId(pathname), [pathname]);
+  const form = useForm<EmployeeFormValues>({ defaultValues });
 
-  if (!employee) {
+  const employeeFormQuery = trpc.hrEmployees.form.useQuery(
+    { employeeId: employeeId ?? "" },
+    { enabled: Boolean(employeeId) },
+  );
+  const updateMutation = trpc.hrEmployees.update.useMutation();
+
+  useEffect(() => {
+    if (employeeFormQuery.data?.form) {
+      form.reset(toFormValues(employeeFormQuery.data.form));
+    }
+  }, [employeeFormQuery.data?.form, form]);
+
+  const onSubmit = (values: EmployeeFormValues) => {
+    if (!employeeId) {
+      return;
+    }
+    updateMutation.mutate(
+      {
+        employeeId,
+        ...sanitizePayload(values),
+      },
+      {
+        onSuccess: (data) => {
+          form.reset(toFormValues(data.form));
+        },
+      },
+    );
+  };
+
+  if (!employeeId) {
+    return <EmptyState message="Pick an employee from the directory to edit their profile." />;
+  }
+
+  if (employeeFormQuery.isLoading) {
     return (
-      <section className="rounded-[32px] border border-dashed border-slate-200 bg-white/95 p-10 text-center shadow-xl shadow-indigo-100 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-500 dark:text-indigo-200">
-          Employee management
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold text-slate-900 dark:text-white">
-          No employee data yet
-        </h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          Add employees from the Employee Management page to start editing profiles.
-        </p>
-        <Link
-          href="/hr-admin/employees"
-          className="mt-6 inline-flex items-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
-        >
-          Back to directory
-        </Link>
-      </section>
+      <div className="flex min-h-[60vh] items-center justify-center text-slate-500">
+        Loading employee details...
+      </div>
     );
   }
 
-  const joiningDate = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(employee.startDate));
+  if (employeeFormQuery.isError || !employeeFormQuery.data?.form) {
+    return <EmptyState message="We couldn’t load the employee form. Try opening it from the directory again." />;
+  }
+
+  const headerForm = employeeFormQuery.data.form;
 
   return (
     <div className="space-y-8">
       <div className="space-y-4">
         <EmployeeHeader
-          name={employee.name}
-          designation={employee.role}
-          joining_date={joiningDate}
+          name={headerForm.fullName}
+          designation={headerForm.role}
+          joining_date={headerForm.startDate ? new Date(headerForm.startDate).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
         />
         <div className="flex flex-wrap gap-3">
           <Link
-            href={`/hr-admin/employees/view/${encodeURIComponent(employee.id)}`}
+            href={`/hr-admin/employees/view/${encodeURIComponent(employeeId)}`}
             className="inline-flex items-center rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
           >
             View profile
           </Link>
-          <Button>Save changes</Button>
         </div>
-        {isFallback ? (
-          <p className="text-xs text-slate-500">
-            Showing sample employee. Use the Employee Management table to edit a specific profile.
+        {updateMutation.isSuccess ? (
+          <p className="text-xs text-emerald-600">
+            Employee record updated.
+          </p>
+        ) : null}
+        {updateMutation.isError ? (
+          <p className="text-xs text-rose-500">
+            {updateMutation.error.message ?? "Failed to update employee."}
           </p>
         ) : null}
       </div>
 
-      <form className="space-y-6">
+      <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
         <div className="rounded-[32px] border border-white/60 bg-white/95 p-8 shadow-xl shadow-indigo-100 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
           <div className="space-y-6">
             <div>
@@ -137,41 +221,38 @@ export default function EditEmployeePage() {
             <div className="grid gap-4 md:grid-cols-2">
               <TextInput
                 label="Full name"
-                id="fullName"
-                name="fullName"
-                defaultValue={employee.name}
                 className="w-full"
+                name="fullName"
+                register={form.register}
+                isRequired
               />
               <TextInput
                 label="Preferred name"
-                id="preferredName"
-                name="preferredName"
-                defaultValue={employee.name.split(" ")[0]}
                 className="w-full"
+                name="preferredName"
+                register={form.register}
               />
               <TextInput
                 label="Email address"
-                id="email"
-                name="email"
                 type="email"
-                defaultValue={employee.email}
                 className="w-full"
+                name="email"
+                register={form.register}
+                isRequired
               />
               <TextInput
                 label="Phone number"
-                id="phone"
-                name="phone"
                 type="tel"
-                defaultValue={employee.phone}
                 className="w-full"
+                name="phone"
+                register={form.register}
               />
               <TextArea
                 label="Residential address"
-                id="address"
-                name="address"
-                defaultValue={employee.address}
                 className="md:col-span-2 w-full"
                 height="120px"
+                name="address"
+                register={form.register}
               />
             </div>
           </div>
@@ -184,58 +265,67 @@ export default function EditEmployeePage() {
                 Employment data
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Update squad, manager, and compensation details.
+                Update squad, manager, and work arrangements.
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <TextInput
                 label="Employee ID"
-                id="employeeId"
-                name="employeeId"
-                defaultValue={employee.id}
-                readOnly
                 className="w-full"
+                defaultValue={headerForm.employeeCode ?? employeeId}
+                readOnly
               />
               <div className="flex flex-col">
                 <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
                   Department
                 </label>
                 <select
-                  id="department"
-                  name="department"
-                  defaultValue={employee.department}
                   className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  {...form.register("department")}
                 >
-                  {departmentOptions.map((dept) => (
-                    <option key={dept} value={dept}>
-                      {dept}
+                  <option value="">Select department</option>
+                  {departmentOptions.map((department) => (
+                    <option key={department} value={department}>
+                      {department}
                     </option>
                   ))}
                 </select>
               </div>
               <TextInput
-                label="Squad / Team"
-                id="squad"
-                name="squad"
-                defaultValue={employee.squad}
+                label="Role / title"
                 className="w-full"
+                name="role"
+                register={form.register}
+                isRequired
               />
               <TextInput
-                label="Reporting manager"
-                id="manager"
-                name="manager"
-                defaultValue={employee.manager}
+                label="Start date"
+                type="date"
                 className="w-full"
+                name="startDate"
+                register={form.register}
               />
+              <div className="flex flex-col">
+                <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
+                  Work location
+                </label>
+                <select
+                  className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  {...form.register("workLocation")}
+                >
+                  <option value="">Select location</option>
+                  <option value="Dhaka HQ">Dhaka HQ</option>
+                  <option value="Remote">Remote</option>
+                  <option value="Hybrid">Hybrid</option>
+                </select>
+              </div>
               <div className="flex flex-col">
                 <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
                   Employment type
                 </label>
                 <select
-                  id="employmentType"
-                  name="employmentType"
-                  defaultValue={employee.employmentType}
                   className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  {...form.register("employmentType")}
                 >
                   {employmentTypes.map((type) => (
                     <option key={type} value={type}>
@@ -249,11 +339,10 @@ export default function EditEmployeePage() {
                   Work arrangement
                 </label>
                 <select
-                  id="workArrangement"
-                  name="workArrangement"
-                  defaultValue={employee.workArrangement}
                   className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  {...form.register("workArrangement")}
                 >
+                  <option value="">Select arrangement</option>
                   {workArrangements.map((arrangement) => (
                     <option key={arrangement} value={arrangement}>
                       {arrangement}
@@ -266,10 +355,8 @@ export default function EditEmployeePage() {
                   Status
                 </label>
                 <select
-                  id="status"
-                  name="status"
-                  defaultValue={employee.status}
                   className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  {...form.register("status")}
                 >
                   {statusOptions.map((status) => (
                     <option key={status} value={status}>
@@ -278,21 +365,6 @@ export default function EditEmployeePage() {
                   ))}
                 </select>
               </div>
-              <TextInput
-                label="Salary band"
-                id="salaryBand"
-                name="salaryBand"
-                defaultValue={employee.salaryBand}
-                className="w-full"
-              />
-              <TextInput
-                label="Annual salary (USD)"
-                id="annualSalary"
-                name="annualSalary"
-                type="number"
-                defaultValue={employee.annualSalary.toString()}
-                className="w-full"
-              />
             </div>
           </div>
         </div>
@@ -310,38 +382,40 @@ export default function EditEmployeePage() {
             <div className="grid gap-4 md:grid-cols-3">
               <TextInput
                 label="Name"
-                id="emergencyName"
-                name="emergencyName"
-                defaultValue={employee.emergencyContact.name}
                 className="w-full"
+                name="emergencyName"
+                register={form.register}
               />
               <TextInput
                 label="Phone"
-                id="emergencyPhone"
-                name="emergencyPhone"
                 type="tel"
-                defaultValue={employee.emergencyContact.phone}
                 className="w-full"
+                name="emergencyPhone"
+                register={form.register}
               />
               <TextInput
                 label="Relation"
-                id="emergencyRelation"
-                name="emergencyRelation"
-                defaultValue={employee.emergencyContact.relation}
                 className="w-full"
+                name="emergencyRelation"
+                register={form.register}
               />
             </div>
           </div>
         </div>
 
         <div className="flex flex-wrap justify-end gap-3">
-            <Link
-              href={`/hr-admin/employees/view/${encodeURIComponent(employee.id)}`}
-              className="inline-flex items-center rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
-            >
+          <Link
+            href={`/hr-admin/employees/view/${encodeURIComponent(employeeId)}`}
+            className="inline-flex items-center rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
+          >
             Cancel
           </Link>
-          <Button>Save changes</Button>
+          <Button
+            type="submit"
+            disabled={updateMutation.isPending}
+          >
+            {updateMutation.isPending ? "Saving..." : "Save changes"}
+          </Button>
         </div>
       </form>
     </div>

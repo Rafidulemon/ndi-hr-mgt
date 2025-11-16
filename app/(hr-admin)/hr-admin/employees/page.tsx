@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-
 import Button from "../../../components/atoms/buttons/Button";
 import TextArea from "../../../components/atoms/inputs/TextArea";
 import TextInput from "../../../components/atoms/inputs/TextInput";
-
-import { employeeStatusStyles, pendingApprovalStatusStyles } from "./statusStyles";
+import Image from "next/image";
+import {
+  employeeStatusStyles,
+  pendingApprovalStatusStyles,
+} from "./statusStyles";
 import { trpc } from "@/trpc/client";
 import type { EmployeeDirectoryEntry, EmployeeStatus } from "@/types/hr-admin";
 
@@ -36,7 +38,7 @@ const formatRelativeTime = (value?: string | null) => {
 
 const countNewHiresInDays = (
   employees: EmployeeDirectoryEntry[],
-  days: number,
+  days: number
 ) => {
   const now = Date.now();
   const msInDay = 1000 * 60 * 60 * 24;
@@ -59,7 +61,12 @@ const locationOptions = [
 ];
 
 const employmentTypes = ["Full-time", "Part-time", "Contract"];
-const statusFilterOptions: EmployeeStatus[] = ["Active", "On Leave", "Probation", "Pending"];
+const statusFilterOptions: EmployeeStatus[] = [
+  "Active",
+  "On Leave",
+  "Probation",
+  "Pending",
+];
 
 export default function EmployeeManagementPage() {
   const dashboardQuery = trpc.hrEmployees.dashboard.useQuery();
@@ -67,7 +74,9 @@ export default function EmployeeManagementPage() {
   const pendingApprovals = dashboardQuery.data?.pendingApprovals ?? [];
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState<"all" | EmployeeStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | EmployeeStatus>(
+    "all"
+  );
 
   const filteredDirectory = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -85,7 +94,8 @@ export default function EmployeeManagementPage() {
 
       const matchesDepartment =
         departmentFilter === "all" ||
-        (employee.department?.toLowerCase() ?? "") === departmentFilter.toLowerCase();
+        (employee.department?.toLowerCase() ?? "") ===
+          departmentFilter.toLowerCase();
 
       const matchesStatus =
         statusFilter === "all" || employee.status === statusFilter;
@@ -96,10 +106,10 @@ export default function EmployeeManagementPage() {
 
   const totalEmployees = employeeDirectory.length;
   const activeEmployees = employeeDirectory.filter(
-    (employee) => employee.status === "Active",
+    (employee) => employee.status === "Active"
   ).length;
   const pendingEmployees = employeeDirectory.filter(
-    (employee) => employee.status === "Pending",
+    (employee) => employee.status === "Pending"
   ).length;
   const remoteHybridEmployees = employeeDirectory.filter((employee) => {
     const arrangement = employee.workArrangement?.toLowerCase();
@@ -107,7 +117,7 @@ export default function EmployeeManagementPage() {
   }).length;
   const newHires = countNewHiresInDays(employeeDirectory, 60);
   const readyApprovals = pendingApprovals.filter(
-    (request) => request.status === "Ready",
+    (request) => request.status === "Ready"
   ).length;
 
   const overviewCards = useMemo(
@@ -122,7 +132,9 @@ export default function EmployeeManagementPage() {
         value: `${activeEmployees}`,
         helper:
           totalEmployees > 0
-            ? `${Math.round((activeEmployees / totalEmployees) * 100)}% of total`
+            ? `${Math.round(
+                (activeEmployees / totalEmployees) * 100
+              )}% of total`
             : "No records yet",
       },
       {
@@ -135,7 +147,9 @@ export default function EmployeeManagementPage() {
         value: remoteHybridEmployees.toString(),
         helper:
           totalEmployees > 0
-            ? `${Math.round((remoteHybridEmployees / totalEmployees) * 100)}% flexible`
+            ? `${Math.round(
+                (remoteHybridEmployees / totalEmployees) * 100
+              )}% flexible`
             : "—",
       },
     ],
@@ -146,7 +160,7 @@ export default function EmployeeManagementPage() {
       pendingApprovals.length,
       readyApprovals,
       remoteHybridEmployees,
-    ],
+    ]
   );
 
   const directorySummary =
@@ -195,7 +209,8 @@ export default function EmployeeManagementPage() {
                 Bring sign-ups, approvals, and people data into one desk.
               </h1>
               <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                Manually create employee accounts, hold them in approval, then jump into detailed profiles without switching apps.
+                Manually create employee accounts, hold them in approval, then
+                jump into detailed profiles without switching apps.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -227,7 +242,9 @@ export default function EmployeeManagementPage() {
                 <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">
                   {card.value}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{card.helper}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {card.helper}
+                </p>
               </div>
             ))}
           </div>
@@ -282,7 +299,7 @@ export default function EmployeeManagementPage() {
                 <th className="px-4 py-3">Role</th>
                 <th className="px-4 py-3">Department</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Manager</th>
+                <th className="px-4 py-3">Team Lead</th>
                 <th className="px-4 py-3">Start date</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -294,13 +311,15 @@ export default function EmployeeManagementPage() {
                     colSpan={7}
                     className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                   >
-                    No employees match the current filters. Try adjusting your search.
+                    No employees match the current filters. Try adjusting your
+                    search.
                   </td>
                 </tr>
               ) : (
                 filteredDirectory.map((employee) => {
                   const statusStyles =
-                    employeeStatusStyles[employee.status] ?? employeeStatusStyles.Active;
+                    employeeStatusStyles[employee.status] ??
+                    employeeStatusStyles.Active;
                   return (
                     <tr
                       key={employee.id}
@@ -308,9 +327,16 @@ export default function EmployeeManagementPage() {
                     >
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 text-sm font-semibold uppercase text-white shadow-lg shadow-slate-900/20 dark:from-indigo-500 dark:to-sky-500">
-                            {employee.avatarInitials}
+                          <div className="flex h-11 w-11 items-center justify-center rounded-full border border-black text-sm font-semibold uppercase text-white shadow-lg shadow-slate-900/20 dark:from-indigo-500 dark:to-sky-500">
+                            <Image
+                              src="/default_profile.png"
+                              alt={employee.name}
+                              width={44}
+                              height={44}
+                              className="h-11 w-11 rounded-2xl object-cover"
+                            />
                           </div>
+
                           <div>
                             <p className="font-semibold text-slate-900 dark:text-white">
                               {employee.name}
@@ -355,7 +381,7 @@ export default function EmployeeManagementPage() {
                         <div className="flex flex-wrap justify-end gap-2">
                           <Button
                             href={`/hr-admin/employees/view/${encodeURIComponent(
-                              employee.id,
+                              employee.id
                             )}`}
                             theme="white"
                             className="px-4 py-2 text-xs"
@@ -364,7 +390,7 @@ export default function EmployeeManagementPage() {
                           </Button>
                           <Button
                             href={`/hr-admin/employees/edit/${encodeURIComponent(
-                              employee.id,
+                              employee.id
                             )}`}
                             className="px-4 py-2 text-xs"
                           >
@@ -391,7 +417,8 @@ export default function EmployeeManagementPage() {
               Manually add an employee
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              This creates a pending account. HR approval flips the status to active.
+              This creates a pending account. HR approval flips the status to
+              active.
             </p>
           </div>
           <form className="grid gap-4 md:grid-cols-2">
@@ -424,11 +451,7 @@ export default function EmployeeManagementPage() {
               placeholder="e.g. Payroll Associate"
               className="w-full"
             />
-            <TextInput
-              label="Start date"
-              type="date"
-              className="w-full"
-            />
+            <TextInput label="Start date" type="date" className="w-full" />
             <div className="flex flex-col">
               <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
                 Work location
@@ -468,21 +491,23 @@ export default function EmployeeManagementPage() {
             />
             <div className="md:col-span-2">
               <label className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-200">
-                <input type="checkbox" className="rounded border-slate-300 text-indigo-600" />
+                <input
+                  type="checkbox"
+                  className="rounded border-slate-300 text-indigo-600"
+                />
                 Send account invite email now
               </label>
               <p className="mt-2 text-xs text-slate-400">
-                The profile stays in <span className="font-semibold">Pending</span> until HR approves inside this dashboard.
+                The profile stays in{" "}
+                <span className="font-semibold">Pending</span> until HR approves
+                inside this dashboard.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 md:col-span-2">
               <Button className="px-6 py-3 text-sm">
                 Create pending profile
               </Button>
-              <Button
-                theme="white"
-                className="px-6 py-3 text-sm"
-              >
+              <Button theme="white" className="px-6 py-3 text-sm">
                 Save draft
               </Button>
             </div>
@@ -494,7 +519,9 @@ export default function EmployeeManagementPage() {
             <p className="text-xs uppercase tracking-[0.3em] text-white/70">
               Signup pipeline
             </p>
-            <h3 className="mt-2 text-3xl font-semibold">{pendingApprovals.length}</h3>
+            <h3 className="mt-2 text-3xl font-semibold">
+              {pendingApprovals.length}
+            </h3>
             <p className="text-sm text-white/70">Pending approvals</p>
           </div>
           <dl className="space-y-3 text-sm">
@@ -516,10 +543,12 @@ export default function EmployeeManagementPage() {
           <div className="rounded-2xl bg-white/10 p-4 text-sm text-white/80">
             <p className="font-semibold">Auto-approvals</p>
             <p className="mt-1 text-white/70">
-              Coming soon: configure policies to auto-approve referrals or pre-onboarded contractors.
+              Coming soon: configure policies to auto-approve referrals or
+              pre-onboarded contractors.
             </p>
             <p className="mt-3 text-xs text-white/50">
-              {pendingEmployees} people in the directory are still marked as Pending until paperwork is complete.
+              {pendingEmployees} people in the directory are still marked as
+              Pending until paperwork is complete.
             </p>
           </div>
         </div>
@@ -536,15 +565,10 @@ export default function EmployeeManagementPage() {
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button
-              theme="white"
-              className="px-5 py-2.5 text-sm"
-            >
+            <Button theme="white" className="px-5 py-2.5 text-sm">
               Download spreadsheet
             </Button>
-            <Button className="px-5 py-2.5 text-sm">
-              Approve all ready
-            </Button>
+            <Button className="px-5 py-2.5 text-sm">Approve all ready</Button>
           </div>
         </div>
 
@@ -581,7 +605,9 @@ export default function EmployeeManagementPage() {
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div>
-                    <p className="text-xs uppercase tracking-wider text-slate-400">Role</p>
+                    <p className="text-xs uppercase tracking-wider text-slate-400">
+                      Role
+                    </p>
                     <p className="font-semibold text-slate-900 dark:text-white">
                       {request.role}
                     </p>
@@ -616,15 +642,10 @@ export default function EmployeeManagementPage() {
                     {request.note}
                   </p>
                   <div className="flex gap-2">
-                    <Button
-                      theme="secondary"
-                      className="px-4 py-2 text-xs"
-                    >
+                    <Button theme="secondary" className="px-4 py-2 text-xs">
                       Request update
                     </Button>
-                    <Button className="px-4 py-2 text-xs">
-                      Approve
-                    </Button>
+                    <Button className="px-4 py-2 text-xs">Approve</Button>
                     <Button
                       theme="cancel-secondary"
                       className="px-4 py-2 text-xs"

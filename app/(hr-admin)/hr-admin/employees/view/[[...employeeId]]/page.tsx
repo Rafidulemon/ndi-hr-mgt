@@ -7,19 +7,11 @@ import { usePathname } from "next/navigation";
 import Text from "@/app/components/atoms/Text/Text";
 import Button from "@/app/components/atoms/buttons/Button";
 import { EmployeeHeader } from "@/app/components/layouts/EmployeeHeader";
-import {
-  employeeDirectory,
-  employeeStatusStyles,
-  type Employee,
-} from "@/app/(hr-admin)/hr-admin/employees/data";
+import { employeeStatusStyles } from "@/app/(hr-admin)/hr-admin/employees/statusStyles";
+import { trpc } from "@/trpc/client";
+import type { HrEmployeeProfile } from "@/types/hr-admin";
 
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
-
-const formatDate = (value?: string) => {
+const formatDate = (value?: string | null) => {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
@@ -43,35 +35,6 @@ const extractEmployeeId = (pathname: string | null) => {
   return decodeURIComponent(last);
 };
 
-const resolveEmployee = (
-  pathname: string | null
-): { employee: Employee | null; isFallback: boolean } => {
-  if (!employeeDirectory.length) {
-    return { employee: null, isFallback: false };
-  }
-
-  const employeeId = extractEmployeeId(pathname);
-
-  if (!employeeId) {
-    return { employee: employeeDirectory[0], isFallback: true };
-  }
-
-  const normalizedId = employeeId.trim().toLowerCase();
-  if (!normalizedId) {
-    return { employee: employeeDirectory[0], isFallback: true };
-  }
-
-  const match = employeeDirectory.find(
-    (item) => item.id.toLowerCase() === normalizedId
-  );
-
-  if (!match) {
-    return { employee: employeeDirectory[0], isFallback: true };
-  }
-
-  return { employee: match, isFallback: false };
-};
-
 const documentStatusColor: Record<string, string> = {
   Signed:
     "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200",
@@ -81,40 +44,59 @@ const documentStatusColor: Record<string, string> = {
     "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200",
 };
 
+const EmptyState = ({ message }: { message: string }) => (
+  <section className="rounded-[32px] border border-dashed border-slate-200 bg-white/95 p-10 text-center shadow-xl shadow-indigo-100 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300">
+    <p className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-500 dark:text-indigo-200">
+      Employee management
+    </p>
+    <h1 className="mt-3 text-3xl font-semibold text-slate-900 dark:text-white">
+      Nothing to show yet
+    </h1>
+    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{message}</p>
+    <Link
+      href="/hr-admin/employees"
+      className="mt-6 inline-flex items-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
+    >
+      Back to directory
+    </Link>
+  </section>
+);
+
 export default function EmployeeProfilePage() {
   const pathname = usePathname();
-  const { employee, isFallback } = useMemo(
-    () => resolveEmployee(pathname),
-    [pathname],
+  const employeeId = useMemo(() => extractEmployeeId(pathname), [pathname]);
+  const profileQuery = trpc.hrEmployees.profile.useQuery(
+    { employeeId: employeeId ?? "" },
+    { enabled: Boolean(employeeId) },
   );
 
-  if (!employee) {
+  if (!employeeId) {
+    return <EmptyState message="Pick an employee from the directory to view their profile." />;
+  }
+
+  if (profileQuery.isLoading) {
     return (
-      <section className="rounded-[32px] border border-dashed border-slate-200 bg-white/95 p-10 text-center shadow-xl shadow-indigo-100 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-500 dark:text-indigo-200">
-          Employee management
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold text-slate-900 dark:text-white">
-          No employee data yet
-        </h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          Add employees from the Employee Management page to preview their profiles here.
-        </p>
-        <Link
-          href="/hr-admin/employees"
-          className="mt-6 inline-flex items-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
-        >
-          Back to directory
-        </Link>
-      </section>
+      <div className="flex min-h-[60vh] items-center justify-center text-slate-500">
+        Loading employee profile...
+      </div>
     );
   }
 
+  if (profileQuery.isError || !profileQuery.data?.profile) {
+    return <EmptyState message="We couldn’t load the employee profile. Try opening it from the directory again." />;
+  }
+
+  const employee = profileQuery.data.profile;
+  return <EmployeeProfileContent employee={employee} />;
+}
+
+const EmployeeProfileContent = ({ employee }: { employee: HrEmployeeProfile }) => {
   const personaTags = [
     employee.department,
     employee.squad,
     employee.workArrangement,
     employee.status,
+    ...employee.tags,
   ].filter(Boolean) as string[];
 
   const quickStats = [
@@ -126,17 +108,17 @@ export default function EmployeeProfilePage() {
     {
       label: "Employment type",
       value: employee.employmentType,
-      helper: employee.workArrangement,
-    },
-    {
-      label: "Compensation band",
-      value: employee.salaryBand,
-      helper: currencyFormatter.format(employee.annualSalary),
+      helper: employee.workArrangement ?? "—",
     },
     {
       label: "Manager",
-      value: employee.manager,
-      helper: employee.department,
+      value: formatValue(employee.manager),
+      helper: employee.department ?? "—",
+    },
+    {
+      label: "Work location",
+      value: formatValue(employee.location),
+      helper: employee.address ?? "—",
     },
   ];
 
@@ -145,46 +127,49 @@ export default function EmployeeProfilePage() {
       title: "Contact & Basics",
       items: [
         { label: "Email", value: employee.email },
-        { label: "Phone", value: employee.phone },
-        { label: "Location", value: employee.location },
-        { label: "Work arrangement", value: employee.workArrangement },
+        { label: "Phone", value: formatValue(employee.phone) },
+        { label: "Location", value: formatValue(employee.location) },
+        { label: "Work arrangement", value: formatValue(employee.workArrangement) },
       ],
     },
     {
       title: "Employment Snapshot",
       items: [
-        { label: "Employee ID", value: employee.id },
-        { label: "Department", value: employee.department },
-        { label: "Squad", value: employee.squad },
-        { label: "Manager", value: employee.manager },
+        { label: "Employee ID", value: employee.employeeCode ?? employee.id },
+        { label: "Department", value: formatValue(employee.department) },
+        { label: "Squad", value: formatValue(employee.squad) },
+        { label: "Manager", value: formatValue(employee.manager) },
         { label: "Start date", value: formatDate(employee.startDate) },
         { label: "Next review", value: formatDate(employee.nextReview) },
       ],
     },
     {
       title: "Emergency contact",
-      items: [
-        { label: "Name", value: employee.emergencyContact.name },
-        { label: "Phone", value: employee.emergencyContact.phone },
-        { label: "Relation", value: employee.emergencyContact.relation },
-      ],
+      items: employee.emergencyContact
+        ? [
+            { label: "Name", value: employee.emergencyContact.name },
+            { label: "Phone", value: employee.emergencyContact.phone },
+            { label: "Relation", value: employee.emergencyContact.relation },
+          ]
+        : [{ label: "Contact", value: "Not provided" }],
     },
     {
       title: "Addresses",
       items: [
-        { label: "Residential", value: employee.address },
-        { label: "Work location", value: employee.location },
+        { label: "Residential", value: formatValue(employee.address) },
+        { label: "Work location", value: formatValue(employee.location) },
       ],
     },
   ];
 
-  const timeOffEntries = [
-    { label: "Annual leave", value: `${employee.timeOffBalance.annual} days` },
-    { label: "Sick leave", value: `${employee.timeOffBalance.sick} days` },
-    { label: "Casual leave", value: `${employee.timeOffBalance.casual} days` },
+  const leaveEntries = [
+    { label: "Annual leave", value: `${employee.leaveBalances.annual} days` },
+    { label: "Sick leave", value: `${employee.leaveBalances.sick} days` },
+    { label: "Casual leave", value: `${employee.leaveBalances.casual} days` },
   ];
 
   const joiningDate = formatDate(employee.startDate);
+  const statusStyle = employeeStatusStyles[employee.status] ?? employeeStatusStyles.Active;
 
   return (
     <div className="space-y-8">
@@ -203,11 +188,6 @@ export default function EmployeeProfilePage() {
           </Link>
           <Button theme="secondary">Export Record</Button>
         </div>
-        {isFallback ? (
-          <p className="text-xs text-slate-500">
-            Showing sample employee. Use the Employee Management table to open a specific profile.
-          </p>
-        ) : null}
       </div>
 
       <section className="grid gap-6 xl:grid-cols-[2fr_1fr]">
@@ -222,11 +202,11 @@ export default function EmployeeProfilePage() {
                 className="text-xl font-semibold text-slate-900 dark:text-white"
               />
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {employee.department} · {employee.workArrangement}
+                {formatValue(employee.department)} · {formatValue(employee.workArrangement)}
               </p>
               <div className="flex flex-wrap gap-2">
                 <span
-                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${employeeStatusStyles[employee.status].bg}`}
+                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusStyle.bg}`}
                 >
                   {employee.status}
                 </span>
@@ -234,16 +214,18 @@ export default function EmployeeProfilePage() {
                   {employee.employmentType}
                 </span>
               </div>
-              <div className="flex flex-wrap gap-2 text-xs">
-                {personaTags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600 dark:bg-slate-800/60 dark:text-slate-200"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
+              {personaTags.length > 0 ? (
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {personaTags.map((tag, index) => (
+                    <span
+                      key={`${tag}-${index}`}
+                      className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600 dark:bg-slate-800/60 dark:text-slate-200"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -272,7 +254,7 @@ export default function EmployeeProfilePage() {
               Time off balance
             </p>
             <div className="mt-4 space-y-3">
-              {timeOffEntries.map((entry) => (
+              {leaveEntries.map((entry) => (
                 <div
                   key={entry.label}
                   className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm dark:bg-slate-800/60"
@@ -320,48 +302,60 @@ export default function EmployeeProfilePage() {
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
             Skills & tags
           </h3>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs">
-            {employee.skills.map((skill) => (
-              <span
-                key={skill}
-                className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600 dark:bg-slate-800/60 dark:text-slate-200"
-              >
-                {skill}
-              </span>
-            ))}
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs">
-            {employee.tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full bg-indigo-50 px-3 py-1 font-semibold text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-200"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
+          {employee.skills.length === 0 && employee.tags.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+              No skills or tags captured yet.
+            </p>
+          ) : (
+            <>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                {employee.skills.map((skill, index) => (
+                  <span
+                    key={`${skill}-${index}`}
+                    className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600 dark:bg-slate-800/60 dark:text-slate-200"
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                {employee.tags.map((tag, index) => (
+                  <span
+                    key={`${tag}-${index}`}
+                    className="rounded-full bg-indigo-50 px-3 py-1 font-semibold text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-200"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="rounded-[32px] border border-white/60 bg-white/95 p-6 shadow-xl shadow-indigo-100 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
             Compliance & documents
           </h3>
-          <ul className="mt-4 space-y-3 text-sm">
-            {employee.documents.map((document) => (
-              <li key={document.name} className="flex items-center justify-between">
-                <span className="text-slate-600 dark:text-slate-300">
-                  {document.name}
-                </span>
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${documentStatusColor[document.status]}`}
-                >
-                  {document.status}
-                </span>
-              </li>
-            ))}
-          </ul>
+          {employee.documents.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+              No compliance documents uploaded yet.
+            </p>
+          ) : (
+            <ul className="mt-4 space-y-3 text-sm">
+              {employee.documents.map((document) => (
+                <li key={document.name} className="flex items-center justify-between">
+                  <span className="text-slate-600 dark:text-slate-300">{document.name}</span>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${documentStatusColor[document.status]}`}
+                  >
+                    {document.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </section>
     </div>
   );
-}
+};
