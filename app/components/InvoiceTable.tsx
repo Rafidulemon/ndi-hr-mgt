@@ -1,4 +1,4 @@
-import Text from "../../components/atoms/Text/Text";
+import Text from "../components/atoms/Text/Text";
 
 const cellBorder = "border-slate-200 dark:border-slate-700/70";
 const accentText = "text-blue-500 dark:text-sky-400";

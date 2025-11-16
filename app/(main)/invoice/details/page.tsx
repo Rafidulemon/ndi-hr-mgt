@@ -2,7 +2,7 @@
 import Image from "next/image";
 import { EmployeeHeader } from "../../../components/layouts/EmployeeHeader";
 import Text from "../../../components/atoms/Text/Text";
-import { InvoiceTable } from "../InvoiceTable";
+import { InvoiceTable } from "@/app/components/InvoiceTable";
 import Button from "../../../components/atoms/buttons/Button";
 import { useRouter } from "next/navigation";
 

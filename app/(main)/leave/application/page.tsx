@@ -13,7 +13,7 @@ import RadioGroup from "../../../components/atoms/inputs/RadioGroup";
 import TextArea from "../../../components/atoms/inputs/TextArea";
 import CustomDatePicker from "../../../components/atoms/inputs/DatePicker";
 import { EmployeeHeader } from "../../../components/layouts/EmployeeHeader";
-import ApplicationPreview from "../Preview";
+import ApplicationPreview from "../../../components/Preview";
 import {
   leaveTypeOptionMap,
   leaveTypeOptions,

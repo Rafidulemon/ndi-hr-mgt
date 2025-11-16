@@ -1,0 +1,534 @@
+import Link from "next/link";
+
+import TextArea from "../../../components/atoms/inputs/TextArea";
+import TextInput from "../../../components/atoms/inputs/TextInput";
+
+import {
+  employeeDirectory,
+  employeeStatusStyles,
+  pendingApprovalStatusStyles,
+  pendingApprovals,
+} from "./data";
+
+const formatDate = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  }).format(date);
+};
+
+const formatRelativeTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "moments ago";
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.round(diffMs / (1000 * 60));
+  if (diffMinutes < 60) return `${Math.max(diffMinutes, 1)}m ago`;
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.round(diffHours / 24);
+  return `${diffDays}d ago`;
+};
+
+const countNewHiresInDays = (days: number) => {
+  const now = Date.now();
+  const msInDay = 1000 * 60 * 60 * 24;
+  return employeeDirectory.filter((employee) => {
+    const start = new Date(employee.startDate).getTime();
+    if (Number.isNaN(start)) return false;
+    const diffDays = Math.floor((now - start) / msInDay);
+    return diffDays <= days;
+  }).length;
+};
+
+const departmentOptions = [
+  "Engineering",
+  "Product",
+  "People",
+  "Finance",
+  "Operations",
+];
+
+const locationOptions = [
+  "Dhaka HQ",
+  "Remote",
+  "Remote — GMT+6",
+  "Remote — PST",
+];
+
+const employmentTypes = ["Full-time", "Part-time", "Contract"];
+
+export default function EmployeeManagementPage() {
+  const totalEmployees = employeeDirectory.length;
+  const activeEmployees = employeeDirectory.filter(
+    (employee) => employee.status === "Active"
+  ).length;
+  const pendingEmployees = employeeDirectory.filter(
+    (employee) => employee.status === "Pending"
+  ).length;
+  const remoteHybridEmployees = employeeDirectory.filter((employee) =>
+    ["Remote", "Hybrid"].includes(employee.workArrangement)
+  ).length;
+  const newHires = countNewHiresInDays(60);
+  const readyApprovals = pendingApprovals.filter(
+    (request) => request.status === "Ready"
+  ).length;
+
+  const overviewCards = [
+    {
+      label: "Total employees",
+      value: totalEmployees.toString().padStart(2, "0"),
+      helper: `+${newHires} joined last 60 days`,
+    },
+    {
+      label: "Active workforce",
+      value: `${activeEmployees}`,
+      helper: `${Math.round((activeEmployees / totalEmployees) * 100)}% of total`,
+    },
+    {
+      label: "Signup approvals",
+      value: pendingApprovals.length.toString(),
+      helper: `${readyApprovals} ready to approve`,
+    },
+    {
+      label: "Remote + hybrid",
+      value: remoteHybridEmployees.toString(),
+      helper: `${Math.round((remoteHybridEmployees / totalEmployees) * 100)}% flexible`,
+    },
+  ];
+
+  return (
+    <div className="space-y-8">
+      <section className="rounded-[32px] border border-white/60 bg-white/95 p-8 shadow-xl shadow-indigo-100 transition dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-300">
+              Employee management
+            </p>
+            <div>
+              <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">
+                Bring sign-ups, approvals, and people data into one desk.
+              </h1>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                Manually create employee accounts, hold them in approval, then jump into detailed profiles without switching apps.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <TextInput
+                label="Search directory"
+                placeholder="Name, squad, status..."
+                className="w-full sm:flex-1"
+              />
+              <a
+                href="#manual-signup"
+                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
+              >
+                + Add employee
+              </a>
+            </div>
+          </div>
+
+          <div className="grid w-full gap-3 sm:grid-cols-2">
+            {overviewCards.map((card) => (
+              <div
+                key={card.label}
+                className="rounded-3xl border border-slate-100 bg-gradient-to-br from-white to-slate-50/60 p-5 shadow-inner shadow-white/60 dark:border-slate-700/70 dark:from-slate-900 dark:to-slate-900/60 dark:shadow-none"
+              >
+                <p className="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                  {card.label}
+                </p>
+                <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">
+                  {card.value}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{card.helper}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[32px] border border-white/60 bg-white/95 p-6 shadow-xl shadow-indigo-100 transition dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">
+              Employee directory
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {totalEmployees} records · Export-ready and synced with payroll
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600 shadow-inner shadow-white/60 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+              <option>All departments</option>
+              <option>Engineering</option>
+              <option>Product</option>
+              <option>People</option>
+              <option>Finance</option>
+            </select>
+            <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600 shadow-inner shadow-white/60 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+              <option>Status: All</option>
+              <option>Active</option>
+              <option>On Leave</option>
+              <option>Probation</option>
+              <option>Pending</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-6 overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-100 text-sm dark:divide-slate-800">
+            <thead>
+              <tr className="text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <th className="px-4 py-3">Employee</th>
+                <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Department</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Manager</th>
+                <th className="px-4 py-3">Start date</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {employeeDirectory.map((employee) => (
+                <tr
+                  key={employee.id}
+                  className="transition hover:bg-slate-50/60 dark:hover:bg-slate-800/50"
+                >
+                  <td className="px-4 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 text-sm font-semibold uppercase text-white shadow-lg shadow-slate-900/20 dark:from-indigo-500 dark:to-sky-500">
+                        {employee.avatarInitials}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">
+                          {employee.name}
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {employee.email}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <p className="font-medium text-slate-800 dark:text-slate-100">
+                      {employee.role}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {employee.squad}
+                    </p>
+                  </td>
+                  <td className="px-4 py-4 text-slate-600 dark:text-slate-300">
+                    {employee.department}
+                  </td>
+                  <td className="px-4 py-4">
+                    <span
+                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${employeeStatusStyles[employee.status].bg}`}
+                    >
+                      {employee.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 text-slate-600 dark:text-slate-300">
+                    {employee.manager}
+                    <span className="block text-xs text-slate-400">
+                      {employee.workArrangement}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 text-slate-600 dark:text-slate-300">
+                    {formatDate(employee.startDate)}
+                    <span className="block text-xs text-slate-400">
+                      {employee.experience} exp
+                    </span>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Link
+                        href={`/hr-admin/employees/view?employeeId=${encodeURIComponent(
+                          employee.id
+                        )}`}
+                        className="inline-flex items-center rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
+                      >
+                        View
+                      </Link>
+                      <Link
+                        href={`/hr-admin/employees/edit?employeeId=${encodeURIComponent(
+                          employee.id
+                        )}`}
+                        className="inline-flex items-center rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm shadow-slate-900/20 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
+                      >
+                        Edit
+                      </Link>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section
+        id="manual-signup"
+        className="grid gap-6 rounded-[32px] border border-white/60 bg-white/95 p-6 shadow-xl shadow-indigo-100 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none lg:grid-cols-[2fr_1fr]"
+      >
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">
+              Manually add an employee
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              This creates a pending account. HR approval flips the status to active.
+            </p>
+          </div>
+          <form className="grid gap-4 md:grid-cols-2">
+            <TextInput
+              label="Full name"
+              placeholder="e.g. Afsana Khan"
+              className="w-full"
+            />
+            <TextInput
+              label="Work email"
+              type="email"
+              placeholder="name@ndihr.io"
+              className="w-full"
+            />
+            <div className="flex flex-col">
+              <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
+                Department
+              </label>
+              <select className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                <option value="">Select team</option>
+                {departmentOptions.map((department) => (
+                  <option key={department} value={department}>
+                    {department}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <TextInput
+              label="Role / title"
+              placeholder="e.g. Payroll Associate"
+              className="w-full"
+            />
+            <TextInput
+              label="Start date"
+              type="date"
+              className="w-full"
+            />
+            <div className="flex flex-col">
+              <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
+                Work location
+              </label>
+              <select className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                <option value="">Select location</option>
+                {locationOptions.map((location) => (
+                  <option key={location} value={location}>
+                    {location}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <TextInput
+              label="Manager"
+              placeholder="e.g. Sharif Uddin"
+              className="w-full"
+            />
+            <div className="flex flex-col">
+              <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
+                Employment type
+              </label>
+              <select className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                <option value="">Select type</option>
+                {employmentTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <TextArea
+              label="Notes for HR (optional)"
+              placeholder="Share onboarding context, paperwork status, or equipment needs."
+              className="md:col-span-2 w-full"
+              height="120px"
+            />
+            <div className="md:col-span-2">
+              <label className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-200">
+                <input type="checkbox" className="rounded border-slate-300 text-indigo-600" />
+                Send account invite email now
+              </label>
+              <p className="mt-2 text-xs text-slate-400">
+                The profile stays in <span className="font-semibold">Pending</span> until HR approves inside this dashboard.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 md:col-span-2">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
+              >
+                Create pending profile
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
+              >
+                Save draft
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div className="space-y-4 rounded-[28px] border border-slate-100 bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white shadow-inner shadow-slate-900/40 dark:border-slate-700/70">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-white/70">
+              Signup pipeline
+            </p>
+            <h3 className="mt-2 text-3xl font-semibold">{pendingApprovals.length}</h3>
+            <p className="text-sm text-white/70">Pending approvals</p>
+          </div>
+          <dl className="space-y-3 text-sm">
+            <div className="flex items-center justify-between rounded-2xl bg-white/10 px-4 py-3">
+              <dt>Ready to activate</dt>
+              <dd className="text-lg font-semibold">{readyApprovals}</dd>
+            </div>
+            <div className="flex items-center justify-between rounded-2xl bg-white/10 px-4 py-3">
+              <dt>Need documents</dt>
+              <dd className="text-lg font-semibold">
+                {
+                  pendingApprovals.filter(
+                    (request) => request.status === "Documents Pending"
+                  ).length
+                }
+              </dd>
+            </div>
+          </dl>
+          <div className="rounded-2xl bg-white/10 p-4 text-sm text-white/80">
+            <p className="font-semibold">Auto-approvals</p>
+            <p className="mt-1 text-white/70">
+              Coming soon: configure policies to auto-approve referrals or pre-onboarded contractors.
+            </p>
+            <p className="mt-3 text-xs text-white/50">
+              {pendingEmployees} people in the directory are still marked as Pending until paperwork is complete.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[32px] border border-white/60 bg-white/95 p-6 shadow-xl shadow-indigo-100 transition dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">
+              Pending signup approvals
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Accounts remain inaccessible until you approve them here.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              className="rounded-2xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-600 dark:text-slate-100"
+            >
+              Download spreadsheet
+            </button>
+            <button
+              type="button"
+              className="rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-slate-900/20 transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
+            >
+              Approve all ready
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-4">
+          {pendingApprovals.map((request) => (
+            <div
+              key={request.id}
+              className="grid gap-4 rounded-[28px] border border-slate-100 p-5 text-sm shadow-sm shadow-white/40 transition hover:border-slate-200 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-200"
+            >
+              <div className="flex flex-wrap items-center gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    {request.id}
+                  </p>
+                  <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                    {request.name}
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${pendingApprovalStatusStyles[request.status]}`}
+                >
+                  {request.status}
+                </span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800/70 dark:text-slate-300">
+                  {request.channel}
+                </span>
+                <p className="ml-auto text-xs text-slate-500 dark:text-slate-400">
+                  {formatRelativeTime(request.requestedAt)}
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-slate-400">Role</p>
+                  <p className="font-semibold text-slate-900 dark:text-white">
+                    {request.role}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-slate-400">
+                    Department
+                  </p>
+                  <p className="font-semibold text-slate-900 dark:text-white">
+                    {request.department}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-slate-400">
+                    Experience
+                  </p>
+                  <p className="font-semibold text-slate-900 dark:text-white">
+                    {request.experience}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-slate-400">
+                    Email
+                  </p>
+                  <p className="font-mono text-sm text-slate-700 dark:text-slate-200">
+                    {request.email}
+                  </p>
+                </div>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {request.note}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
+                  >
+                    Request update
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-2xl border border-emerald-400/60 bg-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-emerald-500/40 transition hover:bg-emerald-600"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-2xl border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-200"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
