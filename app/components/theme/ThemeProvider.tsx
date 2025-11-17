@@ -37,14 +37,14 @@ const applyThemeToRoot = (theme: ResolvedTheme) => {
 };
 
 const getStoredPreference = (): ThemePreference => {
-  if (typeof window === "undefined") return "system";
+  if (typeof window === "undefined") return "light";
   const stored = window.localStorage.getItem(STORAGE_KEY) as
     | ThemePreference
     | null;
   if (stored === "light" || stored === "dark" || stored === "system") {
     return stored;
   }
-  return "system";
+  return "light";
 };
 
 const getSystemTheme = (): ResolvedTheme => {
@@ -56,7 +56,7 @@ const getSystemTheme = (): ResolvedTheme => {
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const [preference, setPreferenceState] =
-    useState<ThemePreference>("system");
+    useState<ThemePreference>("light");
   const [resolvedTheme, setResolvedTheme] =
     useState<ResolvedTheme>("light");
   const [hasHydrated, setHasHydrated] = useState(false);

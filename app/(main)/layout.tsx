@@ -1,3 +1,4 @@
+import type { UserRole } from "@prisma/client";
 import LeftMenu from "../components/navigations/LeftMenu";
 import "../globals.css";
 import { requireUser } from "@/server/auth/guards";
@@ -8,9 +9,14 @@ export default async function MainLayout({
   children: React.ReactNode;
 }>) {
   const user = await requireUser();
-  const isLeader = ["MANAGER", "HR_ADMIN", "ORG_ADMIN", "SUPER_ADMIN"].includes(
-    user.role,
-  );
+  const elevatedRoles: ReadonlyArray<UserRole> = [
+    "MANAGER",
+    "HR_ADMIN",
+    "ORG_ADMIN",
+    "SUPER_ADMIN",
+  ];
+  const canAccessHrAdmin = elevatedRoles.includes(user.role);
+  const isLeader = canAccessHrAdmin;
   const fullName =
     user.profile?.preferredName ??
     [user.profile?.firstName, user.profile?.lastName]
@@ -27,6 +33,7 @@ export default async function MainLayout({
             <LeftMenu
               className="lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:scrollbar-none"
               isLeader={isLeader}
+              canAccessHrAdmin={canAccessHrAdmin}
               organizationName={organizationName}
               userFullName={fullName}
             />

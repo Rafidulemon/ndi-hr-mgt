@@ -13,6 +13,7 @@ import {
   FaCalendarCheck,
   FaClipboardList,
   FaEnvelopeOpenText,
+  FaUser,
   FaUsers,
 } from "react-icons/fa";
 import { TbReportAnalytics } from "react-icons/tb";
@@ -44,6 +45,7 @@ type Props = {
   className?: string;
   organizationName?: string;
   userFullName?: string;
+  showEmployeeDashboardLink?: boolean;
 };
 
 const hrMenuItems: MenuItem[] = [
@@ -101,6 +103,7 @@ const HrAdminLeftMenu = ({
   className = "",
   organizationName = "NDI HR",
   userFullName,
+  showEmployeeDashboardLink = false,
 }: Props) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -184,6 +187,22 @@ const HrAdminLeftMenu = ({
             </li>
           ))}
         </ul>
+        {showEmployeeDashboardLink && (
+          <div className="mt-4 rounded-2xl border border-slate-200/70 bg-slate-50/80 p-3 dark:border-slate-700/80 dark:bg-slate-800/60">
+            <p className="px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Employee Portal
+            </p>
+            <Link
+              href="/"
+              className={`${getNavClasses(isRouteActive("/"))} mt-3`}
+            >
+              <FaUser className="text-lg" />
+              <span className="text-[16px] font-semibold">
+                Employee Dashboard
+              </span>
+            </Link>
+          </div>
+        )}
       </nav>
 
       <div className="mt-auto w-full">

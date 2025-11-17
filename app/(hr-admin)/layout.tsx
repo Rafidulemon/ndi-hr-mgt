@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import type { UserRole } from "@prisma/client";
 
 import HrAdminLeftMenu from "../components/navigations/HrAdminLeftMenu";
 import "../globals.css";
@@ -11,9 +12,15 @@ export default async function HrAdminLayout({
   children: ReactNode;
 }>) {
   const user = await requireUser();
-  const isHrAdmin = user.role === "HR_ADMIN";
+  const elevatedRoles: ReadonlyArray<UserRole> = [
+    "MANAGER",
+    "HR_ADMIN",
+    "ORG_ADMIN",
+    "SUPER_ADMIN",
+  ];
+  const canAccessHrAdmin = elevatedRoles.includes(user.role);
 
-  if (!isHrAdmin) {
+  if (!canAccessHrAdmin) {
     redirect("/");
   }
 
@@ -34,6 +41,7 @@ export default async function HrAdminLayout({
               className="lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:scrollbar-none"
               organizationName={organizationName}
               userFullName={fullName}
+              showEmployeeDashboardLink
             />
           </div>
         </aside>

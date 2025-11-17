@@ -16,7 +16,7 @@ import {
   FaUser,
   FaUsers,
 } from "react-icons/fa";
-import { MdOutlineDashboard } from "react-icons/md";
+import { MdOutlineAdminPanelSettings, MdOutlineDashboard } from "react-icons/md";
 import { TbReport, TbReportAnalytics } from "react-icons/tb";
 import { HiOutlineDocumentText } from "react-icons/hi";
 import { IoIosPaper } from "react-icons/io";
@@ -26,7 +26,7 @@ import { trpc } from "@/trpc/client";
 
 type Props = {
   isLeader?: boolean;
-  isAdmin?: boolean;
+  canAccessHrAdmin?: boolean;
   className?: string;
   organizationName?: string;
   userFullName?: string;
@@ -99,6 +99,7 @@ type DropdownKey = "profile" | "leave" | "daily" | "monthly" | null;
 
 const LeftMenu = ({
   isLeader = false,
+  canAccessHrAdmin = false,
   className = "",
   organizationName = "Ninja Digital Innovations",
   userFullName,
@@ -447,6 +448,22 @@ const LeftMenu = ({
             </li>
           )}
         </ul>
+        {canAccessHrAdmin && (
+          <div className="mt-4 rounded-2xl border border-slate-200/70 bg-slate-50/80 p-3 dark:border-slate-700/80 dark:bg-slate-800/60">
+            <p className="px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Admin Tools
+            </p>
+            <Link
+              href="/hr-admin"
+              className={`${getNavClasses(isRouteActive("/hr-admin"))} mt-3`}
+            >
+              <MdOutlineAdminPanelSettings className="text-lg" />
+              <span className="text-[16px] font-semibold">
+                HR Admin Dashboard
+              </span>
+            </Link>
+          </div>
+        )}
       </nav>
 
       <div className="mt-auto w-full">
