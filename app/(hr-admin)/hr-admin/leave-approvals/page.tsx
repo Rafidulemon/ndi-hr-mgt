@@ -2,14 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { BiChevronDown, BiChevronUp, BiDownload } from "react-icons/bi";
-import { FiSearch } from "react-icons/fi";
-
+import { FiCheck, FiEye, FiSearch, FiX } from "react-icons/fi";
 import ApplicationPreview from "@/app/components/Preview";
 import { Modal } from "@/app/components/atoms/frame/Modal";
 import {
   leaveTypeOptions,
   leaveTypeValues,
-  type LeaveTypeValue,
 } from "@/lib/leave-types";
 import type { HrLeaveRequest } from "@/types/hr-leave";
 import { trpc } from "@/trpc/client";
@@ -56,7 +54,7 @@ const leaveTypeFilterOptions = ["ALL", ...leaveTypeValues] as const;
 
 type StatusFilter = (typeof statusFilters)[number]["value"];
 type LeaveTypeFilterValue = (typeof leaveTypeFilterOptions)[number];
-type HrActionStatus = "APPROVED" | "PROCESSING" | "DENIED";
+type HrActionStatus = "APPROVED" | "DENIED";
 type SortField = "submittedAt" | "startDate" | "leaveType" | "status";
 type SortOrder = "asc" | "desc";
 
@@ -477,9 +475,6 @@ export default function HrAdminLeaveManagementPage() {
                       Status
                     </SortButton>
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">
-                    Remaining
-                  </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">
                     Actions
                   </th>
@@ -502,6 +497,8 @@ export default function HrAdminLeaveManagementPage() {
                   requests.map((request) => {
                     const status = statusMeta[request.status] ?? statusMeta.PENDING;
                     const isUpdating = updatingRequestId === request.id || updateStatus.isPending;
+                    const isFinalized =
+                      request.status === "APPROVED" || request.status === "DENIED";
                     return (
                       <tr key={request.id} className="text-slate-700 dark:text-slate-200">
                         <td className="px-4 py-4 align-top">
@@ -510,13 +507,9 @@ export default function HrAdminLeaveManagementPage() {
                             {request.employee.department ?? "—"} ·{" "}
                             {request.employee.employeeCode ?? "No ID"}
                           </p>
-                          <p className="text-xs text-slate-400">{request.employee.email}</p>
                         </td>
                         <td className="px-4 py-4 align-top">
                           <p className="font-semibold">{request.leaveTypeLabel}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {request.reason ?? "No reason supplied"}
-                          </p>
                         </td>
                         <td className="px-4 py-4 align-top text-sm">
                           <p>{formatDate(request.startDate)}</p>
@@ -538,48 +531,41 @@ export default function HrAdminLeaveManagementPage() {
                             {status.label}
                           </span>
                         </td>
-                        <td className="px-4 py-4 align-top text-sm">
-                          <p className="font-semibold">
-                            {request.remainingBalance.remaining} day
-                            {request.remainingBalance.remaining === 1 ? "" : "s"}
-                          </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            of {request.remainingBalance.label}
-                          </p>
-                        </td>
                         <td className="px-4 py-4 align-top">
-                          <div className="flex flex-wrap justify-end gap-2">
+                          <div className="flex flex-nowrap items-center justify-end gap-2">
                             <button
                               type="button"
                               onClick={() => handleViewApplication(request.id)}
-                              className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500"
+                              title="View application"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500"
                             >
-                              View
+                              <FiEye className="text-lg" />
+                              <span className="sr-only">View application</span>
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(request.id, "APPROVED")}
-                              disabled={isUpdating}
-                              className="rounded-xl border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/40 dark:text-emerald-200 dark:hover:bg-emerald-500/10"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(request.id, "PROCESSING")}
-                              disabled={isUpdating}
-                              className="rounded-xl border border-sky-200 px-3 py-1.5 text-xs font-semibold text-sky-600 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-500/40 dark:text-sky-200 dark:hover:bg-sky-500/10"
-                            >
-                              Changes
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusChange(request.id, "DENIED")}
-                              disabled={isUpdating}
-                              className="rounded-xl border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/40 dark:text-rose-200 dark:hover:bg-rose-500/10"
-                            >
-                              Deny
-                            </button>
+                            {!isFinalized && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusChange(request.id, "APPROVED")}
+                                  disabled={isUpdating}
+                                  title="Approve request"
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-200 text-emerald-600 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/40 dark:text-emerald-200 dark:hover:bg-emerald-500/10"
+                                >
+                                  <FiCheck className="text-lg" />
+                                  <span className="sr-only">Approve request</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusChange(request.id, "DENIED")}
+                                  disabled={isUpdating}
+                                  title="Reject request"
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/40 dark:text-rose-200 dark:hover:bg-rose-500/10"
+                                >
+                                  <FiX className="text-lg" />
+                                  <span className="sr-only">Reject request</span>
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
