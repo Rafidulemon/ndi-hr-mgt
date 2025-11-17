@@ -1,22 +1,15 @@
+"use client";
+
+import { useMemo } from "react";
+
 import Button from "@/app/components/atoms/buttons/Button";
+import { trpc } from "@/trpc/client";
+import type {
+  HrDashboardAttendanceState,
+  HrDashboardResponse,
+} from "@/types/hr-dashboard";
 
-type AttendanceState = "on-time" | "late" | "remote" | "missing";
-
-type AttendanceLogEntry = {
-  name: string;
-  department: string;
-  checkIn: string;
-  status: string;
-  method: string;
-  state: AttendanceState;
-};
-
-type WorkforcePoint = {
-  label: string;
-  plan: number;
-  actual: number;
-};
-
+type WorkforcePoint = HrDashboardResponse["workforceCapacity"][number];
 type WorkforceMetricKey = "plan" | "actual";
 
 type Normalizer = {
@@ -24,188 +17,7 @@ type Normalizer = {
   range: number;
 };
 
-const statHighlights = [
-  {
-    label: "People Strength",
-    value: "128",
-    trend: "+5.2%",
-    descriptor: "vs last month",
-  },
-  {
-    label: "Attendance Accuracy",
-    value: "97.4%",
-    trend: "+1.1%",
-    descriptor: "synced 5m ago",
-  },
-  {
-    label: "Average Utilization",
-    value: "82%",
-    trend: "+3 pts",
-    descriptor: "target 80%",
-  },
-  {
-    label: "Open Actions",
-    value: "23",
-    trend: "-4 today",
-    descriptor: "HR service desk",
-  },
-];
-
-const attendanceBreakdown = [
-  {
-    label: "On-site",
-    value: 62,
-    delta: "+6 today",
-    gradient: "from-emerald-400 to-emerald-500",
-  },
-  {
-    label: "Remote",
-    value: 24,
-    delta: "+2 vs avg",
-    gradient: "from-sky-400 to-blue-500",
-  },
-  {
-    label: "Late",
-    value: 9,
-    delta: "-3 vs avg",
-    gradient: "from-amber-400 to-orange-500",
-  },
-  {
-    label: "Absent",
-    value: 5,
-    delta: "+1 vs avg",
-    gradient: "from-rose-400 to-pink-500",
-  },
-];
-
-const attendanceTrend = [
-  { hour: "9 AM", onsite: 38, remote: 6 },
-  { hour: "10 AM", onsite: 57, remote: 9 },
-  { hour: "11 AM", onsite: 69, remote: 11 },
-  { hour: "12 PM", onsite: 80, remote: 14 },
-  { hour: "1 PM", onsite: 77, remote: 15 },
-  { hour: "2 PM", onsite: 73, remote: 13 },
-];
-
-const attendanceLog: AttendanceLogEntry[] = [
-  {
-    name: "Anika Rahman",
-    department: "Product Design",
-    checkIn: "09:02 AM",
-    status: "On-site",
-    method: "Turnstile · HQ",
-    state: "on-time",
-  },
-  {
-    name: "Farhan Amin",
-    department: "CX Operations",
-    checkIn: "09:37 AM",
-    status: "Late",
-    method: "Mobile · Mirpur",
-    state: "late",
-  },
-  {
-    name: "Lara Siddique",
-    department: "People Ops",
-    checkIn: "09:15 AM",
-    status: "Remote",
-    method: "VPN · Chattogram",
-    state: "remote",
-  },
-  {
-    name: "David Chowdhury",
-    department: "Engineering",
-    checkIn: "--",
-    status: "Missing",
-    method: "Awaiting sync",
-    state: "missing",
-  },
-];
-
-const leaveApprovals = [
-  {
-    name: "Noor Hasan",
-    role: "Finance Specialist",
-    type: "Annual Leave",
-    duration: "Dec 18 – Dec 22 (5 days)",
-    balance: "8 days remaining",
-    coverage: "Sabiha covering closing tasks",
-    submitted: "Requested 2h ago",
-  },
-  {
-    name: "Sadia Rahim",
-    role: "CX Chapter Lead",
-    type: "Work From Abroad",
-    duration: "Dec 26 – Jan 5 (7 days)",
-    balance: "Remote allowance 14 days",
-    coverage: "Rafi to shadow queues",
-    submitted: "Requested yesterday",
-  },
-  {
-    name: "Ayon Talukdar",
-    role: "Engineering Manager",
-    type: "Parental Leave",
-    duration: "Jan 3 – Jan 24 (15 days)",
-    balance: "Full entitlement",
-    coverage: "Rotation plan shared",
-    submitted: "Requested 3d ago",
-  },
-];
-
-const quickActions = [
-  {
-    title: "Push attendance reminder",
-    detail: "Ping 9 people without check-in yet.",
-    meta: "Due soon",
-    cta: "Send Reminder",
-  },
-  {
-    title: "Lock noon attendance",
-    detail: "Freeze 12 PM window to avoid edits.",
-    meta: "Cutoff in 30m",
-    cta: "Lock Window",
-  },
-  {
-    title: "Escalate late pattern",
-    detail: "Share CX Ops anomaly with lead.",
-    meta: "Insight",
-    cta: "Raise Ticket",
-  },
-];
-
-const workforceCapacity: WorkforcePoint[] = [
-  { label: "Jul", plan: 120, actual: 118 },
-  { label: "Aug", plan: 121, actual: 121 },
-  { label: "Sep", plan: 123, actual: 125 },
-  { label: "Oct", plan: 125, actual: 128 },
-  { label: "Nov", plan: 127, actual: 131 },
-  { label: "Dec", plan: 129, actual: 133 },
-];
-
-const workforceSignals = [
-  { label: "Backfills ready", value: "6", detail: "Offers signed" },
-  { label: "Critical roles", value: "3", detail: ">30 days aging" },
-];
-
-const engagementGauge = {
-  value: 87,
-  change: "+4 pts vs last pulse",
-};
-
-const engagementSnapshot = [
-  { label: "Listening participation", value: "92%", detail: "Pulse survey" },
-  { label: "1:1 coverage", value: "86%", detail: "Rolling 30 days" },
-  { label: "Learning completion", value: "64%", detail: "Q4 enablement" },
-];
-
-const teamCapacity = [
-  { team: "Engineering", committed: 49, available: 52 },
-  { team: "Product", committed: 38, available: 40 },
-  { team: "CX Operations", committed: 27, available: 28 },
-  { team: "People & Culture", committed: 10, available: 12 },
-];
-
-const attendanceStateStyles: Record<AttendanceState, string> = {
+const attendanceStateStyles: Record<HrDashboardAttendanceState, string> = {
   "on-time":
     "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200",
   late: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200",
@@ -213,7 +25,17 @@ const attendanceStateStyles: Record<AttendanceState, string> = {
   missing: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200",
 };
 
+const numberFormatter = new Intl.NumberFormat("en-US");
+const fullDateFormatter = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  month: "short",
+  day: "numeric",
+});
+
 const getWorkforceNormalizer = (points: WorkforcePoint[]): Normalizer => {
+  if (!points.length) {
+    return { min: 0, range: 1 };
+  }
   const values = points.flatMap((point) => [point.plan, point.actual]);
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -227,10 +49,11 @@ const buildLinePath = (
 ) =>
   points
     .map((point, index) => {
-      const x =
-        points.length <= 1 ? 0 : (index / (points.length - 1)) * 100;
-      const normalized =
-        ((point[key] - normalizer.min) / normalizer.range) * 100;
+      if (points.length === 1) {
+        return `M0,${50}`;
+      }
+      const x = (index / (points.length - 1)) * 100;
+      const normalized = ((point[key] - normalizer.min) / normalizer.range) * 100;
       const y = 100 - normalized;
       return `${index === 0 ? "M" : "L"}${x},${y}`;
     })
@@ -243,34 +66,87 @@ const buildPlotPoints = (
 ) =>
   points.map((point, index) => {
     const x = points.length <= 1 ? 0 : (index / (points.length - 1)) * 100;
-    const normalized =
-      ((point[key] - normalizer.min) / normalizer.range) * 100;
+    const normalized = ((point[key] - normalizer.min) / normalizer.range) * 100;
     const y = 100 - normalized;
     return { ...point, x, y, value: point[key] };
   });
 
-export default function HrAdminDashboardPage() {
-  const attendanceMax =
-    Math.max(...attendanceTrend.map((slot) => slot.onsite + slot.remote)) || 1;
+const formatFullDate = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return fullDateFormatter.format(parsed);
+};
 
-  const workforceNormalizer = getWorkforceNormalizer(workforceCapacity);
+export default function HrAdminDashboardPage() {
+  const queryDate = useMemo(() => new Date().toISOString(), []);
+
+  const dashboardQuery = trpc.hrDashboard.overview.useQuery({
+    date: queryDate,
+  });
+
+  if (dashboardQuery.isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center text-slate-500">
+        Loading dashboard...
+      </div>
+    );
+  }
+
+  if (dashboardQuery.isError || !dashboardQuery.data) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center text-slate-600">
+        <p>We couldn&apos;t load the dashboard summary right now.</p>
+        <Button
+          onClick={() => dashboardQuery.refetch()}
+          disabled={dashboardQuery.isFetching}
+          className="px-6 py-3 text-sm"
+        >
+          {dashboardQuery.isFetching ? "Refreshing..." : "Retry"}
+        </Button>
+      </div>
+    );
+  }
+
+  const data = dashboardQuery.data;
+  const statHighlights = data.statHighlights;
+  const attendanceBreakdown = data.attendanceBreakdown;
+  const attendanceTrend = data.attendanceTrend;
+  const attendanceLog = data.attendanceLog;
+  const leaveApprovals = data.leaveApprovals;
+  const quickActions = data.quickActions;
+  const workforceCapacity = data.workforceCapacity;
+  const workforceSignals = data.workforceSignals;
+  const engagementGauge = data.engagementGauge;
+  const engagementSnapshot = data.engagementSnapshot;
+  const teamCapacity = data.teamCapacity;
+
+  const attendanceMax = attendanceTrend.length
+    ? Math.max(...attendanceTrend.map((slot) => slot.onsite + slot.remote)) || 1
+    : 1;
+
+  const workforcePoints = workforceCapacity.length
+    ? workforceCapacity
+    : [{ label: "Now", plan: 0, actual: 0 }];
+  const workforceNormalizer = getWorkforceNormalizer(workforcePoints);
   const workforceActualPath = buildLinePath(
-    workforceCapacity,
+    workforcePoints,
     "actual",
     workforceNormalizer,
   );
-  const workforcePlanPath = buildLinePath(
-    workforceCapacity,
-    "plan",
-    workforceNormalizer,
-  );
+  const workforcePlanPath = buildLinePath(workforcePoints, "plan", workforceNormalizer);
   const workforceActualPoints = buildPlotPoints(
-    workforceCapacity,
+    workforcePoints,
     "actual",
     workforceNormalizer,
   );
 
   const gaugeAngle = (engagementGauge.value / 100) * 360;
+  const todayLabel = formatFullDate(data.date);
+  const workforceSubtitle = `${numberFormatter.format(data.coverageSummary.totalEmployees)} teammates tracked`;
+  const coverageChangePositive = !data.coverageSummary.changeLabel.startsWith("-");
+  const breakdownBase = Math.max(data.coverageSummary.totalEmployees, 1);
 
   return (
     <div className="space-y-10 pb-12">
@@ -290,17 +166,15 @@ export default function HrAdminDashboardPage() {
           <div className="grid w-full max-w-sm grid-cols-2 gap-4 text-sm">
             <div className="rounded-2xl border border-slate-200/70 bg-white px-4 py-3 text-slate-600 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/70 dark:text-slate-300">
               <p className="text-xs uppercase text-slate-400">Today</p>
-              <p className="font-semibold text-slate-900 dark:text-slate-100">
-                Tuesday, 10 Dec
-              </p>
-              <p>Payroll sprint · Week 2</p>
+              <p className="font-semibold text-slate-900 dark:text-slate-100">{todayLabel}</p>
+              <p>{workforceSubtitle}</p>
             </div>
             <div className="rounded-2xl border border-slate-200/70 bg-white px-4 py-3 text-slate-600 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/70 dark:text-slate-300">
-              <p className="text-xs uppercase text-slate-400">Next sync</p>
+              <p className="text-xs uppercase text-slate-400">Sync status</p>
               <p className="font-semibold text-slate-900 dark:text-slate-100">
-                2:30 PM
+                {data.coverageSummary.syncedLabel}
               </p>
-              <p>Attendance review</p>
+              <p>{data.coverageSummary.changeLabel}</p>
             </div>
           </div>
         </div>
@@ -323,9 +197,7 @@ export default function HrAdminDashboardPage() {
               >
                 {card.trend}
               </p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {card.descriptor}
-              </p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{card.descriptor}</p>
             </article>
           );
         })}
@@ -342,15 +214,19 @@ export default function HrAdminDashboardPage() {
                 Live coverage overview
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Synced 2 minutes ago · Bio-metric + VPN sources
+                {data.coverageSummary.syncedLabel} · Bio-metric + VPN sources
               </p>
             </div>
             <div className="rounded-3xl border border-slate-100 bg-gradient-to-br from-slate-50 to-white px-5 py-4 text-right text-sm shadow-sm dark:border-slate-800 dark:from-slate-900 dark:to-slate-950">
               <p className="text-xs uppercase text-slate-400">Coverage</p>
               <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-                89% of 132
+                {data.coverageSummary.percentLabel}
               </p>
-              <p className="text-xs text-emerald-500">+4 vs yesterday</p>
+              <p
+                className={`text-xs font-semibold ${coverageChangePositive ? "text-emerald-500" : "text-rose-500"}`}
+              >
+                {data.coverageSummary.changeLabel}
+              </p>
             </div>
           </div>
 
@@ -364,13 +240,11 @@ export default function HrAdminDashboardPage() {
                 <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
                   {item.value}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {item.delta}
-                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{item.delta}</p>
                 <div className="mt-4 h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800">
                   <div
                     className={`h-1.5 rounded-full bg-gradient-to-r ${item.gradient}`}
-                    style={{ width: `${Math.min(item.value, 100)}%` }}
+                    style={{ width: `${Math.min((item.value / breakdownBase) * 100, 100)}%` }}
                   />
                 </div>
               </div>
@@ -384,25 +258,31 @@ export default function HrAdminDashboardPage() {
               </p>
               <p className="text-xs text-slate-400">On-site vs remote</p>
             </div>
-            <div className="mt-4 flex h-48 items-end gap-4">
-              {attendanceTrend.map((slot) => (
-                <div key={slot.hour} className="flex flex-1 flex-col items-center gap-2">
-                  <div className="flex h-40 w-full flex-col justify-end gap-1 rounded-2xl bg-slate-50 p-2 dark:bg-slate-800/40">
-                    <div
-                      className="w-full rounded-xl bg-gradient-to-t from-emerald-500 to-emerald-300"
-                      style={{ height: `${(slot.onsite / attendanceMax) * 100}%` }}
-                    />
-                    <div
-                      className="w-full rounded-xl bg-gradient-to-t from-sky-500 to-sky-300"
-                      style={{ height: `${(slot.remote / attendanceMax) * 100}%` }}
-                    />
+            {attendanceTrend.length === 0 ? (
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500 dark:border-slate-700">
+                No check-ins recorded for the selected day.
+              </div>
+            ) : (
+              <div className="mt-4 flex h-48 items-end gap-4">
+                {attendanceTrend.map((slot) => (
+                  <div key={slot.hour} className="flex flex-1 flex-col items-center gap-2">
+                    <div className="flex h-40 w-full flex-col justify-end gap-1 rounded-2xl bg-slate-50 p-2 dark:bg-slate-800/40">
+                      <div
+                        className="w-full rounded-xl bg-gradient-to-t from-emerald-500 to-emerald-300"
+                        style={{ height: `${(slot.onsite / attendanceMax) * 100}%` }}
+                      />
+                      <div
+                        className="w-full rounded-xl bg-gradient-to-t from-sky-500 to-sky-300"
+                        style={{ height: `${(slot.remote / attendanceMax) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {slot.hour}
+                    </span>
                   </div>
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                    {slot.hour}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-8">
@@ -412,34 +292,40 @@ export default function HrAdminDashboardPage() {
               </h3>
               <p className="text-xs text-slate-400">Showing most recent</p>
             </div>
-            <div className="mt-4 space-y-3">
-              {attendanceLog.map((entry) => (
-                <div
-                  key={`${entry.name}-${entry.checkIn}`}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100/80 bg-white px-4 py-3 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {entry.name}
-                    </p>
-                    <p className="text-xs text-slate-500">{entry.department}</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${attendanceStateStyles[entry.state]}`}
-                    >
-                      {entry.status}
-                    </span>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                        {entry.checkIn}
+            {attendanceLog.length === 0 ? (
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500 dark:border-slate-800">
+                No attendance events have been logged today yet.
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {attendanceLog.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100/80 bg-white px-4 py-3 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {entry.name}
                       </p>
-                      <p className="text-xs text-slate-500">{entry.method}</p>
+                      <p className="text-xs text-slate-500">{entry.department}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${attendanceStateStyles[entry.state]}`}
+                      >
+                        {entry.status}
+                      </span>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                          {entry.checkIn}
+                        </p>
+                        <p className="text-xs text-slate-500">{entry.method}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </article>
 
@@ -458,171 +344,64 @@ export default function HrAdminDashboardPage() {
               Prioritize
             </span>
           </div>
-          <div className="mt-6 space-y-4">
-            {leaveApprovals.map((request) => (
-              <div
-                key={request.name}
-                className="rounded-2xl border border-slate-100/80 bg-white p-4 text-sm shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                      {request.name}
-                    </p>
-                    <p className="text-xs text-slate-500">{request.role}</p>
+          {leaveApprovals.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500 dark:border-slate-700">
+              No leave requests require attention right now.
+            </div>
+          ) : (
+            <div className="mt-6 space-y-4">
+              {leaveApprovals.map((request) => (
+                <div
+                  key={request.id}
+                  className="rounded-2xl border border-slate-100/80 bg-white p-4 text-sm shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                        {request.name}
+                      </p>
+                      <p className="text-xs text-slate-500">{request.role}</p>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                      {request.type}
+                    </span>
                   </div>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                    {request.type}
-                  </span>
+                  <dl className="mt-4 grid grid-cols-1 gap-3 text-slate-600 dark:text-slate-300 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-xs uppercase text-slate-400">Duration</dt>
+                      <dd className="font-semibold text-slate-900 dark:text-slate-50">
+                        {request.duration}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase text-slate-400">Balance</dt>
+                      <dd className="font-semibold text-slate-900 dark:text-slate-50">
+                        {request.balance}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase text-slate-400">Coverage</dt>
+                      <dd>{request.coverage}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase text-slate-400">Submitted</dt>
+                      <dd>{request.submitted}</dd>
+                    </div>
+                  </dl>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <Button className="px-4 py-2 text-xs font-semibold">Approve</Button>
+                    <button className="rounded-full border border-slate-200/70 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-400 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500">
+                      Escalate
+                    </button>
+                  </div>
                 </div>
-                <dl className="mt-4 grid grid-cols-1 gap-3 text-slate-600 dark:text-slate-300 sm:grid-cols-2">
-                  <div>
-                    <dt className="text-xs uppercase text-slate-400">Duration</dt>
-                    <dd className="font-semibold text-slate-900 dark:text-slate-50">
-                      {request.duration}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs uppercase text-slate-400">Balance</dt>
-                    <dd className="font-semibold text-slate-900 dark:text-slate-50">
-                      {request.balance}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs uppercase text-slate-400">Coverage</dt>
-                    <dd>{request.coverage}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs uppercase text-slate-400">Submitted</dt>
-                    <dd>{request.submitted}</dd>
-                  </div>
-                </dl>
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <Button className="px-4 py-2 text-xs font-semibold">Approve</Button>
-                  <Button
-                    theme="secondary"
-                    className="px-4 py-2 text-xs font-semibold"
-                  >
-                    Ask Manager
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </article>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-3">
-        <article className="rounded-[32px] border border-white/60 bg-white/90 p-6 shadow-xl dark:border-slate-700/70 dark:bg-slate-900/80">
-          <div>
-            <p className="text-xs uppercase text-slate-400">Quick actions</p>
-            <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">
-              Resolve in seconds
-            </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Frequently used HR workflows ready to launch.
-            </p>
-          </div>
-          <div className="mt-6 space-y-5">
-            {quickActions.map((action) => (
-              <div
-                key={action.title}
-                className="rounded-2xl border border-slate-100/80 bg-white p-5 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">
-                      {action.title}
-                    </p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      {action.detail}
-                    </p>
-                  </div>
-                  <span className="text-xs font-semibold uppercase text-slate-400">
-                    {action.meta}
-                  </span>
-                </div>
-                <Button className="mt-4 w-full justify-center" theme="primary">
-                  {action.cta}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="rounded-[32px] border border-white/60 bg-white/90 p-6 shadow-xl dark:border-slate-700/70 dark:bg-slate-900/80 xl:col-span-2">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase text-slate-400">Workforce trend</p>
-              <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">
-                Momentum vs hiring plan
-              </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Track how actual headcount is pacing against plan.
-              </p>
-            </div>
-            <div className="rounded-full bg-slate-100 px-4 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-200">
-              Dec release
-            </div>
-          </div>
-          <div className="mt-6 rounded-3xl border border-slate-100 bg-slate-50/70 p-6 dark:border-slate-800/70 dark:bg-slate-900/40">
-            <svg viewBox="0 0 100 100" className="h-48 w-full">
-              <defs>
-                <linearGradient id="actualGradient" x1="0%" x2="0%" y1="0%" y2="100%">
-                  <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.7" />
-                  <stop offset="100%" stopColor="#6366f1" stopOpacity="0.1" />
-                </linearGradient>
-              </defs>
-              <path
-                d={workforcePlanPath}
-                fill="none"
-                stroke="#94a3b8"
-                strokeDasharray="4 4"
-                strokeWidth={1}
-              />
-              <path
-                d={workforceActualPath}
-                fill="none"
-                stroke="url(#actualGradient)"
-                strokeWidth={2.2}
-                strokeLinecap="round"
-              />
-              {workforceActualPoints.map((point) => (
-                <circle
-                  key={point.label}
-                  cx={point.x}
-                  cy={point.y}
-                  r={1.5}
-                  fill="#38bdf8"
-                />
-              ))}
-            </svg>
-            <div className="mt-4 grid grid-cols-6 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {workforceCapacity.map((point) => (
-                <span key={point.label}>{point.label}</span>
-              ))}
-            </div>
-          </div>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            {workforceSignals.map((signal) => (
-              <div
-                key={signal.label}
-                className="rounded-2xl border border-slate-100/80 bg-white px-4 py-3 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60"
-              >
-                <p className="text-xs uppercase text-slate-400">{signal.label}</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
-                  {signal.value}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {signal.detail}
-                </p>
-              </div>
-            ))}
-          </div>
-        </article>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-3">
         <article className="rounded-[32px] border border-white/60 bg-white/90 p-6 shadow-xl dark:border-slate-700/70 dark:bg-slate-900/80">
           <div className="flex items-center justify-between">
             <div>
@@ -685,30 +464,168 @@ export default function HrAdminDashboardPage() {
               Compare current commitments against available FTE.
             </p>
           </div>
-          <div className="mt-6 space-y-5">
-            {teamCapacity.map((team) => {
-              const percent = Math.round((team.committed / team.available) * 100);
-              return (
-                <div key={team.team}>
-                  <div className="flex items-center justify-between text-sm">
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">
-                      {team.team}
+          {teamCapacity.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500 dark:border-slate-700">
+              No team assignments available yet.
+            </div>
+          ) : (
+            <div className="mt-6 space-y-5">
+              {teamCapacity.map((team) => {
+                const percent = team.available > 0 ? Math.round((team.committed / team.available) * 100) : 0;
+                return (
+                  <div key={team.team}>
+                    <div className="flex items-center justify-between text-sm">
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">
+                        {team.team}
+                      </p>
+                      <p className="text-xs text-slate-500">{percent}% utilized</p>
+                    </div>
+                    <div className="mt-2 h-3 rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div
+                        className="h-3 rounded-full bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400"
+                        style={{ width: `${Math.min(percent, 100)}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {team.committed} / {team.available} FTE committed
                     </p>
-                    <p className="text-xs text-slate-500">{percent}% utilized</p>
                   </div>
-                  <div className="mt-2 h-3 rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div
-                      className="h-3 rounded-full bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400"
-                      style={{ width: `${Math.min(percent, 100)}%` }}
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {team.committed} / {team.available} FTE committed
+                );
+              })}
+            </div>
+          )}
+        </article>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-3">
+        <article className="rounded-[32px] border border-white/60 bg-white/90 p-6 shadow-xl dark:border-slate-700/70 dark:bg-slate-900/80 lg:col-span-2">
+          <div>
+            <p className="text-xs uppercase text-slate-400">Workforce plan</p>
+            <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">
+              Headcount plan vs actuals
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Includes pending invites for forward-looking plan.
+            </p>
+          </div>
+          <div className="mt-6">
+            <svg viewBox="0 0 100 60" className="h-48 w-full">
+              <defs>
+                <linearGradient id="planGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#94a3b8" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="#94a3b8" stopOpacity="0.1" />
+                </linearGradient>
+                <linearGradient id="actualGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#38bdf8" />
+                  <stop offset="100%" stopColor="#6366f1" />
+                </linearGradient>
+              </defs>
+              <path
+                d={workforcePlanPath}
+                fill="none"
+                stroke="url(#planGradient)"
+                strokeWidth={1.5}
+                strokeDasharray="4 4"
+              />
+              <path
+                d={workforceActualPath}
+                fill="none"
+                stroke="url(#actualGradient)"
+                strokeWidth={2.5}
+              />
+              {workforceActualPoints.map((point) => (
+                <circle
+                  key={point.label}
+                  cx={point.x}
+                  cy={point.y}
+                  r={1.3}
+                  fill="#38bdf8"
+                />
+              ))}
+            </svg>
+            <div className="mt-4 flex items-center gap-4 text-xs text-slate-500">
+              <div className="flex items-center gap-2">
+                <span className="h-1.5 w-6 rounded-full bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400" />
+                Actual
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-1.5 w-6 rounded-full border border-dashed border-slate-400" />
+                Plan incl. invites
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-6 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              {workforcePoints.map((point) => (
+                <span key={point.label}>{point.label}</span>
+              ))}
+            </div>
+          </div>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            {workforceSignals.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500 dark:border-slate-700">
+                No workforce signals right now.
+              </div>
+            ) : (
+              workforceSignals.map((signal) => (
+                <div
+                  key={signal.label}
+                  className="rounded-2xl border border-slate-100/80 bg-white px-4 py-3 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60"
+                >
+                  <p className="text-xs uppercase text-slate-400">{signal.label}</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                    {signal.value}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {signal.detail}
                   </p>
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
+        </article>
+
+        <article className="rounded-[32px] border border-white/60 bg-white/90 p-6 shadow-xl dark:border-slate-700/70 dark:bg-slate-900/80">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase text-slate-400">Next actions</p>
+              <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">
+                HR console prompts
+              </h2>
+            </div>
+            <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-600 dark:bg-sky-400/10 dark:text-sky-200">
+              Live feed
+            </span>
+          </div>
+          {quickActions.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500 dark:border-slate-700">
+              No outstanding actions right now.
+            </div>
+          ) : (
+            <div className="mt-6 space-y-4">
+              {quickActions.map((action) => (
+                <div
+                  key={action.id}
+                  className="rounded-2xl border border-slate-100/80 bg-white p-4 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-base font-semibold text-slate-900 dark:text-slate-50">
+                        {action.title}
+                      </p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {action.detail}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                      {action.meta}
+                    </span>
+                  </div>
+                  <button className="mt-4 text-sm font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-sky-300 dark:hover:text-sky-200">
+                    {action.cta}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </article>
       </section>
     </div>
