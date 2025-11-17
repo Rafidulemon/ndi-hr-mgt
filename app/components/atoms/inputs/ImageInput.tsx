@@ -1,7 +1,7 @@
 'use client';
 
 /* eslint-disable @next/next/no-img-element */
-import { useState, ChangeEvent } from "react";
+import { ChangeEvent } from "react";
 
 type ImageInputProps = {
   className?: string;
@@ -10,6 +10,8 @@ type ImageInputProps = {
   isRequired?: boolean;
   initialImage?: string;
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
+  isUploading?: boolean;
+  error?: string | null;
 };
 
 const ImageInput = (props: ImageInputProps) => {
@@ -20,18 +22,9 @@ const ImageInput = (props: ImageInputProps) => {
     isRequired = false,
     initialImage = "/default_profile.png",
     onChange,
+    isUploading = false,
+    error = null,
   } = props;
-
-  const [preview, setPreview] = useState<string>(initialImage);
-
-  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
-    if (onChange) onChange(event);
-
-    const file = event.target.files?.[0];
-    if (file) {
-      setPreview(URL.createObjectURL(file));
-    }
-  };
 
   return (
     <div className={`flex flex-col ${className}`}>
@@ -51,16 +44,20 @@ const ImageInput = (props: ImageInputProps) => {
 
       <div className="relative h-24 w-24 overflow-hidden rounded-full border border-white/80 shadow shadow-slate-200/50 transition-colors duration-200 dark:border-slate-700 dark:shadow-slate-900/50">
         <img
-          src={preview}
+          src={initialImage}
           alt="Profile preview"
           className="h-full w-full object-cover"
         />
 
         <label
           htmlFor={id}
-          className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/50 opacity-0 transition-opacity hover:opacity-100"
+          className={`absolute inset-0 flex cursor-pointer items-center justify-center bg-black/50 text-white opacity-0 transition-opacity ${
+            isUploading ? "cursor-not-allowed opacity-100" : "hover:opacity-100"
+          }`}
         >
-          <span className="text-sm font-semibold text-white">Change</span>
+          <span className="text-sm font-semibold">
+            {isUploading ? "Uploading..." : "Change"}
+          </span>
         </label>
 
         <input
@@ -68,9 +65,13 @@ const ImageInput = (props: ImageInputProps) => {
           type="file"
           accept="image/*"
           className="hidden"
-          onChange={handleImageChange}
+          onChange={onChange}
+          disabled={isUploading}
         />
       </div>
+      {error ? (
+        <p className="mt-2 text-xs font-semibold text-rose-600 dark:text-rose-300">{error}</p>
+      ) : null}
     </div>
   );
 };

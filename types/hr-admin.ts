@@ -21,6 +21,7 @@ export type EmployeeDirectoryEntry = {
   workArrangement: string | null;
   avatarInitials: string;
   experience: string;
+  profilePhotoUrl: string | null;
 };
 
 export type PendingApproval = {
@@ -74,6 +75,7 @@ export type HrEmployeeProfile = {
   employmentType: string;
   workArrangement: string | null;
   avatarInitials: string;
+  profilePhotoUrl: string | null;
   experience: string;
   address: string | null;
   emergencyContact: HrEmployeeEmergencyContact | null;
@@ -107,6 +109,7 @@ export type HrEmployeeForm = {
   startDate: string | null;
   status: EmployeeStatus;
   emergencyContact: HrEmployeeEmergencyContact | null;
+  profilePhotoUrl: string | null;
 };
 
 export type HrEmployeeFormResponse = {

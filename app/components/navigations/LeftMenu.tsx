@@ -183,8 +183,8 @@ const LeftMenu = ({
 
   return (
     <div className={containerClasses}>
-      <div className="sticky top-0 z-20 flex flex-col items-center gap-3 rounded-[24px] bg-white/95 px-4 pb-3 text-center backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:text-left dark:bg-slate-900/85">
-      <div className="flex flex-row items-center justify-center gap-3 sm:justify-start">
+      <div className="sticky top-0 z-20 flex flex-col items-center gap-3 rounded-[24px] bg-white/95 pb-2 text-center backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:text-left dark:bg-slate-900/85">
+      <div className="flex flex-row items-center justify-center gap-1 sm:justify-start">
         <Image
           src="/logo/ndi.logo.png"
           alt="Demo Logo"
@@ -195,7 +195,7 @@ const LeftMenu = ({
         />
         <div>
           <p
-            className="text-base font-semibold text-indigo-700 dark:text-slate-100"
+            className="text-base font-semibold text-[#364a6e] dark:text-slate-100"
           >
             {organizationName}
           </p>

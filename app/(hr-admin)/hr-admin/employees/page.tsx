@@ -327,15 +327,21 @@ export default function EmployeeManagementPage() {
                     >
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-full border border-black text-sm font-semibold uppercase text-white shadow-lg shadow-slate-900/20 dark:from-indigo-500 dark:to-sky-500">
-                            <Image
-                              src="/default_profile.png"
-                              alt={employee.name}
-                              width={44}
-                              height={44}
-                              className="h-11 w-11 rounded-2xl object-cover"
-                            />
-                          </div>
+                          {employee.profilePhotoUrl ? (
+                            <div className="relative h-11 w-11 overflow-hidden rounded-full border border-white/70 shadow shadow-slate-900/5 dark:border-slate-700/70 dark:shadow-slate-900/40">
+                              <Image
+                                src={employee.profilePhotoUrl}
+                                alt={employee.name}
+                                fill
+                                sizes="44px"
+                                className="object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 text-sm font-semibold uppercase text-white shadow shadow-indigo-500/30 dark:from-slate-800 dark:to-slate-700">
+                              {employee.avatarInitials}
+                            </div>
+                          )}
 
                           <div>
                             <p className="font-semibold text-slate-900 dark:text-white">

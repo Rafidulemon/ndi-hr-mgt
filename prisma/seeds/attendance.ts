@@ -5,7 +5,7 @@ const baseDate = new Date("2025-01-10T00:00:00+06:00");
 const attendanceRecords = [
   {
     id: "att-1",
-    employeeId: "3",
+    employeeId: "0003",
     attendanceDate: baseDate,
     checkInAt: new Date("2025-01-10T09:05:00+06:00"),
     checkOutAt: new Date("2025-01-10T18:05:00+06:00"),
@@ -17,7 +17,7 @@ const attendanceRecords = [
   },
   {
     id: "att-2",
-    employeeId: "4",
+    employeeId: "0005",
     attendanceDate: baseDate,
     checkInAt: new Date("2025-01-10T09:20:00+06:00"),
     checkOutAt: new Date("2025-01-10T18:30:00+06:00"),
@@ -29,7 +29,7 @@ const attendanceRecords = [
   },
   {
     id: "att-3",
-    employeeId: "5",
+    employeeId: "0009",
     attendanceDate: baseDate,
     checkInAt: new Date("2025-01-10T09:00:00+06:00"),
     checkOutAt: new Date("2025-01-10T17:45:00+06:00"),
@@ -40,7 +40,7 @@ const attendanceRecords = [
   },
   {
     id: "att-4",
-    employeeId: "3",
+    employeeId: "0003",
     attendanceDate: new Date("2025-01-11T00:00:00+06:00"),
     checkInAt: new Date("2025-01-11T09:10:00+06:00"),
     checkOutAt: new Date("2025-01-11T13:00:00+06:00"),
@@ -52,7 +52,7 @@ const attendanceRecords = [
   },
   {
     id: "att-5",
-    employeeId: "4",
+    employeeId: "0005",
     attendanceDate: new Date("2025-01-11T00:00:00+06:00"),
     status: "ABSENT" as const,
     note: "Approved sick leave.",

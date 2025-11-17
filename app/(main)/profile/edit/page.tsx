@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -14,6 +14,8 @@ import { Card } from "../../../components/atoms/frame/Card";
 import Text from "../../../components/atoms/Text/Text";
 import SelectBox from "../../../components/atoms/selectBox/SelectBox";
 import { trpc } from "@/trpc/client";
+import { uploadProfileImage } from "@/lib/upload-profile-image";
+import type { UserProfileResponse } from "@/server/modules/user/user.service";
 
 const profileFormSchema = z.object({
   profile: z.object({
@@ -146,7 +148,21 @@ const formatInputDate = (value?: Date | string | null) => {
   return date.toISOString().slice(0, 10);
 };
 
-type ProfileData = any;
+type MaybeDate = Date | string | null | undefined;
+
+type ProfileData = Omit<UserProfileResponse, "lastLoginAt" | "profile" | "employment"> & {
+  lastLoginAt: MaybeDate;
+  profile:
+    | null
+    | (Omit<NonNullable<UserProfileResponse["profile"]>, "dateOfBirth"> & {
+        dateOfBirth: MaybeDate;
+      });
+  employment:
+    | null
+    | (Omit<NonNullable<UserProfileResponse["employment"]>, "startDate"> & {
+        startDate: MaybeDate;
+      });
+};
 
 function mapProfileToForm(data: ProfileData): ProfileFormData {
   return {
@@ -196,9 +212,13 @@ function mapProfileToForm(data: ProfileData): ProfileFormData {
 function EditProfilePage() {
   const router = useRouter();
   const profileQuery = trpc.user.profile.useQuery();
+  const utils = trpc.useUtils();
   const updateProfile = trpc.user.updateProfile.useMutation();
   const [serverMessage, setServerMessage] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string>("/dp.png");
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const {
     register,
@@ -213,6 +233,7 @@ function EditProfilePage() {
   useEffect(() => {
     if (profileQuery.data) {
       reset(mapProfileToForm(profileQuery.data));
+      setPhotoUrl(profileQuery.data.profile?.profilePhotoUrl ?? "/dp.png");
     }
   }, [profileQuery.data, reset]);
 
@@ -224,6 +245,37 @@ function EditProfilePage() {
     () => getOptionLabel(employmentTypeOptions, profileQuery.data?.employment?.employmentType ?? null),
     [profileQuery.data?.employment?.employmentType],
   );
+
+  const handlePhotoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoError("Please choose an image smaller than 5MB.");
+      event.target.value = "";
+      return;
+    }
+
+    setPhotoError(null);
+    setIsPhotoUploading(true);
+    const previousUrl = photoUrl;
+    const previewUrl = URL.createObjectURL(file);
+    setPhotoUrl(previewUrl);
+    try {
+      const url = await uploadProfileImage(file);
+      setPhotoUrl(url);
+      await utils.user.profile.invalidate();
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : "Failed to upload photo.");
+      setPhotoUrl(previousUrl);
+    } finally {
+      setIsPhotoUploading(false);
+      URL.revokeObjectURL(previewUrl);
+      event.target.value = "";
+    }
+  };
 
   const onSubmit = (values: ProfileFormData) => {
     setServerMessage(null);
@@ -300,7 +352,13 @@ function EditProfilePage() {
         <Card title="Personal Basics" isTransparentBackground>
           <div className="space-y-6">
             <div className="flex flex-col items-center gap-3 sm:flex-row">
-              <ImageInput id="profilePic" onChange={(event) => console.log(event.target.files)} />
+              <ImageInput
+                id="profilePic"
+                initialImage={photoUrl}
+                isUploading={isPhotoUploading}
+                error={photoError}
+                onChange={handlePhotoUpload}
+              />
               <div className="space-y-1 text-sm text-slate-500 dark:text-slate-400">
                 <p className="font-semibold text-slate-900 dark:text-slate-100">Profile photo</p>
                 <p>JPG or PNG · Max 5 MB · Square crop recommended.</p>

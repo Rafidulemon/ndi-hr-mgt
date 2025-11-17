@@ -185,7 +185,7 @@ function ProfilePage() {
       <section className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <Card title="Profile Overview">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
-            <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-[28px] border border-white/60 shadow-lg shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:shadow-slate-900/60">
+            <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-full border border-white/60 shadow-lg shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:shadow-slate-900/60">
               <Image
                 src={avatarSrc}
                 alt={fullName}

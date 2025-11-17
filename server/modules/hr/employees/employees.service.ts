@@ -54,6 +54,7 @@ const employeeSelect = {
       preferredName: true,
       workModel: true,
       currentAddress: true,
+      profilePhotoUrl: true,
     },
   },
   employment: {
@@ -134,6 +135,7 @@ const employeeDetailSelect = {
       permanentAddress: true,
       workEmail: true,
       workPhone: true,
+      profilePhotoUrl: true,
     },
   },
   employment: {
@@ -314,6 +316,7 @@ const mapEmployeeRecord = (record: EmployeeRecord): EmployeeDirectoryEntry => {
       : "—",
     workArrangement: profile?.workModel ? workModelLabels[profile.workModel] : null,
     avatarInitials: buildInitials(profile, record.email),
+    profilePhotoUrl: profile?.profilePhotoUrl ?? null,
     experience: formatExperience(employment?.startDate),
   };
 };
@@ -417,6 +420,7 @@ const mapEmployeeProfileDetail = (record: EmployeeDetailRecord): HrEmployeeProfi
     employmentType: employment ? employmentTypeLabels[employment.employmentType] : "Full-time",
     workArrangement: profile?.workModel ? workModelLabels[profile.workModel] : null,
     avatarInitials: buildInitials(profile, record.email),
+    profilePhotoUrl: profile?.profilePhotoUrl ?? null,
     experience: formatExperience(employment?.startDate),
     address: profile?.currentAddress ?? profile?.permanentAddress ?? null,
     emergencyContact: emergencyContact
@@ -475,6 +479,7 @@ const mapEmployeeForm = (record: EmployeeDetailRecord): HrEmployeeForm => {
           relation: emergencyContact.relationship,
         }
       : null,
+    profilePhotoUrl: profile?.profilePhotoUrl ?? null,
   };
 };
 

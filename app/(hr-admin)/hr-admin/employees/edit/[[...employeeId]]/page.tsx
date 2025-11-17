@@ -1,16 +1,18 @@
-'use client';
+"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useForm } from "react-hook-form";
 
 import Button from "@/app/components/atoms/buttons/Button";
+import ImageInput from "@/app/components/atoms/inputs/ImageInput";
 import TextArea from "@/app/components/atoms/inputs/TextArea";
 import TextInput from "@/app/components/atoms/inputs/TextInput";
 import { EmployeeHeader } from "@/app/components/layouts/EmployeeHeader";
 import { trpc } from "@/trpc/client";
 import type { HrEmployeeForm } from "@/types/hr-admin";
+import { uploadProfileImage } from "@/lib/upload-profile-image";
 
 const employmentTypes = ["Full-time", "Part-time", "Contract", "Intern"] as const;
 const workArrangements = ["Remote", "Hybrid", "On-site"] as const;
@@ -131,6 +133,10 @@ export default function EditEmployeePage() {
   const pathname = usePathname();
   const employeeId = useMemo(() => extractEmployeeId(pathname), [pathname]);
   const form = useForm<EmployeeFormValues>({ defaultValues });
+  const utils = trpc.useUtils();
+  const [photoUrl, setPhotoUrl] = useState("/dp.png");
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const employeeFormQuery = trpc.hrEmployees.form.useQuery(
     { employeeId: employeeId ?? "" },
@@ -141,8 +147,46 @@ export default function EditEmployeePage() {
   useEffect(() => {
     if (employeeFormQuery.data?.form) {
       form.reset(toFormValues(employeeFormQuery.data.form));
+      setPhotoUrl(employeeFormQuery.data.form.profilePhotoUrl ?? "/dp.png");
     }
   }, [employeeFormQuery.data?.form, form]);
+
+  const handlePhotoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    if (!employeeId) {
+      return;
+    }
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoError("Please choose an image smaller than 5MB.");
+      event.target.value = "";
+      return;
+    }
+
+    setPhotoError(null);
+    setIsPhotoUploading(true);
+    const previousUrl = photoUrl;
+    const previewUrl = URL.createObjectURL(file);
+    setPhotoUrl(previewUrl);
+    try {
+      const url = await uploadProfileImage(file, { employeeId });
+      setPhotoUrl(url);
+      await Promise.all([
+        utils.hrEmployees.profile.invalidate({ employeeId }),
+        utils.hrEmployees.form.invalidate({ employeeId }),
+      ]);
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : "Failed to upload photo.");
+      setPhotoUrl(previousUrl);
+    } finally {
+      setIsPhotoUploading(false);
+      URL.revokeObjectURL(previewUrl);
+      event.target.value = "";
+    }
+  };
 
   const onSubmit = (values: EmployeeFormValues) => {
     if (!employeeId) {
@@ -217,6 +261,19 @@ export default function EditEmployeePage() {
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 Keep their core profile details up to date.
               </p>
+            </div>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <ImageInput
+                id="employee-profile-photo"
+                initialImage={photoUrl}
+                isUploading={isPhotoUploading}
+                error={photoError}
+                onChange={handlePhotoUpload}
+              />
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                <p className="font-semibold text-slate-900 dark:text-white">Profile photo</p>
+                <p>Uploads save immediately · JPG/PNG/WEBP · Max 5 MB</p>
+              </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <TextInput

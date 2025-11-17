@@ -1,5 +1,6 @@
-'use client';
+"use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
@@ -193,8 +194,21 @@ const EmployeeProfileContent = ({ employee }: { employee: HrEmployeeProfile }) =
       <section className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <div className="rounded-[32px] border border-white/60 bg-white/95 p-6 shadow-xl shadow-indigo-100 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
-            <div className="flex h-28 w-28 items-center justify-center rounded-[24px] bg-gradient-to-br from-indigo-500 via-sky-500 to-cyan-400 text-3xl font-semibold text-white shadow-lg shadow-indigo-500/30 dark:from-slate-800 dark:to-slate-700">
-              {employee.avatarInitials}
+            <div className="relative h-28 w-28 overflow-hidden rounded-full border border-white/60 shadow-lg shadow-indigo-100 dark:border-slate-700/70 dark:shadow-slate-900/60">
+              {employee.profilePhotoUrl ? (
+                <Image
+                  src={employee.profilePhotoUrl}
+                  alt={employee.name}
+                  fill
+                  sizes="112px"
+                  className="object-cover"
+                  priority
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-500 via-sky-500 to-cyan-400 text-3xl font-semibold text-white dark:from-slate-800 dark:to-slate-700">
+                  {employee.avatarInitials}
+                </div>
+              )}
             </div>
             <div className="space-y-3">
               <Text
