@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import type { UserRole } from "@prisma/client";
+import { LeaveStatus, type UserRole } from "@prisma/client";
 
 import HrAdminLeftMenu from "../components/navigations/HrAdminLeftMenu";
 import "../globals.css";
 import { requireUser } from "@/server/auth/guards";
+import { prisma } from "@/server/db";
 
 export default async function HrAdminLayout({
   children,
@@ -30,6 +31,16 @@ export default async function HrAdminLayout({
       .filter(Boolean)
       .join(" ");
   const organizationName = user.organization?.name ?? "NDI HR";
+  const pendingLeaveCount =
+    user.organizationId &&
+    (await prisma.leaveRequest.count({
+      where: {
+        status: { in: [LeaveStatus.PENDING, LeaveStatus.PROCESSING] },
+        employee: {
+          organizationId: user.organizationId,
+        },
+      },
+    }));
 
   return (
     <div className="relative flex min-h-screen w-full">
@@ -42,6 +53,7 @@ export default async function HrAdminLayout({
               organizationName={organizationName}
               userFullName={fullName}
               showEmployeeDashboardLink
+              pendingLeaveCount={Number(pendingLeaveCount) || 0}
             />
           </div>
         </aside>

@@ -1,8 +1,14 @@
+import { UserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import type { TRPCContext } from "@/server/api/trpc";
 
-const HR_ONLY_ROLE = "HR_ADMIN";
+const HR_ALLOWED_ROLES: UserRole[] = [
+  "HR_ADMIN",
+  "MANAGER",
+  "ORG_ADMIN",
+  "SUPER_ADMIN",
+];
 
 export const requireHrAdmin = (ctx: TRPCContext) => {
   if (!ctx.session) {
@@ -10,8 +16,7 @@ export const requireHrAdmin = (ctx: TRPCContext) => {
   }
 
   const user = ctx.session.user;
-
-  if (user.role !== HR_ONLY_ROLE) {
+  if (!HR_ALLOWED_ROLES.includes(user.role as UserRole)) {
     throw new TRPCError({ code: "FORBIDDEN", message: "HR access required." });
   }
 

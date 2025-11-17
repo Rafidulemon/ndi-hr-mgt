@@ -85,10 +85,29 @@ const fileToDataUrl = (file: File) =>
     reader.readAsDataURL(file);
   });
 
+const calculateInclusiveDays = (start?: Date | string | null, end?: Date | string | null) => {
+  if (!start || !end) return 0;
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return 0;
+  }
+  const normalizedStart = new Date(startDate);
+  normalizedStart.setHours(0, 0, 0, 0);
+  const normalizedEnd = new Date(endDate);
+  normalizedEnd.setHours(0, 0, 0, 0);
+  const diffMs = normalizedEnd.getTime() - normalizedStart.getTime();
+  const dayMs = 1000 * 60 * 60 * 24;
+  return Math.floor(diffMs / dayMs) + 1;
+};
+
 export default function LeaveApplicationPage() {
   const router = useRouter();
   const utils = trpc.useUtils();
   const leaveMutation = trpc.leave.submitApplication.useMutation();
+  const summaryQuery = trpc.leave.summary.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
   const {
     data: profileData,
     isLoading: isProfileLoading,
@@ -152,6 +171,7 @@ export default function LeaveApplicationPage() {
     register,
     handleSubmit,
     control,
+    watch,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(leaveApplicationSchema),
@@ -200,6 +220,43 @@ export default function LeaveApplicationPage() {
     { label: "Employee ID", value: valueOrFallback(userData.employeeId) },
     { label: "Designation", value: valueOrFallback(userData.designation) },
   ];
+
+  const selectedLeaveType = watch("leaveType");
+  const startDateValue = watch("startDate");
+  const endDateValue = watch("endDate");
+  const leaveBalances = summaryQuery.data?.balances ?? [];
+  const selectedOption =
+    leaveTypeOptionMap[selectedLeaveType as LeaveTypeValue] ??
+    leaveTypeOptions[0];
+  const selectedBalance = leaveBalances.find(
+    (entry) => (entry.type as LeaveTypeValue) === selectedLeaveType,
+  );
+  const requestedDays = calculateInclusiveDays(startDateValue, endDateValue);
+  const hasNoBalance = selectedBalance ? selectedBalance.remaining <= 0 : false;
+  const exceedsBalance = selectedBalance
+    ? requestedDays > selectedBalance.remaining
+    : false;
+  const quotaBlocked = hasNoBalance || exceedsBalance;
+  const requestIsValid = requestedDays > 0;
+  const submitDisabled =
+    leaveMutation.isPending || quotaBlocked || !requestIsValid || summaryQuery.isLoading;
+  const quotaMessage = summaryQuery.isLoading
+    ? "Checking available days..."
+    : summaryQuery.error
+      ? "Unable to load your leave balance right now."
+      : !selectedBalance
+        ? "Balance data unavailable. Please refresh."
+        : hasNoBalance
+          ? `You have no ${selectedOption?.shortLabel ?? "selected"} leave remaining.`
+          : exceedsBalance
+            ? `Request spans ${requestedDays} day${
+                requestedDays === 1 ? "" : "s"
+              }, but only ${selectedBalance.remaining} day${
+                selectedBalance.remaining === 1 ? "" : "s"
+              } remain.`
+            : `You have ${selectedBalance.remaining} day${
+                selectedBalance.remaining === 1 ? "" : "s"
+              } available.`;
 
   const handleAttachmentChange = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -250,9 +307,53 @@ export default function LeaveApplicationPage() {
   const onSubmit = async (data: FormData) => {
     setFormMessage(null);
 
+    const requestedType = data.leaveType as LeaveTypeValue;
+    const targetBalance = leaveBalances.find(
+      (entry) => (entry.type as LeaveTypeValue) === requestedType,
+    );
+    const totalRequestedDays = calculateInclusiveDays(data.startDate, data.endDate);
+    const leaveLabel =
+      leaveTypeOptionMap[requestedType]?.shortLabel ?? data.leaveType;
+
+    if (summaryQuery.isLoading) {
+      setFormMessage({
+        type: "error",
+        text: "Please wait while we confirm your available leave balance.",
+      });
+      return;
+    }
+
+    if (!targetBalance) {
+      setFormMessage({
+        type: "error",
+        text: "We could not determine your remaining leave. Refresh and try again.",
+      });
+      return;
+    }
+
+    if (targetBalance.remaining <= 0) {
+      setFormMessage({
+        type: "error",
+        text: `You currently have no ${leaveLabel} days remaining.`,
+      });
+      return;
+    }
+
+    if (totalRequestedDays > targetBalance.remaining) {
+      setFormMessage({
+        type: "error",
+        text: `This request covers ${totalRequestedDays} day${
+          totalRequestedDays === 1 ? "" : "s"
+        }, but you only have ${targetBalance.remaining} day${
+          targetBalance.remaining === 1 ? "" : "s"
+        } available.`,
+      });
+      return;
+    }
+
     try {
       await leaveMutation.mutateAsync({
-        leaveType: data.leaveType as LeaveTypeValue,
+        leaveType: requestedType,
         reason: data.reason,
         note: data.note || undefined,
         startDate: data.startDate,
@@ -358,6 +459,35 @@ export default function LeaveApplicationPage() {
                 <p className="text-sm text-slate-500 dark:text-slate-400">{card.description}</p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-6 rounded-3xl border border-dashed border-slate-200 bg-white/70 p-4 dark:border-slate-700/60 dark:bg-slate-900/60">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
+                  Selected leave balance
+                </p>
+                <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  {selectedOption?.label ?? "Leave type"}
+                </p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {quotaMessage}
+                </p>
+              </div>
+              <span
+                className={`rounded-full px-4 py-1 text-xs font-semibold ${
+                  quotaBlocked
+                    ? "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-100"
+                    : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-100"
+                }`}
+              >
+                {quotaBlocked ? "Action needed" : "Good to apply"}
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              Requested duration: {requestedDays} day{requestedDays === 1 ? "" : "s"}.
+              {exceedsBalance && " Reduce the window or pick another type."}
+            </p>
           </div>
 
           <div className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
@@ -525,10 +655,16 @@ export default function LeaveApplicationPage() {
                     type="submit"
                     theme="aqua"
                     className="w-full sm:w-auto"
-                    disabled={leaveMutation.isPending}
+                    disabled={submitDisabled}
                   >
                     <Text
-                      text={leaveMutation.isPending ? "Submitting..." : "Submit application"}
+                      text={
+                        leaveMutation.isPending
+                          ? "Submitting..."
+                          : quotaBlocked
+                            ? "Adjust request to submit"
+                            : "Submit application"
+                      }
                       className="text-[15px] font-semibold"
                     />
                   </Button>

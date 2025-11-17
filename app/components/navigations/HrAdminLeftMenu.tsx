@@ -46,6 +46,7 @@ type Props = {
   organizationName?: string;
   userFullName?: string;
   showEmployeeDashboardLink?: boolean;
+  pendingLeaveCount?: number;
 };
 
 const hrMenuItems: MenuItem[] = [
@@ -69,7 +70,7 @@ const hrMenuItems: MenuItem[] = [
   },
   {
     id: "leave",
-    label: "Leave Approvals",
+    label: "Leave Management",
     icon: <FaClipboardList />,
     href: "/hr-admin/leave-approvals",
   },
@@ -104,6 +105,7 @@ const HrAdminLeftMenu = ({
   organizationName = "NDI HR",
   userFullName,
   showEmployeeDashboardLink = false,
+  pendingLeaveCount = 0,
 }: Props) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -135,7 +137,7 @@ const HrAdminLeftMenu = ({
   };
 
   const containerClasses = [
-    "flex min-h-full w-full flex-col gap-4 rounded-[32px] border border-white/60 bg-white/90 p-6 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur transition-colors duration-200 lg:min-w-[18rem]",
+    "flex min-h-full w-full flex-col gap-4 rounded-[32px] border border-white/60 bg-white/90 px-4 py-6 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur transition-colors duration-200 lg:min-w-[18rem]",
     "dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:shadow-slate-900/60",
     className,
   ]
@@ -146,7 +148,7 @@ const HrAdminLeftMenu = ({
     [
       "flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200",
       isActive
-        ? "bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 text-white shadow-lg shadow-indigo-500/30 dark:shadow-sky-900/40"
+        ? "bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 text-white shadow-lg shadow-indigo-500/30 dark:shadow-sky-900/40 rounded"
         : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-slate-100",
     ].join(" ");
 
@@ -175,17 +177,25 @@ const HrAdminLeftMenu = ({
 
       <nav className="flex flex-1 flex-col">
         <ul className="mt-4 space-y-2">
-          {hrMenuItems.map((item) => (
-            <li key={item.id}>
-              <Link
-                href={item.href ?? "#"}
-                className={getNavClasses(isRouteActive(item.href))}
-              >
-                {item.icon}
-                <span className="text-[16px] font-semibold">{item.label}</span>
-              </Link>
-            </li>
-          ))}
+          {hrMenuItems.map((item) => {
+            const showPendingBadge = item.id === "leave" && pendingLeaveCount > 0;
+            return (
+              <li key={item.id}>
+                <Link
+                  href={item.href ?? "#"}
+                  className={getNavClasses(isRouteActive(item.href))}
+                >
+                  {item.icon}
+                  <span className="text-[16px] font-semibold">{item.label}</span>
+                  {showPendingBadge ? (
+                    <span className="ml-auto rounded-full bg-rose-500/10 px-3 py-0.5 text-xs font-bold text-rose-600 dark:bg-rose-400/20 dark:text-rose-100">
+                      {pendingLeaveCount}
+                    </span>
+                  ) : null}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
         {showEmployeeDashboardLink && (
           <div className="mt-4 rounded-2xl border border-slate-200/70 bg-slate-50/80 p-3 dark:border-slate-700/80 dark:bg-slate-800/60">
