@@ -5,7 +5,7 @@ import { trpc } from "@/trpc/client";
 import type { EmployeeDashboardResponse } from "@/types/employee-dashboard";
 import Button from "../components/atoms/buttons/Button";
 import { CardWithHeader } from "../components/atoms/frame/CardWithHeader";
-import LoadingSpinner from "../components/atoms/loading/LoadingSpinner";
+import DashboardLoadingIndicator from "../components/dashboard/DashboardLoadingIndicator";
 import Text from "../components/atoms/Text/Text";
 
 const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -226,12 +226,15 @@ function HomePage() {
 
   const isLoading = queries.some((query) => query.isLoading);
   const isFetching = queries.some((query) => query.isFetching);
+  const showFetchingIndicator = !isLoading && isFetching;
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50/60 px-4 dark:bg-slate-950/60">
-        <LoadingSpinner label="Loading your dashboard..." />
-      </div>
+      <DashboardLoadingIndicator
+        fullscreen
+        label="Loading your dashboard..."
+        helper="We are fetching your attendance, leave, and notifications."
+      />
     );
   }
 
@@ -312,7 +315,18 @@ function HomePage() {
       : "Keep logging your day so we can surface accurate habits.";
 
   return (
-    <div className="space-y-8">
+    <div className="relative space-y-8">
+      {showFetchingIndicator ? (
+        <div className="pointer-events-none absolute inset-x-0 top-4 z-20 flex justify-center">
+          <div className="w-full max-w-md">
+            <DashboardLoadingIndicator
+              label="Refreshing dashboard..."
+              helper="Updating the latest stats."
+              subtle
+            />
+          </div>
+        </div>
+      ) : null}
       <section className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-indigo-600 via-sky-500 to-cyan-400 p-8 text-white shadow-2xl dark:shadow-slate-950/60">
           <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">

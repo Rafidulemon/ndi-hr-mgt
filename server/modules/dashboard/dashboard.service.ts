@@ -6,7 +6,7 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
-import type { TRPCContext } from "@/server/api/trpc";
+import { prisma } from "@/server/db";
 import { leaveTypeLabelMap } from "@/lib/leave-types";
 import {
   buildBalanceResponse,
@@ -224,6 +224,12 @@ type MonthlyAttendanceSummary = {
   checkInSamples: number;
 };
 
+type DashboardServiceInput = {
+  userId: string;
+  organizationId: string;
+  organizationNameHint?: string | null;
+};
+
 const summarizeMonthlyAttendance = (
   records: AttendanceRecordForDashboard[],
   monthStart: Date,
@@ -298,23 +304,9 @@ type DashboardSections = {
 };
 
 const loadDashboardDataset = async (
-  ctx: TRPCContext,
+  input: DashboardServiceInput,
 ): Promise<DashboardDataset> => {
-  if (!ctx.session) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
-  }
-
-  const organizationId =
-    ctx.session.user.organization?.id ?? ctx.session.user.organizationId;
-
-  if (!organizationId) {
-    throw new TRPCError({
-      code: "PRECONDITION_FAILED",
-      message: "Missing organization context for dashboard.",
-    });
-  }
-
-  const userId = ctx.session.user.id;
+  const { userId, organizationId, organizationNameHint } = input;
   const now = new Date();
   const todayStart = startOfDay(now);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -331,12 +323,12 @@ const loadDashboardDataset = async (
     upcomingLeaves,
     notifications,
     pendingCount,
-  ] = await ctx.prisma.$transaction([
-    ctx.prisma.user.findUnique({
+  ] = await prisma.$transaction([
+    prisma.user.findUnique({
       where: { id: userId },
       select: userDashboardSelect,
     }),
-    ctx.prisma.attendanceRecord.findMany({
+    prisma.attendanceRecord.findMany({
       where: {
         employeeId: userId,
         attendanceDate: {
@@ -349,7 +341,7 @@ const loadDashboardDataset = async (
         attendanceDate: "asc",
       },
     }),
-    ctx.prisma.leaveRequest.findMany({
+    prisma.leaveRequest.findMany({
       where: {
         employeeId: userId,
         startDate: { lt: monthEnd },
@@ -360,7 +352,7 @@ const loadDashboardDataset = async (
         startDate: "asc",
       },
     }),
-    ctx.prisma.leaveRequest.findMany({
+    prisma.leaveRequest.findMany({
       where: {
         employeeId: userId,
         startDate: { gte: todayStart },
@@ -376,7 +368,7 @@ const loadDashboardDataset = async (
       orderBy: { startDate: "asc" },
       take: 4,
     }),
-    ctx.prisma.notification.findMany({
+    prisma.notification.findMany({
       where: {
         organizationId,
         status: {
@@ -395,7 +387,7 @@ const loadDashboardDataset = async (
       ],
       take: 5,
     }),
-    ctx.prisma.leaveRequest.count({
+    prisma.leaveRequest.count({
       where: {
         employeeId: userId,
         status: {
@@ -423,7 +415,7 @@ const loadDashboardDataset = async (
   };
 
   const organizationName =
-    ctx.session.user.organization?.name ??
+    organizationNameHint ??
     userRecord.organization?.name ??
     "Workspace";
 
@@ -783,38 +775,38 @@ const buildDashboardSections = (dataset: DashboardDataset): DashboardSections =>
   };
 };
 
-const resolveSections = async (ctx: TRPCContext) => {
-  const dataset = await loadDashboardDataset(ctx);
+const resolveSections = async (input: DashboardServiceInput) => {
+  const dataset = await loadDashboardDataset(input);
   return buildDashboardSections(dataset);
 };
 
-const getOverview = async (ctx: TRPCContext) => {
-  const sections = await resolveSections(ctx);
+const getOverview = async (input: DashboardServiceInput) => {
+  const sections = await resolveSections(input);
   return sections.overview;
 };
 
-const getProfileSection = async (ctx: TRPCContext) => {
-  const sections = await resolveSections(ctx);
+const getProfileSection = async (input: DashboardServiceInput) => {
+  const sections = await resolveSections(input);
   return sections.profile;
 };
 
-const getSummarySection = async (ctx: TRPCContext) => {
-  const sections = await resolveSections(ctx);
+const getSummarySection = async (input: DashboardServiceInput) => {
+  const sections = await resolveSections(input);
   return sections.summary;
 };
 
-const getAttendanceSection = async (ctx: TRPCContext) => {
-  const sections = await resolveSections(ctx);
+const getAttendanceSection = async (input: DashboardServiceInput) => {
+  const sections = await resolveSections(input);
   return sections.attendance;
 };
 
-const getTimeOffSection = async (ctx: TRPCContext) => {
-  const sections = await resolveSections(ctx);
+const getTimeOffSection = async (input: DashboardServiceInput) => {
+  const sections = await resolveSections(input);
   return sections.timeOff;
 };
 
-const getNotificationsSection = async (ctx: TRPCContext) => {
-  const sections = await resolveSections(ctx);
+const getNotificationsSection = async (input: DashboardServiceInput) => {
+  const sections = await resolveSections(input);
   return sections.notifications;
 };
 

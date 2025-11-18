@@ -18,27 +18,61 @@ const handleRequest = async <T>(resolver: () => Promise<T>, errorMessage: string
   }
 };
 
+const buildDashboardInput = (ctx: TRPCContext) => {
+  if (!ctx.session) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  const organizationId =
+    ctx.session.user.organization?.id ?? ctx.session.user.organizationId;
+
+  if (!organizationId) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "Missing organization context for dashboard.",
+    });
+  }
+
+  return {
+    userId: ctx.session.user.id,
+    organizationId,
+    organizationNameHint: ctx.session.user.organization?.name ?? null,
+  };
+};
+
 const getOverview = (ctx: TRPCContext) =>
-  handleRequest(() => DashboardService.getOverview(ctx), "Failed to load dashboard overview.");
+  handleRequest(
+    () => DashboardService.getOverview(buildDashboardInput(ctx)),
+    "Failed to load dashboard overview.",
+  );
 
 const getProfile = (ctx: TRPCContext) =>
-  handleRequest(() => DashboardService.getProfileSection(ctx), "Failed to load profile section.");
+  handleRequest(
+    () => DashboardService.getProfileSection(buildDashboardInput(ctx)),
+    "Failed to load profile section.",
+  );
 
 const getSummary = (ctx: TRPCContext) =>
-  handleRequest(() => DashboardService.getSummarySection(ctx), "Failed to load summary section.");
+  handleRequest(
+    () => DashboardService.getSummarySection(buildDashboardInput(ctx)),
+    "Failed to load summary section.",
+  );
 
 const getAttendance = (ctx: TRPCContext) =>
   handleRequest(
-    () => DashboardService.getAttendanceSection(ctx),
+    () => DashboardService.getAttendanceSection(buildDashboardInput(ctx)),
     "Failed to load attendance section.",
   );
 
 const getTimeOff = (ctx: TRPCContext) =>
-  handleRequest(() => DashboardService.getTimeOffSection(ctx), "Failed to load time off section.");
+  handleRequest(
+    () => DashboardService.getTimeOffSection(buildDashboardInput(ctx)),
+    "Failed to load time off section.",
+  );
 
 const getNotifications = (ctx: TRPCContext) =>
   handleRequest(
-    () => DashboardService.getNotificationsSection(ctx),
+    () => DashboardService.getNotificationsSection(buildDashboardInput(ctx)),
     "Failed to load notifications.",
   );
 
