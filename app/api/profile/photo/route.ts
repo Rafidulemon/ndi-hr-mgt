@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 
 import { prisma } from "@/server/db";
-import { getCurrentUserFromCookies } from "@/server/auth/guards";
+import { getCurrentUser } from "@/server/auth/guards";
 import { buildPublicR2Url, r2BucketName, r2Client } from "@/server/storage/r2";
 
 export const runtime = "nodejs";
@@ -31,7 +31,7 @@ const disallowedResponse = (message: string, status = 400) =>
   NextResponse.json({ error: message }, { status });
 
 export async function POST(request: Request) {
-  const sessionUser = await getCurrentUserFromCookies();
+  const sessionUser = await getCurrentUser();
   if (!sessionUser) {
     return disallowedResponse("Unauthorized", 401);
   }

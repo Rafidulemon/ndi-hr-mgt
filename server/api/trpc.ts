@@ -1,13 +1,9 @@
 import { initTRPC, TRPCError } from "@trpc/server";
-import { parse } from "cookie";
+import { getServerSession } from "next-auth";
 
 import { prisma } from "@/server/db";
-import {
-  ActiveSession,
-  SESSION_COOKIE_NAME,
-  findSessionByToken,
-  buildSessionRemovalCookie,
-} from "@/server/auth/session";
+import { authUserSelect, type AuthUser } from "@/server/auth/selection";
+import { nextAuthOptions } from "@/app/utils/next-auth-options";
 
 type CreateContextOptions = {
   headers: Headers;
@@ -18,24 +14,22 @@ type CreateContextOptions = {
  */
 export const createTRPCContext = async (opts: CreateContextOptions) => {
   const responseHeaders = new Headers();
-  const cookieHeader = opts.headers.get("cookie") ?? "";
-  const cookies = cookieHeader ? parse(cookieHeader) : {};
-  const token = cookies?.[SESSION_COOKIE_NAME] as string | undefined;
+  const session = await getServerSession(nextAuthOptions);
 
-  let session: ActiveSession | null = null;
+  let authUser: AuthUser | null = null;
 
-  if (token) {
-    session = await findSessionByToken(token);
-    if (!session) {
-      responseHeaders.append("set-cookie", buildSessionRemovalCookie());
-    }
+  if (session?.user?.id) {
+    authUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: authUserSelect,
+    });
   }
 
   return {
     headers: opts.headers,
     prisma,
     responseHeaders,
-    session,
+    session: authUser ? { user: authUser } : null,
   } satisfies TRPCContext;
 };
 
@@ -43,7 +37,7 @@ export type TRPCContext = {
   headers: Headers;
   prisma: typeof prisma;
   responseHeaders: Headers;
-  session: ActiveSession | null;
+  session: { user: AuthUser } | null;
 };
 
 const t = initTRPC.context<TRPCContext>().create();

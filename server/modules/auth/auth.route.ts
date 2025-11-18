@@ -1,34 +1,52 @@
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "@/server/api/trpc";
-import { authController } from "./auth.controller";
-import {
-  loginSchema,
-  registerSchema,
-  sendResetPasswordLinkSchema,
-  tokenValidationSchema,
-  trialStatusSchema,
-  updateUserPasswordSchema,
-} from "./auth.validation";
+import { procedure, router } from "@/server/trpc";
+import { z } from "zod";
+import { AuthController } from "./auth.controller";
+import { AuthZodSchema } from "./auth.validation";
 
-export const authRouter = createTRPCRouter({
-  me: publicProcedure.query(({ ctx }) => ctx.session?.user ?? null),
-  login: publicProcedure.input(loginSchema).mutation(({ ctx, input }) =>
-    authController.login({ ctx, input }),
-  ),
-  logout: protectedProcedure.mutation(({ ctx }) => authController.logout({ ctx })),
-  register: publicProcedure.input(registerSchema).mutation(({ ctx, input }) =>
-    authController.register({ ctx, input }),
-  ),
-  sendResetPasswordLink: publicProcedure
-    .input(sendResetPasswordLinkSchema)
-    .mutation(({ input }) => authController.sendResetPasswordLink({ input })),
-  updateUserPassword: publicProcedure
-    .input(updateUserPasswordSchema)
-    .mutation(({ input }) => authController.updateUserPassword({ input })),
-  tokenValidate: publicProcedure.input(tokenValidationSchema).query(({ input }) =>
-    authController.tokenValidate({ input }),
-  ),
-  isAuthorisationChange: protectedProcedure.query(() => authController.isAuthorisationChange()),
-  isTrialExpired: publicProcedure.input(trialStatusSchema).query(({ input }) =>
-    authController.isTrialExpired({ input }),
-  ),
+export const AuthRouter = router({
+  sendUserResetPasswordLink: procedure
+    .input(AuthZodSchema.userEmailParams)
+    .mutation(({ input }) => {
+      return AuthController.sendResetPasswordLinkHandler(input.email);
+    }),
+
+  updateUserPassword: procedure
+    .input(AuthZodSchema.userPasswordUpdateParams)
+    .mutation(({ input }) => {
+      try {
+        return AuthController.updateUserPasswordHandler(input);
+      } catch (error) {
+        throw new Error("Error updating password");
+      }
+    }),
+
+  getUserRegistrationPayload: procedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      try {
+        const decodedData = await AuthController.getUserRegistrationPayloadHandler(input);
+        return decodedData;
+      } catch (error) {
+        throw error;
+      }
+    }),
+
+  IsAuthorisationChange: procedure.query(async () => {
+    try {
+      return await AuthController.getIsAuthorisationChange();
+    } catch (error) {
+      throw error;
+    }
+  }),
+
+  IsTrialExpired: procedure
+    .input(z.object({ email: z.string() }))
+    .query(async ({ input }) => {
+      try {
+        const result = await AuthController.getIsTrialExpired(input.email);
+        return result;
+      } catch (error) {
+        throw error;
+      }
+    }),
 });

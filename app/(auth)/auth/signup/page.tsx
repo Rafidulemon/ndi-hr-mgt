@@ -13,7 +13,6 @@ import ImageInput from "../../../components/atoms/inputs/ImageInput";
 import PasswordInput from "../../../components/atoms/inputs/PasswordInput";
 import Text from "../../../components/atoms/Text/Text";
 import TextInput from "../../../components/atoms/inputs/TextInput";
-import { trpc } from "@/trpc/client";
 
 const schema = z
   .object({
@@ -43,23 +42,13 @@ function SignupPage() {
   const router = useRouter();
   const [serverMessage, setServerMessage] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-  });
-  const registerMutation = trpc.auth.register.useMutation({
-    onSuccess: () => {
-      setServerError(null);
-      setServerMessage("Account created! Sign in using your new credentials.");
-      router.push("/auth/login");
-    },
-    onError: (error) => {
-      setServerMessage(null);
-      setServerError(error.message || "Unable to create the account.");
-    },
   });
 
   const handleLoginButton = () => {
@@ -69,15 +58,11 @@ function SignupPage() {
   const handleOnSubmit = (data: FormData) => {
     setServerError(null);
     setServerMessage(null);
-    registerMutation.mutate({
-      employeeId: data.employeeId,
-      department: data.department,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      designation: data.designation,
-      email: data.email,
-      password: data.password,
-    });
+    setIsSubmitting(true);
+    setServerMessage(
+      "Self-service sign-up is no longer available. Please use your invitation link or contact your administrator.",
+    );
+    setIsSubmitting(false);
   };
 
   return (
@@ -203,11 +188,8 @@ function SignupPage() {
           </p>
         ) : null}
 
-        <Button type="submit" theme="primary" isWidthFull disabled={registerMutation.isPending}>
-          <Text
-            text={registerMutation.isPending ? "Creating account..." : "Create account"}
-            className="text-[16px] font-semibold"
-          />
+        <Button type="submit" theme="primary" isWidthFull disabled={isSubmitting}>
+          <Text text={isSubmitting ? "Submitting..." : "Create account"} className="text-[16px] font-semibold" />
         </Button>
       </form>
     </AuthLayout>

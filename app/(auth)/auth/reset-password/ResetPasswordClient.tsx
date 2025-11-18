@@ -42,7 +42,7 @@ export function ResetPasswordClient() {
     resolver: zodResolver(schema),
   });
   const resetToken = useMemo(() => searchParams.get("token") ?? "", [searchParams]);
-  const tokenValidationQuery = trpc.auth.tokenValidate.useQuery(
+  const tokenValidationQuery = trpc.auth.getUserRegistrationPayload.useQuery(
     { token: resetToken },
     { enabled: Boolean(resetToken) },
   );

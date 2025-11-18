@@ -1,47 +1,56 @@
 "use client";
+
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { ChangeEvent } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 import AuthLayout from "../_components/AuthLayout";
 import Button from "../../../components/atoms/buttons/Button";
 import EmailInput from "../../../components/atoms/inputs/EmailInput";
 import PasswordInput from "../../../components/atoms/inputs/PasswordInput";
 import Text from "../../../components/atoms/Text/Text";
-import { trpc } from "@/trpc/client";
+
+const passwordPattern = /^.{8,}$/;
 
 const schema = z.object({
-  email: z.string().nonempty({ message: "Email is required" }),
-  password: z.string().nonempty({ message: "Password is required" }),
-  remember: z.boolean().optional(),
+  email: z.string().min(1, "Email is required").email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .regex(passwordPattern, "Password must be at least 8 characters."),
 });
 
 type FormData = z.infer<typeof schema>;
 
 function LoginPage() {
   const router = useRouter();
+  const [rememberMe, setRememberMe] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const {
-    handleSubmit,
-    formState: { errors },
     register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      remember: false,
-    },
   });
-  const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: () => {
-      setFormError(null);
-      router.push("/");
-    },
-    onError: (error) => {
-      setFormError(error.message || "Unable to sign in with those credentials.");
-    },
-  });
+
+  useEffect(() => {
+    const rememberedEmail = localStorage.getItem("rememberedEmail");
+    const rememberedPassword = localStorage.getItem("rememberedPassword");
+
+    if (rememberedEmail && rememberedPassword) {
+      setValue("email", rememberedEmail);
+      setValue("password", rememberedPassword);
+      setRememberMe(true);
+    }
+  }, [setValue]);
 
   const handleForgotPasswordClick = () => {
     router.push("/auth/forget-password");
@@ -51,21 +60,56 @@ function LoginPage() {
     router.push("/auth/signup");
   };
 
-  const handleLogin = (data: FormData) => {
-    setFormError(null);
-    loginMutation.mutate({
+  const toggleRememberMe = (event: ChangeEvent<HTMLInputElement>) => {
+    setRememberMe(event.target.checked);
+  };
+
+  const persistRememberedCredentials = (data: FormData) => {
+    if (rememberMe) {
+      localStorage.setItem("rememberedEmail", data.email);
+      localStorage.setItem("rememberedPassword", data.password);
+    } else {
+      localStorage.removeItem("rememberedEmail");
+      localStorage.removeItem("rememberedPassword");
+    }
+  };
+
+  const attemptSignIn = async (data: FormData) => {
+    const response = await signIn("credentials", {
       email: data.email,
       password: data.password,
-      remember: data.remember ?? false,
+      redirect: false,
+      callbackUrl: "/",
     });
+
+    if (!response || response.error || response.status === 401) {
+      throw new Error("Invalid email or password.");
+    }
+
+    persistRememberedCredentials(data);
+    router.push(response.url ?? "/");
+  };
+
+  const onSubmit = async (data: FormData) => {
+    setFormError(null);
+    setIsSubmitting(true);
+
+    try {
+      await attemptSignIn(data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to sign in right now.";
+      setFormError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <AuthLayout
       title="Welcome back"
-      subtitle="Sign in to continue"
-      description="Use your corporate credentials to jump back into your workspace. Multifactor encryption keeps every session protected."
-      helper="Need SSO instead? Use your company login portal to switch authentication methods."
+      subtitle="Sign in to continue."
+      description="Use your work email and password to access your dashboard."
+      helper="Forgot your credentials? Use the recovery link below."
       footer={
         <p className="text-sm">
           New to NDI HR?
@@ -86,7 +130,7 @@ function LoginPage() {
         ),
       }}
     >
-      <form onSubmit={handleSubmit(handleLogin)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="space-y-4">
           <EmailInput
             name="email"
@@ -101,7 +145,7 @@ function LoginPage() {
             error={errors?.password}
             register={register}
             label="Password"
-            placeholder="Your secure password"
+            placeholder="Enter your password"
             isRequired
           />
         </div>
@@ -111,9 +155,10 @@ function LoginPage() {
             <input
               type="checkbox"
               className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-900"
-              {...register("remember")}
+              checked={rememberMe}
+              onChange={toggleRememberMe}
             />
-            <span>Keep me signed in for 30 days</span>
+            <span>Remember me</span>
           </label>
           <button
             type="button"
@@ -129,12 +174,8 @@ function LoginPage() {
             {formError}
           </p>
         ) : null}
-
-        <Button type="submit" theme="primary" isWidthFull disabled={loginMutation.isPending}>
-          <Text
-            text={loginMutation.isPending ? "Signing in..." : "Sign in"}
-            className="text-[16px] font-semibold"
-          />
+        <Button type="submit" theme="primary" isWidthFull disabled={isSubmitting}>
+          <Text text={isSubmitting ? "Signing in..." : "Sign in"} className="text-[16px] font-semibold" />
         </Button>
       </form>
     </AuthLayout>

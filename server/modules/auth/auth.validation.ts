@@ -44,3 +44,8 @@ export const trialStatusSchema = z.object({
 });
 
 export type TrialStatusInput = z.infer<typeof trialStatusSchema>;
+
+export const AuthZodSchema = {
+  userEmailParams: sendResetPasswordLinkSchema,
+  userPasswordUpdateParams: updateUserPasswordSchema,
+};

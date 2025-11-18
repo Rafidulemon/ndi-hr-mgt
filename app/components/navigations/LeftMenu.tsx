@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { signOut } from "next-auth/react";
 import { BiChevronDown, BiChevronUp, BiLogOut } from "react-icons/bi";
 import {
   FaBell,
@@ -22,7 +23,6 @@ import { HiOutlineDocumentText } from "react-icons/hi";
 import { IoIosPaper } from "react-icons/io";
 import { FiSettings } from "react-icons/fi";
 import { Modal } from "../atoms/frame/Modal";
-import { trpc } from "@/trpc/client";
 
 type Props = {
   isLeader?: boolean;
@@ -120,14 +120,26 @@ const LeftMenu = ({
     deriveSectionFromPath(currentPath)
   );
   const [isOpenModal, setIsOpenModal] = useState<boolean>(false);
-  const logoutMutation = trpc.auth.logout.useMutation({
-    onSuccess: () => {
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    setIsLoggingOut(true);
+    setLogoutError(null);
+
+    try {
+      await signOut({ redirect: false });
       router.push("/auth/login");
-    },
-    onSettled: () => {
+    } catch (error) {
+      void error;
+      setLogoutError("Failed to log out. Please try again.");
+    } finally {
+      setIsLoggingOut(false);
       setIsOpenModal(false);
-    },
-  });
+    }
+  };
 
   const nameFallback = useMemo(() => {
     if (userFullName && userFullName.trim().length > 0) {
@@ -471,15 +483,15 @@ const LeftMenu = ({
         <button
           type="button"
           onClick={() => setIsOpenModal(true)}
-          disabled={logoutMutation.isPending}
+          disabled={isLoggingOut}
           className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-400 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200 transition-transform hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70 dark:from-rose-500 dark:via-amber-500 dark:to-orange-400 dark:shadow-rose-900/50 rounded"
         >
           <BiLogOut className="text-lg" />
-          Logout
+          {isLoggingOut ? "Logging out..." : "Logout"}
         </button>
-        {logoutMutation.error ? (
+        {logoutError ? (
           <p className="mt-3 rounded-2xl border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs text-rose-600 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
-            {logoutMutation.error.message}
+            {logoutError}
           </p>
         ) : null}
       </div>
@@ -494,10 +506,7 @@ const LeftMenu = ({
         title="Log Out ?"
         buttonWidth="120px"
         buttonHeight="40px"
-        onDoneClick={() => {
-          if (logoutMutation.isPending) return;
-          logoutMutation.mutate();
-        }}
+        onDoneClick={handleLogout}
         closeOnClick={() => setIsOpenModal(false)}
       >
         <div>Are you sure you would like to log out?</div>

@@ -1,216 +1,105 @@
-import bcrypt from "bcryptjs";
+import { UserPasswordUpdateType } from "@/types/types";
 import { TRPCError } from "@trpc/server";
-
-import type { TRPCContext } from "@/server/api/trpc";
-import { authUserSelect, type AuthUser } from "@/server/auth/selection";
-import {
-  buildSessionRemovalCookie,
-  createSession,
-  deleteSessionById,
-} from "@/server/auth/session";
-import type { PrismaDB } from "@/server/db";
+import jwt from "jsonwebtoken";
 import { AuthService } from "./auth.service";
-import {
-  loginSchema,
-  registerSchema,
-  sendResetPasswordLinkSchema,
-  tokenValidationSchema,
-  trialStatusSchema,
-  updateUserPasswordSchema,
-} from "./auth.validation";
 
-const sanitizeUser = (user: AuthUser) => user;
+const sendResetPasswordLinkHandler = async (email: string) => {
+  try {
+    const user = await AuthService.sendResetPasswordLinkService(email);
+    if (email === user?.email) {
+      const JWT_SECRET = process.env.NEXT_PUBLIC_JWT_SECRET ?? "Nw3oRAt7GSozu9";
+      const GENERATED_JWT_SECRET = JWT_SECRET + user?.id;
 
-const normalizeEmail = (email: string) => email.trim().toLowerCase();
+      const payload = {
+        email: user?.email,
+        id: user?.id,
+      };
 
-const toTitleCase = (value: string) =>
-  value
-    .split(/[-_.\s]+/)
-    .filter(Boolean)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ");
-
-async function resolveOrganization(prisma: PrismaDB, email: string, fallbackName: string) {
-  const [, rawDomain] = email.split("@");
-  const normalizedDomain = rawDomain?.toLowerCase() ?? null;
-
-  if (normalizedDomain) {
-    const existing = await prisma.organization.findUnique({
-      where: { domain: normalizedDomain },
-    });
-
-    if (existing) {
-      return existing;
+      const token = jwt.sign(payload, GENERATED_JWT_SECRET, {
+        expiresIn: "24h",
+      });
+    } else {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "User is not registered!",
+      });
+    }
+  } catch (error) {
+    if (error instanceof TRPCError) {
+      throw error;
+    } else {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to send email!",
+      });
     }
   }
+};
 
-  const orgName = normalizedDomain
-    ? toTitleCase(normalizedDomain.split(".")[0] ?? fallbackName)
-    : `${fallbackName} Workspace`;
-
-  return prisma.organization.create({
-    data: {
-      name: orgName,
-      domain: normalizedDomain,
-    },
-  });
-}
-
-export const authController = {
-  login: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
-    const parsed = loginSchema.parse(input);
-    const email = normalizeEmail(parsed.email);
-
-    const userRecord = await ctx.prisma.user.findUnique({
-      where: { email },
-      select: {
-        passwordHash: true,
-        ...authUserSelect,
-      },
+const updateUserPasswordHandler = async (input: UserPasswordUpdateType) => {
+  if (!input.userId || !input.password) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "User ID and password are required",
     });
+  }
 
-    if (!userRecord) {
-      throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
+  try {
+    const result = await AuthService.updateUserPassworIntoDb(input);
+    if (!result) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to update user password",
+      });
     }
 
-    const isValidPassword = await bcrypt.compare(parsed.password, userRecord.passwordHash);
-    if (!isValidPassword) {
-      throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
-    }
+    return {
+      message: "Password updated successfully",
+    };
+  } catch (error) {
+    throw error;
+  }
+};
 
-    const { cookie } = await createSession(userRecord.id, parsed.remember ?? false);
-
-    await ctx.prisma.user.update({
-      where: { id: userRecord.id },
-      data: { lastLoginAt: new Date() },
+export const getUserRegistrationPayloadHandler = async ({
+  token,
+}: {
+  token: string;
+}) => {
+  try {
+    const result = await AuthService.tokenValidate({ token });
+    return result;
+  } catch (error) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to decode token",
     });
+  }
+};
 
-    const { passwordHash: _ignoredPassword, ...safeUser } = userRecord;
-    void _ignoredPassword;
+const getIsAuthorisationChange = async () => {
+  try {
+    const result = await AuthService.isAuthorisationChange();
+    return result;
+  } catch (error) {}
+};
 
-    ctx.responseHeaders.append("set-cookie", cookie);
-
-    return {
-      user: sanitizeUser(safeUser),
-    };
-  },
-
-  logout: async ({ ctx }: { ctx: TRPCContext }) => {
-    if (!ctx.session) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
-    }
-
-    await deleteSessionById(ctx.session.id);
-
-    const cookie = buildSessionRemovalCookie();
-    ctx.responseHeaders.append("set-cookie", cookie);
-
-    return {
-      success: true,
-    };
-  },
-
-  register: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
-    const parsed = registerSchema.parse(input);
-    const email = normalizeEmail(parsed.email);
-
-    const existingUser = await ctx.prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists" });
-    }
-
-    const organization = await resolveOrganization(
-      ctx.prisma,
-      email,
-      `${parsed.firstName} ${parsed.lastName}`.trim() || "New Workspace",
-    );
-
-    const passwordHash = await bcrypt.hash(parsed.password, 12);
-
-    const userId = await ctx.prisma.$transaction(async (tx) => {
-      const department = await tx.department.upsert({
-        where: {
-          organizationId_name: {
-            organizationId: organization.id,
-            name: parsed.department,
-          },
-        },
-        update: {},
-        create: {
-          organizationId: organization.id,
-          name: parsed.department,
-        },
-      });
-
-      const userRecord = await tx.user.create({
-        data: {
-          email,
-          passwordHash,
-          organizationId: organization.id,
-          role: "EMPLOYEE",
-          status: "ACTIVE",
-        },
-      });
-
-      await tx.employeeProfile.create({
-        data: {
-          userId: userRecord.id,
-          firstName: parsed.firstName,
-          lastName: parsed.lastName,
-          preferredName: parsed.firstName,
-          workEmail: email,
-        },
-      });
-
-      await tx.employmentDetail.create({
-        data: {
-          userId: userRecord.id,
-          organizationId: organization.id,
-          employeeCode: parsed.employeeId,
-          designation: parsed.designation,
-          employmentType: "FULL_TIME",
-          startDate: new Date(),
-          departmentId: department.id,
-        },
-      });
-
-      return userRecord.id;
+const getIsTrialExpired = async (email: string) => {
+  try {
+    const result = await AuthService.isTrialExpired(email);
+    return result;
+  } catch (error) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to decode token",
     });
+  }
+};
 
-    const createdUser = await ctx.prisma.user.findUnique({
-      where: { id: userId },
-      select: authUserSelect,
-    });
-
-    return {
-      user: createdUser ? sanitizeUser(createdUser) : null,
-    };
-  },
-
-  sendResetPasswordLink: async ({ input }: { input: unknown }) => {
-    const parsed = sendResetPasswordLinkSchema.parse(input);
-    const user = await AuthService.sendResetPasswordLinkService(parsed.email);
-
-    return {
-      message: "If an account exists with that email, a reset link has been generated.",
-      user,
-    };
-  },
-
-  updateUserPassword: async ({ input }: { input: unknown }) => {
-    const parsed = updateUserPasswordSchema.parse(input);
-    return AuthService.updateUserPassworIntoDb(parsed);
-  },
-
-  tokenValidate: async ({ input }: { input: unknown }) => {
-    const parsed = tokenValidationSchema.parse(input);
-    return AuthService.tokenValidate(parsed);
-  },
-
-  isAuthorisationChange: async () => AuthService.isAuthorisationChange(),
-
-  isTrialExpired: async ({ input }: { input: unknown }) => {
-    const parsed = trialStatusSchema.parse(input);
-    return AuthService.isTrialExpired(parsed.email);
-  },
+export const AuthController = {
+  sendResetPasswordLinkHandler,
+  updateUserPasswordHandler,
+  getUserRegistrationPayloadHandler,
+  getIsAuthorisationChange,
+  getIsTrialExpired,
 };

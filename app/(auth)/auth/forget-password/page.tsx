@@ -33,10 +33,10 @@ function ForgetPasswordPage() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
-  const sendLinkMutation = trpc.auth.sendResetPasswordLink.useMutation({
-    onSuccess: (payload) => {
+  const sendLinkMutation = trpc.auth.sendUserResetPasswordLink.useMutation({
+    onSuccess: () => {
       setServerError(null);
-      setServerMessage(payload.message);
+      setServerMessage("If that account exists, a reset link is on the way.");
     },
     onError: (error) => {
       setServerMessage(null);

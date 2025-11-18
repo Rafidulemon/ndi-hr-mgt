@@ -1,25 +1,29 @@
 import "server-only";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
 
-import { SESSION_COOKIE_NAME, findSessionByToken } from "@/server/auth/session";
-import type { AuthUser } from "@/server/auth/selection";
+import { prisma } from "@/prisma";
+import { authUserSelect, type AuthUser } from "@/server/auth/selection";
+import { nextAuthOptions } from "@/app/utils/next-auth-options";
 
-export async function getCurrentUserFromCookies(): Promise<AuthUser | null> {
-  const store = await cookies();
-  const token = store.get(SESSION_COOKIE_NAME)?.value;
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  const session = await getServerSession(nextAuthOptions);
 
-  if (!token) {
+  if (!session?.user?.id) {
     return null;
   }
 
-  const session = await findSessionByToken(token);
-  return session?.user ?? null;
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: authUserSelect,
+  });
+
+  return user;
 }
 
 export async function requireUser() {
-  const user = await getCurrentUserFromCookies();
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect("/auth/login");
