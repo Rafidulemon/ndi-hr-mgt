@@ -3,8 +3,10 @@ import { authController } from "./auth.controller";
 import {
   loginSchema,
   registerSchema,
-  requestResetSchema,
-  resetPasswordSchema,
+  sendResetPasswordLinkSchema,
+  tokenValidationSchema,
+  trialStatusSchema,
+  updateUserPasswordSchema,
 } from "./auth.validation";
 
 export const authRouter = createTRPCRouter({
@@ -16,10 +18,17 @@ export const authRouter = createTRPCRouter({
   register: publicProcedure.input(registerSchema).mutation(({ ctx, input }) =>
     authController.register({ ctx, input }),
   ),
-  requestPasswordReset: publicProcedure
-    .input(requestResetSchema)
-    .mutation(({ ctx, input }) => authController.requestPasswordReset({ ctx, input })),
-  resetPassword: publicProcedure.input(resetPasswordSchema).mutation(({ ctx, input }) =>
-    authController.resetPassword({ ctx, input }),
+  sendResetPasswordLink: publicProcedure
+    .input(sendResetPasswordLinkSchema)
+    .mutation(({ input }) => authController.sendResetPasswordLink({ input })),
+  updateUserPassword: publicProcedure
+    .input(updateUserPasswordSchema)
+    .mutation(({ input }) => authController.updateUserPassword({ input })),
+  tokenValidate: publicProcedure.input(tokenValidationSchema).query(({ input }) =>
+    authController.tokenValidate({ input }),
+  ),
+  isAuthorisationChange: protectedProcedure.query(() => authController.isAuthorisationChange()),
+  isTrialExpired: publicProcedure.input(trialStatusSchema).query(({ input }) =>
+    authController.isTrialExpired({ input }),
   ),
 });

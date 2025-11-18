@@ -42,7 +42,11 @@ export function ResetPasswordClient() {
     resolver: zodResolver(schema),
   });
   const resetToken = useMemo(() => searchParams.get("token") ?? "", [searchParams]);
-  const resetMutation = trpc.auth.resetPassword.useMutation({
+  const tokenValidationQuery = trpc.auth.tokenValidate.useQuery(
+    { token: resetToken },
+    { enabled: Boolean(resetToken) },
+  );
+  const updatePasswordMutation = trpc.auth.updateUserPassword.useMutation({
     onSuccess: () => {
       setServerError(null);
       setServerMessage("Password updated successfully. Please sign in.");
@@ -63,10 +67,17 @@ export function ResetPasswordClient() {
       setServerError("Reset token missing. Please use the link from your email.");
       return;
     }
+
+    const userId = tokenValidationQuery.data?.userId;
+    if (!userId) {
+      setServerError("Reset link is invalid or has expired.");
+      return;
+    }
+
     setServerError(null);
     setServerMessage(null);
-    resetMutation.mutate({
-      token: resetToken,
+    updatePasswordMutation.mutate({
+      userId,
       password: data.password,
     });
   };
@@ -126,6 +137,16 @@ export function ResetPasswordClient() {
             Missing reset token. Please open this page using the link you received in your email.
           </p>
         ) : null}
+        {tokenValidationQuery.isLoading ? (
+          <p className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-200">
+            Validating reset link...
+          </p>
+        ) : null}
+        {tokenValidationQuery.error ? (
+          <p className="rounded-2xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+            {tokenValidationQuery.error.message || "Reset link is invalid or has expired."}
+          </p>
+        ) : null}
         {serverError ? (
           <p className="rounded-2xl border border-rose-200 bg-rose-50/60 px-4 py-3 text-sm text-rose-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
             {serverError}
@@ -141,10 +162,10 @@ export function ResetPasswordClient() {
           type="submit"
           theme="primary"
           isWidthFull
-          disabled={!resetToken || resetMutation.isPending}
+          disabled={!resetToken || updatePasswordMutation.isPending}
         >
           <Text
-            text={resetMutation.isPending ? "Updating password..." : "Update password"}
+            text={updatePasswordMutation.isPending ? "Updating password..." : "Update password"}
             className="text-[16px] font-semibold"
           />
         </Button>

@@ -1,247 +1,168 @@
-import bcrypt from "bcryptjs";
+import { UserInfoParam } from "@/app/(auth)/auth/registration/[email]/[token]/page";
+import { nextAuthOptions } from "@/app/utils/next-auth-options";
+import { prisma } from "@/prisma";
+import { type UserPasswordUpdateType } from "@/types/types";
 import { TRPCError } from "@trpc/server";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { getServerSession } from "next-auth";
 
-import type { TRPCContext } from "@/server/api/trpc";
-import { authUserSelect, type AuthUser } from "@/server/auth/selection";
-import {
-  buildSessionRemovalCookie,
-  createSession,
-  deleteSessionById,
-} from "@/server/auth/session";
-import {
-  createPasswordResetToken,
-  verifyPasswordResetToken,
-} from "@/server/auth/password-reset";
-import type { PrismaDB } from "@/server/db";
-import {
-  loginSchema,
-  registerSchema,
-  requestResetSchema,
-  resetPasswordSchema,
-  type LoginInput,
-  type RegisterInput,
-  type RequestResetInput,
-  type ResetPasswordInput,
-} from "./auth.validation";
+const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
 
-const sanitizeUser = (user: AuthUser) => user;
-
-const normalizeEmail = (email: string) => email.trim().toLowerCase();
-
-const toTitleCase = (value: string) =>
-  value
-    .split(/[-_.\s]+/)
-    .filter(Boolean)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ");
-
-async function resolveOrganization(prisma: PrismaDB, email: string, fallbackName: string) {
-  const [, rawDomain] = email.split("@");
-  const normalizedDomain = rawDomain?.toLowerCase() ?? null;
-
-  if (normalizedDomain) {
-    const existing = await prisma.organization.findUnique({
-      where: { domain: normalizedDomain },
-    });
-
-    if (existing) {
-      return existing;
-    }
+const sendResetPasswordLinkService = async (email: string) => {
+  if (!email) {
+    return null;
   }
 
-  const orgName = normalizedDomain
-    ? toTitleCase(normalizedDomain.split(".")[0] ?? fallbackName)
-    : `${fallbackName} Workspace`;
-
-  return prisma.organization.create({
-    data: {
-      name: orgName,
-      domain: normalizedDomain,
-    },
-  });
-}
-
-export const authService = {
-  async login(ctx: TRPCContext, input: LoginInput) {
-    const parsed = loginSchema.parse(input);
-    const email = normalizeEmail(parsed.email);
-
-    const userRecord = await ctx.prisma.user.findUnique({
-      where: { email },
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        email,
+      },
       select: {
-        passwordHash: true,
-        ...authUserSelect,
+        email: true,
+        id: true,
       },
     });
 
-    if (!userRecord) {
-      throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
+    return user;
+  } catch (error) {
+    if (error instanceof TRPCError) {
+      throw error;
     }
 
-    const isValidPassword = await bcrypt.compare(parsed.password, userRecord.passwordHash);
-    if (!isValidPassword) {
-      throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
-    }
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to send email!",
+    });
+  }
+};
 
-    const { cookie } = await createSession(userRecord.id, parsed.remember ?? false);
+const updateUserPassworIntoDb = async (input: UserPasswordUpdateType) => {
+  const { userId, password } = input;
 
-    await ctx.prisma.user.update({
-      where: { id: userRecord.id },
-      data: { lastLoginAt: new Date() },
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const updatedAccount = await prisma.user.updateMany({
+      where: {
+        id: userId,
+      },
+      data: {
+        passwordHash: hashedPassword,
+      },
     });
 
-    const { passwordHash: _ignoredPassword, ...safeUser } = userRecord;
-    void _ignoredPassword;
-
-    return {
-      user: sanitizeUser(safeUser),
-      cookie,
-    };
-  },
-
-  async logout(ctx: TRPCContext) {
-    if (!ctx.session) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
-    }
-
-    await deleteSessionById(ctx.session.id);
-
-    return {
-      cookie: buildSessionRemovalCookie(),
-    };
-  },
-
-  async register(ctx: TRPCContext, input: RegisterInput) {
-    const parsed = registerSchema.parse(input);
-    const email = normalizeEmail(parsed.email);
-
-    const existingUser = await ctx.prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists" });
-    }
-
-    const organization = await resolveOrganization(
-      ctx.prisma,
-      email,
-      `${parsed.firstName} ${parsed.lastName}`.trim() || "New Workspace",
-    );
-
-    const passwordHash = await bcrypt.hash(parsed.password, 12);
-
-    const userId = await ctx.prisma.$transaction(async (tx) => {
-      const department = await tx.department.upsert({
-        where: {
-          organizationId_name: {
-            organizationId: organization.id,
-            name: parsed.department,
-          },
-        },
-        update: {},
-        create: {
-          organizationId: organization.id,
-          name: parsed.department,
-        },
-      });
-
-      const userRecord = await tx.user.create({
-        data: {
-          email,
-          passwordHash,
-          organizationId: organization.id,
-          role: "EMPLOYEE",
-          status: "ACTIVE",
-        },
-      });
-
-      await tx.employeeProfile.create({
-        data: {
-          userId: userRecord.id,
-          firstName: parsed.firstName,
-          lastName: parsed.lastName,
-          preferredName: parsed.firstName,
-          workEmail: email,
-        },
-      });
-
-      await tx.employmentDetail.create({
-        data: {
-          userId: userRecord.id,
-          organizationId: organization.id,
-          employeeCode: parsed.employeeId,
-          designation: parsed.designation,
-          employmentType: "FULL_TIME",
-          startDate: new Date(),
-          departmentId: department.id,
-        },
-      });
-
-      return userRecord.id;
-    });
-
-    const createdUser = await ctx.prisma.user.findUnique({
-      where: { id: userId },
-      select: authUserSelect,
-    });
-
-    return {
-      user: createdUser ? sanitizeUser(createdUser) : null,
-    };
-  },
-
-  async requestPasswordReset(ctx: TRPCContext, input: RequestResetInput) {
-    const parsed = requestResetSchema.parse(input);
-    const email = normalizeEmail(parsed.email);
-
-    const user = await ctx.prisma.user.findUnique({ where: { email }, select: { id: true } });
-
-    if (!user) {
-      return {
-        message: "If an account exists with that email, a reset link has been generated.",
-      };
-    }
-
-    const { token, resetToken } = await createPasswordResetToken(user.id);
-
-    return {
-      message: "If an account exists with that email, a reset link has been generated.",
-      token,
-      expiresAt: resetToken.expiresAt,
-    };
-  },
-
-  async resetPassword(ctx: TRPCContext, input: ResetPasswordInput) {
-    const parsed = resetPasswordSchema.parse(input);
-
-    const tokenRecord = await verifyPasswordResetToken(parsed.token);
-
-    if (!tokenRecord) {
+    if (updatedAccount.count === 0) {
       throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "The reset link is invalid or has expired.",
+        code: "NOT_FOUND",
+        message: `User with id ${userId} not found`,
       });
     }
 
-    const passwordHash = await bcrypt.hash(parsed.password, 12);
+    return { message: "Password updated successfully" };
+  } catch (error) {
+    if (error instanceof TRPCError) {
+      throw error;
+    }
 
-    await ctx.prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: tokenRecord.userId },
-        data: { passwordHash },
-      });
-
-      await tx.passwordResetToken.update({
-        where: { id: tokenRecord.id },
-        data: { usedAt: new Date() },
-      });
-
-      await tx.session.deleteMany({
-        where: { userId: tokenRecord.userId },
-      });
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to update password into db",
     });
+  }
+};
 
-    return {
-      success: true,
-      cookie: buildSessionRemovalCookie(),
-    };
-  },
+const tokenValidate = async ({ token }: { token: string }) => {
+  try {
+    const JWT_SECRET =
+      process.env.NEXT_PUBLIC_JWT_SECRET || process.env.JWT_SECRET || "Nw3oRAt7GSozu9";
+    const decoded = jwt.verify(token, JWT_SECRET) as UserInfoParam;
+
+    if (!decoded.exp || decoded.exp < Math.floor(Date.now() / 1000)) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Token has expired",
+      });
+    }
+    return decoded;
+  } catch (error) {
+    void error;
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Invalid token",
+    });
+  }
+};
+
+const isAuthorisationChange = async () => {
+  const session = await getServerSession(nextAuthOptions);
+
+  if (!session?.user?.id) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "You are not authorized to perform this action",
+    });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true },
+  });
+
+  if (!user) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "User not found",
+    });
+  }
+
+  return session.user.role !== user.role;
+};
+
+const isTrialExpired = async (email: string) => {
+  const trialDurationDays = Number(process.env.NEXT_PUBLIC_TRIAL_DURATION_DAYS ?? 10);
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: {
+      id: true,
+      role: true,
+      updatedAt: true,
+      organization: {
+        select: {
+          createdAt: true,
+        },
+      },
+    },
+  });
+
+  if (!user) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "User not found",
+    });
+  }
+
+  const contractDate = user.organization?.createdAt ?? user.updatedAt ?? new Date();
+  const trialEndDate = new Date(contractDate.getTime() + trialDurationDays * MILLISECONDS_IN_DAY);
+
+  const isTrialExpiredFlag = trialEndDate.getTime() < Date.now();
+  const isVisibilityPrivate = process.env.NEXT_PUBLIC_ACCOUNT_VISIBILITY === "PRIVATE";
+
+  return {
+    isTrialExpired: isTrialExpiredFlag || isVisibilityPrivate,
+    role: user.role,
+    id: user.id,
+    updated_at: user.updatedAt,
+    twoFactor: false,
+  };
+};
+
+export const AuthService = {
+  sendResetPasswordLinkService,
+  updateUserPassworIntoDb,
+  tokenValidate,
+  isAuthorisationChange,
+  isTrialExpired,
 };

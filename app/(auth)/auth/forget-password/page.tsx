@@ -25,7 +25,6 @@ function ForgetPasswordPage() {
   const router = useRouter();
   const [serverMessage, setServerMessage] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [resetToken, setResetToken] = useState<string | null>(null);
 
   const {
     handleSubmit,
@@ -34,19 +33,13 @@ function ForgetPasswordPage() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
-  const resetMutation = trpc.auth.requestPasswordReset.useMutation({
+  const sendLinkMutation = trpc.auth.sendResetPasswordLink.useMutation({
     onSuccess: (payload) => {
       setServerError(null);
-      const demoToken =
-        "token" in payload && typeof payload.token === "string"
-          ? payload.token
-          : null;
-      setResetToken(demoToken);
       setServerMessage(payload.message);
     },
     onError: (error) => {
       setServerMessage(null);
-      setResetToken(null);
       setServerError(error.message || "Unable to process the request.");
     },
   });
@@ -62,8 +55,7 @@ function ForgetPasswordPage() {
   const handleSubmitForm = (data: FormData) => {
     setServerMessage(null);
     setServerError(null);
-    setResetToken(null);
-    resetMutation.mutate({ email: data.email });
+    sendLinkMutation.mutate({ email: data.email });
   };
 
   return (
@@ -108,19 +100,14 @@ function ForgetPasswordPage() {
           </p>
         ) : null}
         {serverMessage ? (
-          <div className="space-y-2 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">
-            <p>{serverMessage}</p>
-            {resetToken ? (
-              <p className="break-all text-xs text-emerald-900 dark:text-emerald-200">
-                Demo reset token: <span className="font-mono">{resetToken}</span>
-              </p>
-            ) : null}
-          </div>
+          <p className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">
+            {serverMessage}
+          </p>
         ) : null}
 
-        <Button type="submit" theme="primary" isWidthFull disabled={resetMutation.isPending}>
+        <Button type="submit" theme="primary" isWidthFull disabled={sendLinkMutation.isPending}>
           <Text
-            text={resetMutation.isPending ? "Sending link..." : "Send reset link"}
+            text={sendLinkMutation.isPending ? "Sending link..." : "Send reset link"}
             className="text-[16px] font-semibold"
           />
         </Button>

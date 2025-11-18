@@ -20,15 +20,27 @@ export const registerSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 
-export const requestResetSchema = z.object({
-  email: z.string().email(),
+export const sendResetPasswordLinkSchema = z.object({
+  email: z.string().email({ message: "A valid email is required" }),
 });
 
-export type RequestResetInput = z.infer<typeof requestResetSchema>;
+export type SendResetPasswordLinkInput = z.infer<typeof sendResetPasswordLinkSchema>;
 
-export const resetPasswordSchema = z.object({
-  token: z.string().min(1, "Reset token is required"),
+export const updateUserPasswordSchema = z.object({
+  userId: z.string().min(1, "User ID is required"),
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
-export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type UpdateUserPasswordInput = z.infer<typeof updateUserPasswordSchema>;
+
+export const tokenValidationSchema = z.object({
+  token: z.string().min(1, "Token is required"),
+});
+
+export type TokenValidationInput = z.infer<typeof tokenValidationSchema>;
+
+export const trialStatusSchema = z.object({
+  email: z.string().email({ message: "A valid email is required" }),
+});
+
+export type TrialStatusInput = z.infer<typeof trialStatusSchema>;
