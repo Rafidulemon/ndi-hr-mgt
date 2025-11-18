@@ -187,7 +187,7 @@ const HrAdminLeftMenu = ({
       </div>
 
       <nav className="flex flex-1 flex-col">
-        <ul className="mt-4 space-y-2">
+        <ul className="space-y-1">
           {hrMenuItems.map((item) => {
             const showPendingBadge = item.id === "leave" && pendingLeaveCount > 0;
             return (

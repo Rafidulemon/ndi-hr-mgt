@@ -1,14 +1,83 @@
-"use client"
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+
 import Text from "../../components/atoms/Text/Text";
 import Button from "../../components/atoms/buttons/Button";
-import { useState, useEffect, useRef, useCallback } from "react";
 import { Modal } from "../../components/atoms/frame/Modal";
 import { EmployeeHeader } from "../../components/layouts/EmployeeHeader";
-import { useRouter } from "next/navigation";
 import DashboardLoadingIndicator from "../../components/dashboard/DashboardLoadingIndicator";
 import { trpc } from "@/trpc/client";
 
 const STORAGE_KEY = "ndi.attendance.timer.v1";
+
+const backendStatuses = [
+  "PRESENT",
+  "LATE",
+  "HALF_DAY",
+  "ABSENT",
+  "REMOTE",
+  "HOLIDAY",
+] as const;
+
+type BackendAttendanceStatus = (typeof backendStatuses)[number];
+
+const attendanceStatusMeta: Record<
+  BackendAttendanceStatus,
+  { label: string; badgeClass: string; dotClass: string; description: string }
+> = {
+  PRESENT: {
+    label: "Present",
+    badgeClass:
+      "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200",
+    dotClass: "bg-emerald-500",
+    description: "Your working hours are being tracked from this portal.",
+  },
+  LATE: {
+    label: "Late",
+    badgeClass:
+      "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200",
+    dotClass: "bg-amber-500",
+    description: "HR has noted a late arrival for today.",
+  },
+  HALF_DAY: {
+    label: "Half Day",
+    badgeClass:
+      "bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-200",
+    dotClass: "bg-sky-500",
+    description: "Only a half day is scheduled or approved for this date.",
+  },
+  ABSENT: {
+    label: "Absent",
+    badgeClass:
+      "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200",
+    dotClass: "bg-rose-500",
+    description: "HR already logged you as absent for today.",
+  },
+  REMOTE: {
+    label: "Remote",
+    badgeClass:
+      "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-200",
+    dotClass: "bg-indigo-500",
+    description: "Remote work has been recorded for this day.",
+  },
+  HOLIDAY: {
+    label: "Holiday",
+    badgeClass:
+      "bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-200",
+    dotClass: "bg-violet-500",
+    description: "This date has been marked as a holiday or leave.",
+  },
+};
+
+const fallbackStatusMeta = {
+  label: "Recorded",
+  badgeClass:
+    "bg-slate-100 text-slate-600 dark:bg-slate-800/50 dark:text-slate-300",
+  dotClass: "bg-slate-400",
+  description: "Attendance has already been logged for this day.",
+};
 
 type TimerState = {
   dateKey: string;
@@ -105,6 +174,47 @@ const formatDisplayTime = (date: Date) =>
     second: "2-digit",
   }).format(date);
 
+const isBackendStatus = (status: string): status is BackendAttendanceStatus =>
+  backendStatuses.includes(status as BackendAttendanceStatus);
+
+const formatTimeOfDay = (value?: string | null) => {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(parsed);
+};
+
+const formatDurationLabel = (seconds?: number | null) => {
+  if (seconds === null || seconds === undefined) return "—";
+  const safeSeconds = Math.max(0, seconds);
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  if (hours === 0 && minutes === 0) {
+    return "0m";
+  }
+  const parts: string[] = [];
+  if (hours) {
+    parts.push(`${hours}h`);
+  }
+  if (minutes) {
+    parts.push(`${minutes}m`);
+  }
+  return parts.join(" ");
+};
+
+const formatSourceLabel = (source?: string | null) => {
+  if (!source) return "Portal";
+  return source
+    .toLowerCase()
+    .split(/[_\s]/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
+
 function AttendancePage() {
   const [timerState, setTimerState] = useState<TimerState>(() => buildInitialState());
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState<boolean>(false);
@@ -115,12 +225,71 @@ function AttendancePage() {
     computeBreakSeconds(timerState),
   );
   const [now, setNow] = useState<Date>(() => new Date());
+  const [actionError, setActionError] = useState<string | null>(null);
   const stateRef = useRef<TimerState>(timerState);
   const startDayMutation = trpc.attendance.startDay.useMutation();
   const completeDayMutation = trpc.attendance.completeDay.useMutation();
   const todayAttendanceQuery = trpc.attendance.today.useQuery(undefined, {
     refetchOnWindowFocus: true,
   });
+
+  const record = todayAttendanceQuery.data?.record ?? null;
+  const hasExistingServerAttendance = Boolean(record);
+  const lockStartBecauseOfServerRecord = hasExistingServerAttendance && !timerState.hasStarted;
+  const statusInfo =
+    record && record.status && isBackendStatus(record.status)
+      ? attendanceStatusMeta[record.status]
+      : fallbackStatusMeta;
+  const summaryMessage = record?.note
+    ? record.note
+    : record
+      ? `${statusInfo.description} Logged via ${formatSourceLabel(record.source)}.`
+      : "No attendance has been logged yet. Start when you are ready to work.";
+  const statusLabel = record ? statusInfo.label : "Awaiting log";
+  const lockMessage = lockStartBecauseOfServerRecord
+    ? record
+      ? `Attendance is already marked as ${statusInfo.label.toLowerCase()}. Please contact HR if this needs to change.`
+      : "Attendance is already recorded for today."
+    : null;
+
+  const summaryFields = [
+    {
+      label: "Check-in",
+      value: record ? formatTimeOfDay(record.checkInAt) : "—",
+      helper: record
+        ? record.checkInAt
+          ? "Logged punch-in time"
+          : "Waiting for your start"
+        : undefined,
+    },
+    {
+      label: "Check-out",
+      value: record ? formatTimeOfDay(record.checkOutAt) : "—",
+      helper: record
+        ? record.checkOutAt
+          ? "Completed for the day"
+          : "Will update after you leave"
+        : undefined,
+    },
+    {
+      label: "Working hours",
+      value: record ? formatDurationLabel(record.totalWorkSeconds) : "—",
+      helper: record
+        ? record.checkOutAt
+          ? "Submitted to HR"
+          : "Updates after you leave"
+        : undefined,
+    },
+    {
+      label: "Break time",
+      value: record ? formatDurationLabel(record.totalBreakSeconds) : "—",
+      helper: record
+        ? record.totalBreakSeconds
+          ? "Saved with your day-end submission"
+          : "Tracked when you finish"
+        : undefined,
+    },
+  ];
 
   const formatTime = (time: number) => {
     const safeTime = Math.max(0, time);
@@ -175,7 +344,6 @@ function AttendancePage() {
     if (!stored) return;
     stateRef.current = stored;
     /* eslint-disable react-hooks/set-state-in-effect */
-    // Hydration-safe: we intentionally sync client state to match persisted data after mount.
     setTimerState(stored);
     setWorkDisplaySeconds(computeWorkSeconds(stored));
     setBreakDisplaySeconds(computeBreakSeconds(stored));
@@ -186,14 +354,18 @@ function AttendancePage() {
     if (todayAttendanceQuery.isFetching || todayAttendanceQuery.isPending) {
       return;
     }
-    const record = todayAttendanceQuery.data?.record;
-    if (!record && !isInitialTimerState(stateRef.current)) {
-      // No server record for today; ensure client timer is reset so user can start again.
+    const hasRecord = Boolean(todayAttendanceQuery.data?.record);
+    if (!hasRecord && !isInitialTimerState(stateRef.current)) {
       /* eslint-disable react-hooks/set-state-in-effect */
       resetTimerState();
       /* eslint-enable react-hooks/set-state-in-effect */
     }
-  }, [todayAttendanceQuery.data, todayAttendanceQuery.isFetching, todayAttendanceQuery.isPending, resetTimerState]);
+  }, [
+    todayAttendanceQuery.data,
+    todayAttendanceQuery.isFetching,
+    todayAttendanceQuery.isPending,
+    resetTimerState,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -218,15 +390,23 @@ function AttendancePage() {
     return () => window.clearInterval(intervalId);
   }, [persistState]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const intervalId = window.setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const navigate = useRouter();
   const handleButtonClick = () => {
     navigate.push("/attendance/history");
   };
-  const hasExistingServerAttendance = Boolean(todayAttendanceQuery.data?.record);
 
   const isInitialLoading = todayAttendanceQuery.isLoading || todayAttendanceQuery.isPending;
   const hasError = todayAttendanceQuery.isError;
   const refetchToday = () => {
+    setActionError(null);
     void todayAttendanceQuery.refetch();
   };
 
@@ -235,52 +415,55 @@ function AttendancePage() {
     if (currentState.hasStarted && !currentState.isLeaved) {
       return;
     }
-    if (startDayMutation.isPending || hasExistingServerAttendance) {
+    if (startDayMutation.isPending || lockStartBecauseOfServerRecord) {
       return;
     }
 
     try {
+      setActionError(null);
       await startDayMutation.mutateAsync();
-      const now = Date.now();
+      const nowTimestamp = Date.now();
       updateTimerState(() => ({
         ...buildInitialState(),
         hasStarted: true,
-        workTimerStartedAt: now,
+        workTimerStartedAt: nowTimestamp,
       }));
       await todayAttendanceQuery.refetch();
     } catch (error) {
-      console.error("Failed to start attendance", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to start attendance.";
+      setActionError(message);
     }
   };
 
   const handleBreak = () => {
-    const now = Date.now();
+    const nowTimestamp = Date.now();
     updateTimerState((prev) => {
       if (!prev.hasStarted || prev.isOnBreak || prev.isLeaved) {
         return prev;
       }
       return {
         ...prev,
-        workSeconds: finalizeWorkSeconds(prev, now),
+        workSeconds: finalizeWorkSeconds(prev, nowTimestamp),
         workTimerStartedAt: null,
         isOnBreak: true,
-        breakTimerStartedAt: now,
+        breakTimerStartedAt: nowTimestamp,
       };
     });
   };
 
   const handleBreakOver = () => {
-    const now = Date.now();
+    const nowTimestamp = Date.now();
     updateTimerState((prev) => {
       if (!prev.isOnBreak || prev.isLeaved) {
         return prev;
       }
       return {
         ...prev,
-        breakSeconds: finalizeBreakSeconds(prev, now),
+        breakSeconds: finalizeBreakSeconds(prev, nowTimestamp),
         breakTimerStartedAt: null,
         isOnBreak: false,
-        workTimerStartedAt: now,
+        workTimerStartedAt: nowTimestamp,
       };
     });
   };
@@ -291,15 +474,15 @@ function AttendancePage() {
     }
 
     setIsLeaveModalOpen(false);
-    const now = Date.now();
+    const nowTimestamp = Date.now();
     const currentState = stateRef.current;
 
     if (!currentState.hasStarted || currentState.isLeaved) {
       return;
     }
 
-    const finalWorkSeconds = finalizeWorkSeconds(currentState, now);
-    const finalBreakSeconds = finalizeBreakSeconds(currentState, now);
+    const finalWorkSeconds = finalizeWorkSeconds(currentState, nowTimestamp);
+    const finalBreakSeconds = finalizeBreakSeconds(currentState, nowTimestamp);
 
     updateTimerState((prev) => {
       if (!prev.hasStarted || prev.isLeaved) {
@@ -317,13 +500,16 @@ function AttendancePage() {
     });
 
     try {
+      setActionError(null);
       await completeDayMutation.mutateAsync({
         workSeconds: finalWorkSeconds,
         breakSeconds: finalBreakSeconds,
       });
       await todayAttendanceQuery.refetch();
     } catch (error) {
-      console.error("Failed to complete attendance", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to complete attendance.";
+      setActionError(message);
     }
   };
 
@@ -332,14 +518,6 @@ function AttendancePage() {
   const isLeaved = timerState.isLeaved;
   const formattedTodayDate = formatDisplayDate(now);
   const formattedCurrentTime = formatDisplayTime(now);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-    const intervalId = window.setInterval(() => {
-      setNow(new Date());
-    }, 1000);
-    return () => window.clearInterval(intervalId);
-  }, []);
 
   if (isInitialLoading) {
     return (
@@ -380,113 +558,189 @@ function AttendancePage() {
       : "Syncing attendance...";
 
   return (
-    <div className="relative flex h-[calc(100vh-100px)] w-full flex-col items-center justify-center gap-6">
-      <EmployeeHeader
-        name="Md. Rafidul Islam"
-        designation="Software Engineer"
-        joining_date="Aug 17, 2023"
-        hasRightButton
-        buttonText="Attendance History"
-        onButtonClick={handleButtonClick}
-      />
-      <div className={`md:w-[60%] lg:w-[40%] h-[100%] flex flex-col gap-10 ${!isLeaved ? "justify-start" : "justify-center"} items-center`}>
-        <div className="flex flex-col items-center text-center gap-1">
-          <Text text={formattedTodayDate} className="text-lg font-semibold" />
-          <Text text={formattedCurrentTime} className="text-sm text-text_secondary" />
-        </div>
-        <Text
-          text="Today’s Total Working Time"
-          className="mt-12 font-semibold text-[24px]"
+    <div className="relative w-full">
+      <div className="flex w-full max-w-4xl flex-col gap-6">
+        <EmployeeHeader
+          name="Md. Rafidul Islam"
+          designation="Software Engineer"
+          joining_date="Aug 17, 2023"
+          hasRightButton
+          buttonText="Attendance History"
+          onButtonClick={handleButtonClick}
         />
-        {!isStarted ? (
-          <div className="w-full h-full mt-[30%]">
-            <Button
-              theme="primary"
-              onClick={() => void handleStart()}
-              className="w-full"
-              disabled={startDayMutation.isPending || hasExistingServerAttendance}
-            >
-              <Text text="Start Working" className="py-1" />
-            </Button>
-            {hasExistingServerAttendance && (
-              <Text
-                text="You have already submitted today’s attendance."
-                className="mt-4 text-sm text-amber-600"
-              />
-            )}
-          </div>
-        ) : (
-          <div className="w-full flex flex-col gap-10 items-center">
-            {!isLeaved && (
-              <div className="flex flex-row gap-4 text-[40px] font-semibold text-text_primary">
-                <Text text={formatTime(workDisplaySeconds)} />
-              </div>
-            )}
-            {!isLeaved && (
-              <Text text="Lunch Break" className="font-semibold text-[24px]" />
-            )}
-            {!isLeaved && isOnBreak && (
-              <div className="flex flex-row gap-4 text-[40px] font-semibold text-text_primary">
-                <Text text={formatTime(breakDisplaySeconds)} />
-              </div>
-            )}
 
-            <div className="w-full flex flex-row gap-4 justify-center">
-              {!isOnBreak && !isLeaved && (
-                <Button theme="secondary" onClick={handleBreak} className="w-[220px]">
-                  Start
-                </Button>
-              )}
-              {isOnBreak && !isLeaved && (
-                <Button
-                  theme="cancel-secondary"
-                  onClick={handleBreakOver}
-                  className="w-[220px]"
-                >
-                  End
-                </Button>
-              )}
-            </div>
-
-            {!isLeaved ? (
-              <Button
-                theme="cancel"
-                className="w-full"
-                onClick={() => setIsLeaveModalOpen(true)}
-                disabled={completeDayMutation.isPending}
+        <section className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-1">
+                <Text
+                  text="Today’s Attendance Snapshot"
+                  className="text-lg font-semibold text-text_primary"
+                />
+                <Text text={summaryMessage} className="text-sm text-text_secondary" />
+              </div>
+              <span
+                className={`inline-flex items-center gap-2 rounded-full px-4 py-1 text-sm font-semibold ${statusInfo.badgeClass}`}
               >
-                <Text text="Leave" className="py-1" />
-              </Button>
-            ) : (
-              <div className="flex flex-col gap-4 text-center">
-                <div className="text-[40px] font-semibold text-text_primary">
-                  <Text text={formatTime(workDisplaySeconds)} />
-                </div>
+                <span className={`h-2 w-2 rounded-full ${statusInfo.dotClass}`} />
+                {statusLabel}
+              </span>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {summaryFields.map((field) => (
+                <SummaryField
+                  key={field.label}
+                  label={field.label}
+                  value={field.value}
+                  helper={field.helper}
+                />
+              ))}
+            </div>
+            {record && (
+              <div className="inline-flex max-w-full items-center gap-2 rounded-2xl bg-slate-900/5 px-4 py-2 text-xs font-medium text-slate-600 dark:bg-slate-100/5 dark:text-slate-300">
+                Logged via {formatSourceLabel(record.source)} · {statusInfo.label}
               </div>
             )}
           </div>
-        )}
-        </div>
-        <Modal
-          doneButtonText="Leave"
-          cancelButtonText="Cancel"
-          isCancelButton
-          className="h-auto w-[40%]"
-          open={isLeaveModalOpen}
-          setOpen={setIsLeaveModalOpen}
-          title="Are you sure?"
-          titleTextSize="text-[24px]"
-          buttonWidth="120px"
-          buttonHeight="40px"
-          onDoneClick={() => handleLeave()}
-          closeOnClick={() => setIsLeaveModalOpen(false)}
-        >
-          <Text
-            text="Are you sure to leave from work for today?"
-            className="my-6 text-[24px] font-semibold text-text_primary"
-          />
-        </Modal>
+        </section>
+
+        <section className="rounded-3xl border border-slate-100 bg-white/90 p-6 text-center shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
+          <div className="flex flex-col items-center gap-6">
+            <div className="flex flex-col items-center text-center gap-1">
+              <Text text={formattedTodayDate} className="text-lg font-semibold" />
+              <Text text={formattedCurrentTime} className="text-sm text-text_secondary" />
+            </div>
+            <Text
+              text="Today’s Total Working Time"
+              className="mt-4 text-2xl font-semibold text-text_primary"
+            />
+            {!isStarted ? (
+              <div className="w-full max-w-md space-y-4">
+                <Button
+                  theme="primary"
+                  onClick={() => void handleStart()}
+                  className="w-full"
+                  disabled={startDayMutation.isPending || lockStartBecauseOfServerRecord}
+                >
+                  <Text text="Start Working" className="py-1" />
+                </Button>
+                {lockMessage && (
+                  <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:bg-amber-500/10 dark:text-amber-200">
+                    {lockMessage}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="flex w-full flex-col items-center gap-8">
+                {!isLeaved && (
+                  <>
+                    <div className="text-[48px] font-semibold leading-none text-text_primary">
+                      <Text text={formatTime(workDisplaySeconds)} />
+                    </div>
+                    <div className="rounded-2xl border border-dashed border-slate-200 px-6 py-4 dark:border-slate-700">
+                      <Text text="Lunch Break" className="font-semibold text-[20px]" />
+                      {isOnBreak ? (
+                        <div className="mt-3 text-[36px] font-semibold text-text_primary">
+                          <Text text={formatTime(breakDisplaySeconds)} />
+                        </div>
+                      ) : (
+                        <Text
+                          text="Break timer will start when you pause work."
+                          className="mt-2 text-sm text-text_secondary"
+                        />
+                      )}
+                    </div>
+                  </>
+                )}
+                <div className="flex w-full flex-col gap-4 md:flex-row md:justify-center">
+                  {!isOnBreak && !isLeaved && (
+                    <Button theme="secondary" onClick={handleBreak} className="w-full md:w-[220px]">
+                      Start Break
+                    </Button>
+                  )}
+                  {isOnBreak && !isLeaved && (
+                    <Button
+                      theme="cancel-secondary"
+                      onClick={handleBreakOver}
+                      className="w-full md:w-[220px]"
+                    >
+                      End Break
+                    </Button>
+                  )}
+                </div>
+
+                {!isLeaved ? (
+                  <Button
+                    theme="cancel"
+                    className="w-full"
+                    onClick={() => setIsLeaveModalOpen(true)}
+                    disabled={completeDayMutation.isPending}
+                  >
+                    <Text text="Leave" className="py-1" />
+                  </Button>
+                ) : (
+                  <div className="flex flex-col gap-2 text-center">
+                    <Text text="Submitted working hours" className="text-sm text-text_secondary" />
+                    <div className="text-[40px] font-semibold text-text_primary">
+                      <Text text={formatTime(workDisplaySeconds)} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {actionError && (
+              <p className="w-full rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-200">
+                {actionError}
+              </p>
+            )}
+            {showInlineLoader && (
+              <p className="w-full rounded-2xl bg-indigo-50/80 px-4 py-2 text-sm font-medium text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-200">
+                {inlineLoaderLabel}
+              </p>
+            )}
+          </div>
+        </section>
       </div>
+
+      <Modal
+        doneButtonText="Leave"
+        cancelButtonText="Cancel"
+        isCancelButton
+        className="h-auto w-full max-w-xl"
+        open={isLeaveModalOpen}
+        setOpen={setIsLeaveModalOpen}
+        title="Are you sure?"
+        titleTextSize="text-[24px]"
+        buttonWidth="120px"
+        buttonHeight="40px"
+        onDoneClick={() => handleLeave()}
+        closeOnClick={() => setIsLeaveModalOpen(false)}
+      >
+        <Text
+          text="Are you sure to leave from work for today?"
+          className="my-6 text-center text-[20px] font-semibold text-text_primary"
+        />
+      </Modal>
+    </div>
   );
 }
+
+type SummaryFieldProps = {
+  label: string;
+  value: string;
+  helper?: string;
+};
+
+const SummaryField = ({ label, value, helper }: SummaryFieldProps) => (
+  <div className="rounded-2xl border border-slate-100 bg-white/70 px-4 py-3 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/60">
+    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      {label}
+    </p>
+    <p className="text-xl font-semibold text-slate-900 dark:text-slate-50">{value}</p>
+    {helper ? (
+      <p className="text-xs text-slate-500 dark:text-slate-400">{helper}</p>
+    ) : null}
+  </div>
+);
+
 export default AttendancePage;

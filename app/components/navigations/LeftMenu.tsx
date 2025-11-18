@@ -220,7 +220,7 @@ const LeftMenu = ({
     </div>
 
       <nav className="flex flex-1 flex-col">
-        <ul className="mt-4 space-y-2">
+        <ul className="space-y-1">
           {menuItems.map((item) => (
             <li key={item.label}>
               {item.label === "Profile" ? (
@@ -448,7 +448,6 @@ const LeftMenu = ({
               )}
             </li>
           ))}
-          {isLeader && (
             <li>
               <Link
                 href="/my-team"
@@ -458,7 +457,6 @@ const LeftMenu = ({
                 <span className="text-[16px] font-semibold">My Team</span>
               </Link>
             </li>
-          )}
         </ul>
         {canAccessHrAdmin && (
           <div className="mt-4 rounded-2xl border border-slate-200/70 bg-slate-50/80 p-3 dark:border-slate-700/80 dark:bg-slate-800/60">

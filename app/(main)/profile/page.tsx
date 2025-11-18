@@ -164,9 +164,7 @@ function ProfilePage() {
   const personaTags = [employment?.teamName, employment?.employmentType, profile?.workModel]
     .filter(Boolean)
     .map((tag) => toTitleCase(tag as string));
-  const fullName =
-    profile?.preferredName ||
-    [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") ||
+  const fullName = [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") ||
     data.email;
   const designation = employment?.designation ?? "Team Member";
   const joiningDate = formatDate(employment?.startDate);

@@ -16,6 +16,7 @@ export type AttendanceRecordResponse = {
   totalBreakSeconds: number;
   status: AttendanceStatus;
   note: string | null;
+  source: string | null;
 };
 
 const formatRecord = (record: {
@@ -27,6 +28,7 @@ const formatRecord = (record: {
   totalBreakSeconds: number | null;
   status: AttendanceStatus;
   note: string | null;
+  source: string | null;
 }): AttendanceRecordResponse => ({
   id: record.id,
   attendanceDate: record.attendanceDate.toISOString(),
@@ -36,6 +38,7 @@ const formatRecord = (record: {
   totalBreakSeconds: record.totalBreakSeconds ?? 0,
   status: record.status,
   note: record.note ?? null,
+  source: record.source ?? null,
 });
 
 const startOfDay = (date: Date) => {
@@ -104,16 +107,11 @@ export const attendanceService = {
     });
 
     if (existing) {
-      if (!existing.checkInAt) {
-        const updated = await prisma.attendanceRecord.update({
-          where: { id: existing.id },
-          data: {
-            checkInAt: now,
-          },
-        });
-        return formatRecord(updated);
-      }
-      return formatRecord(existing);
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "Attendance has already been recorded for today. Please contact HR if you need to make a change.",
+      });
     }
 
     const created = await prisma.attendanceRecord.create({
