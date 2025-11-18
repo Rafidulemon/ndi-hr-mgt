@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 
-import { orgTeams, organizations } from "./seeds/data";
+import { orgDepartments, orgTeams, organizations } from "./seeds/data";
 import { seedAttendance } from "./seeds/attendance";
 import { seedEmployees } from "./seeds/employee";
 import { seedLeaveRequests } from "./seeds/leaveRequest";
@@ -12,7 +12,12 @@ const prisma = new PrismaClient();
 
 const seedOrganizations = async () => {
   for (const organization of organizations) {
-    await prisma.organization.create({ data: organization });
+    const {
+      orgAdminUserId: _orgAdminUserId,
+      managerUserId: _managerUserId,
+      ...orgData
+    } = organization;
+    await prisma.organization.create({ data: orgData });
   }
 };
 
@@ -27,9 +32,53 @@ const seedTeams = async () => {
           organizationId: organization.id,
           name: team.name,
           description: team.description,
+          departmentId: team.departmentId,
         },
       });
     }
+  }
+};
+
+const seedDepartments = async () => {
+  for (const organization of organizations) {
+    const departments = orgDepartments[organization.id] || [];
+
+    for (const department of departments) {
+      await prisma.department.create({
+        data: {
+          id: department.id,
+          organizationId: organization.id,
+          name: department.name,
+          code: department.code,
+          description: department.description,
+        },
+      });
+    }
+  }
+};
+
+const assignDepartmentHeads = async () => {
+  for (const organization of organizations) {
+    const departments = orgDepartments[organization.id] || [];
+    for (const department of departments) {
+      if (!department.headId) continue;
+      await prisma.department.update({
+        where: { id: department.id },
+        data: { headId: department.headId },
+      });
+    }
+  }
+};
+
+const assignOrganizationLeadership = async () => {
+  for (const organization of organizations) {
+    await prisma.organization.update({
+      where: { id: organization.id },
+      data: {
+        orgAdminId: organization.orgAdminUserId,
+        managerId: organization.managerUserId,
+      },
+    });
   }
 };
 
@@ -44,8 +93,11 @@ async function main() {
   }
 
   await seedOrganizations();
+  await seedDepartments();
   await seedTeams();
   await seedUsers(prisma);
+  await assignOrganizationLeadership();
+  await assignDepartmentHeads();
   await seedEmployees(prisma);
   await seedProjects(prisma);
   await seedAttendance(prisma);

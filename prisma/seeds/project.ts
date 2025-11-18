@@ -2,38 +2,27 @@ import { PrismaClient } from "@prisma/client";
 
 const projects = [
   {
-    id: "1",
-    organizationId: "1",
-    name: "HR Platform Implementation",
+    id: "proj-hr-platform",
+    organizationId: "org-ndi",
+    name: "NDI HR Platform",
     code: "NDI-HR-001",
     description: "Rollout of a unified HR and attendance platform.",
-    clientName: "Ninja Digital Innovations",
+    clientName: "Ninja Digital Innovation",
     status: "ACTIVE" as const,
-    startDate: new Date("2025-01-01"),
-    projectManager: "Lead User",
-  },
-  {
-    id: "2",
-    organizationId: "2",
-    name: "Brand Portal Refresh",
-    code: "BC-BRAND-2025",
-    description: "Refresh of customer-facing brand portal experiences.",
-    clientName: "Brand Cloud",
-    status: "ACTIVE" as const,
-    startDate: new Date("2025-02-01"),
-    projectManager: "Brand Cloud PM",
+    startDate: new Date("2024-01-15"),
+    projectManager: "eng-head-sakib",
   },
 ];
 
 const projectAssignments = [
   {
-    userId: "0003",
-    projectId: "1",
+    userId: "frontend-lead-hazrat",
+    projectId: "proj-hr-platform",
     note: "Leads delivery for the HR Platform Implementation project.",
   },
   {
-    userId: "0005",
-    projectId: "1",
+    userId: "backend-lead-sufi",
+    projectId: "proj-hr-platform",
     note: "Builds backend services for the HR Platform Implementation project.",
   },
 ];

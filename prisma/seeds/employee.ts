@@ -1,6 +1,12 @@
 import { PrismaClient, WorkModel as WorkModelEnum } from "@prisma/client";
 
-import { organizationNameById, usersToCreate } from "./data";
+import {
+  organizationNameById,
+  teamDepartmentMap,
+  teamLeadAssignments,
+  teamManagerAssignments,
+  usersToCreate,
+} from "./data";
 
 const defaultStartDate = new Date("2023-01-15");
 const defaultLocation = "Dhaka HQ";
@@ -26,7 +32,11 @@ export const seedEmployees = async (prisma: PrismaClient) => {
       reportingManagerId = null,
       gender = null,
       email,
+      departmentId: explicitDepartmentId = null,
     } = user;
+
+    const resolvedDepartmentId =
+      explicitDepartmentId ?? (teamId ? teamDepartmentMap[teamId] ?? null : null);
 
     await prisma.employeeProfile.create({
       data: {
@@ -57,6 +67,7 @@ export const seedEmployees = async (prisma: PrismaClient) => {
         status: "ACTIVE",
         startDate: defaultStartDate,
         teamId,
+        departmentId: resolvedDepartmentId,
         reportingManagerId,
         primaryLocation: defaultLocation,
         workHours: defaultWorkHours,
@@ -92,17 +103,21 @@ export const seedEmployees = async (prisma: PrismaClient) => {
     });
   }
 
-  const teamLeadAssignments = [
-    { teamId: "1", leadId: "0099" },
-    { teamId: "2", leadId: "0003" },
-    { teamId: "3", leadId: "0001" },
-    { teamId: "4", leadId: "0009" },
-  ];
-
   for (const assignment of teamLeadAssignments) {
     await prisma.team.update({
       where: { id: assignment.teamId },
       data: { leadId: assignment.leadId },
     });
+  }
+
+  for (const assignment of teamManagerAssignments) {
+    for (const teamId of assignment.teamIds) {
+      await prisma.teamManager.create({
+        data: {
+          managerId: assignment.managerId,
+          teamId,
+        },
+      });
+    }
   }
 };

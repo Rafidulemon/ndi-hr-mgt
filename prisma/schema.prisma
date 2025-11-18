@@ -97,6 +97,8 @@ model Organization {
   domain    String?  @unique
   timezone  String?  @default("Asia/Dhaka")
   locale    String?  @default("en-US")
+  orgAdminId String?
+  managerId  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -106,8 +108,12 @@ model Organization {
   teams             Team[]
   projects          Project[]
   notifications     Notification[]
+  orgAdmin          User?          @relation("OrganizationAdmin", fields: [orgAdminId], references: [id])
+  manager           User?          @relation("OrganizationManager", fields: [managerId], references: [id])
 
   @@index([name])
+  @@index([orgAdminId])
+  @@index([managerId])
 }
 
 /// Authenticated user record. One row per employee/admin.
@@ -137,6 +143,9 @@ model User {
   headedDepartments     Department[]          @relation("DepartmentHead")
   ledTeams              Team[]                @relation("TeamLead")
   directReports         EmploymentDetail[]    @relation("ManagerReports")
+  teamMemberships       TeamManager[]
+  administeredOrganizations Organization[]    @relation("OrganizationAdmin")
+  managedOrganizations      Organization[]    @relation("OrganizationManager")
   sessions              Session[]
   passwordResetTokens   PasswordResetToken[]
 
@@ -292,7 +301,7 @@ model Department {
 model Team {
   id             String   @id @default(uuid())
   organizationId String
-  departmentId   String?
+  departmentId   String
   name           String
   description    String?
   leadId         String?
@@ -300,13 +309,27 @@ model Team {
   updatedAt      DateTime @updatedAt
 
   organization   Organization       @relation(fields: [organizationId], references: [id])
-  department     Department?        @relation(fields: [departmentId], references: [id])
+  department     Department         @relation(fields: [departmentId], references: [id])
   lead           User?              @relation("TeamLead", fields: [leadId], references: [id])
   primaryMembers EmploymentDetail[] @relation("PrimaryTeam")
+  teamManagers   TeamManager[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
   @@index([departmentId])
+}
+
+model TeamManager {
+  id        String   @id @default(uuid())
+  teamId    String
+  managerId String
+  createdAt DateTime @default(now())
+
+  team    Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  manager User @relation(fields: [managerId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, managerId])
+  @@index([managerId])
 }
 
 model AttendanceRecord {
