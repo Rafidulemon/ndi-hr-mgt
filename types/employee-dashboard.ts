@@ -98,3 +98,29 @@ export type EmployeeDashboardResponse = {
   };
   notifications: DashboardNotificationItem[];
 };
+
+export type DashboardProfileSection = {
+  workspaceName: string;
+  profile: DashboardProfileSummary;
+  personalDetails: DashboardListEntry[];
+  companyDetails: DashboardListEntry[];
+};
+
+export type DashboardSummarySection = {
+  monthSnapshot: DashboardMonthSnapshot;
+  quickStats: DashboardQuickStat[];
+};
+
+export type DashboardAttendanceSection = {
+  attendanceSummary: DashboardAttendanceSummary;
+  attendanceTrend: DashboardAttendanceTrendPoint[];
+};
+
+export type DashboardTimeOffSection = {
+  leaveBalances: LeaveBalanceResponse[];
+  leaveHighlights: EmployeeDashboardResponse["leaveHighlights"];
+};
+
+export type DashboardNotificationsSection = {
+  notifications: DashboardNotificationItem[];
+};

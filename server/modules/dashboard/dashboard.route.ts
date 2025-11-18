@@ -1,8 +1,25 @@
-import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
-import { employeeDashboardController } from "./dashboard.controller";
+import { protectedProcedure } from "@/server/api/trpc";
+import { router } from "@/server/trpc";
 
-export const dashboardRouter = createTRPCRouter({
+import { DashboardController } from "./dashboard.controller";
+
+export const dashboardRouter = router({
   overview: protectedProcedure.query(({ ctx }) =>
-    employeeDashboardController.overview({ ctx }),
+    DashboardController.getOverview(ctx),
+  ),
+  profile: protectedProcedure.query(({ ctx }) =>
+    DashboardController.getProfile(ctx),
+  ),
+  summary: protectedProcedure.query(({ ctx }) =>
+    DashboardController.getSummary(ctx),
+  ),
+  attendance: protectedProcedure.query(({ ctx }) =>
+    DashboardController.getAttendance(ctx),
+  ),
+  timeOff: protectedProcedure.query(({ ctx }) =>
+    DashboardController.getTimeOff(ctx),
+  ),
+  notifications: protectedProcedure.query(({ ctx }) =>
+    DashboardController.getNotifications(ctx),
   ),
 });

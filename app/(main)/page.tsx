@@ -1,11 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import Button from "../components/atoms/buttons/Button";
-import { CardWithHeader } from "../components/atoms/frame/CardWithHeader";
-import Text from "../components/atoms/Text/Text";
 import { trpc } from "@/trpc/client";
 import type { EmployeeDashboardResponse } from "@/types/employee-dashboard";
+import Button from "../components/atoms/buttons/Button";
+import { CardWithHeader } from "../components/atoms/frame/CardWithHeader";
+import LoadingSpinner from "../components/atoms/loading/LoadingSpinner";
+import Text from "../components/atoms/Text/Text";
 
 const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -209,30 +210,69 @@ const buildLeaveChart = (balances: EmployeeDashboardResponse["leaveBalances"]) =
 };
 
 function HomePage() {
-  const dashboardQuery = trpc.dashboard.overview.useQuery();
+  const profileQuery = trpc.dashboard.profile.useQuery();
+  const summaryQuery = trpc.dashboard.summary.useQuery();
+  const attendanceQuery = trpc.dashboard.attendance.useQuery();
+  const timeOffQuery = trpc.dashboard.timeOff.useQuery();
+  const notificationsQuery = trpc.dashboard.notifications.useQuery();
 
-  if (dashboardQuery.isLoading) {
+  const queries = [
+    profileQuery,
+    summaryQuery,
+    attendanceQuery,
+    timeOffQuery,
+    notificationsQuery,
+  ];
+
+  const isLoading = queries.some((query) => query.isLoading);
+  const isFetching = queries.some((query) => query.isFetching);
+
+  if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-slate-500">
-        Loading your dashboard...
+      <div className="flex min-h-screen items-center justify-center bg-slate-50/60 px-4 dark:bg-slate-950/60">
+        <LoadingSpinner label="Loading your dashboard..." />
       </div>
     );
   }
 
-  if (dashboardQuery.isError || !dashboardQuery.data) {
+  const hasError = queries.some((query) => query.isError || !query.data);
+  const refetchAll = () => {
+    queries.forEach((query) => {
+      void query.refetch();
+    });
+  };
+
+  if (hasError) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 text-center">
         <p className="text-slate-500">
           We couldn&apos;t load your dashboard right now.
         </p>
-        <Button onClick={() => dashboardQuery.refetch()}>
-          <Text text={dashboardQuery.isFetching ? "Refreshing..." : "Retry"} className="font-semibold" />
+        <Button onClick={refetchAll} disabled={isFetching}>
+          <Text text={isFetching ? "Refreshing..." : "Retry"} className="font-semibold" />
         </Button>
       </div>
     );
   }
 
-  const data = dashboardQuery.data;
+  const profileSection = profileQuery.data!;
+  const summarySection = summaryQuery.data!;
+  const attendanceSection = attendanceQuery.data!;
+  const timeOffSection = timeOffQuery.data!;
+  const notificationsSection = notificationsQuery.data!;
+
+  const data: EmployeeDashboardResponse = {
+    profile: profileSection.profile,
+    monthSnapshot: summarySection.monthSnapshot,
+    quickStats: summarySection.quickStats,
+    personalDetails: profileSection.personalDetails,
+    companyDetails: profileSection.companyDetails,
+    attendanceSummary: attendanceSection.attendanceSummary,
+    attendanceTrend: attendanceSection.attendanceTrend,
+    leaveBalances: timeOffSection.leaveBalances,
+    leaveHighlights: timeOffSection.leaveHighlights,
+    notifications: notificationsSection.notifications,
+  };
   const profile = data.profile;
   const avatarSrc = profile.avatarUrl ?? "/dp.png";
   const attendanceChart = buildAttendanceChart(data.attendanceTrend);
