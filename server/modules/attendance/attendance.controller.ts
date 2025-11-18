@@ -1,3 +1,5 @@
+import { TRPCError } from "@trpc/server";
+
 import type { TRPCContext } from "@/server/api/trpc";
 import { attendanceService } from "./attendance.service";
 import type {
@@ -5,21 +7,27 @@ import type {
   CompleteDayInput,
 } from "./attendance.validation";
 
+const buildInput = (ctx: TRPCContext) => {
+  if (!ctx.session) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  return {
+    userId: ctx.session.user.id,
+  };
+};
+
 export const attendanceController = {
-  today: ({ ctx }: { ctx: TRPCContext }) => attendanceService.today(ctx),
-  startDay: ({ ctx }: { ctx: TRPCContext }) => attendanceService.startDay(ctx),
-  completeDay: ({
-    ctx,
-    input,
-  }: {
-    ctx: TRPCContext;
-    input: CompleteDayInput;
-  }) => attendanceService.completeDay(ctx, input),
-  history: ({
-    ctx,
-    input,
-  }: {
-    ctx: TRPCContext;
-    input?: AttendanceHistoryInput;
-  }) => attendanceService.history(ctx, input),
+  today: (ctx: TRPCContext) => attendanceService.today(buildInput(ctx)),
+  startDay: (ctx: TRPCContext) => attendanceService.startDay(buildInput(ctx)),
+  completeDay: (ctx: TRPCContext, input: CompleteDayInput) =>
+    attendanceService.completeDay({
+      ...buildInput(ctx),
+      input,
+    }),
+  history: (ctx: TRPCContext, params?: AttendanceHistoryInput) =>
+    attendanceService.history({
+      ...buildInput(ctx),
+      params,
+    }),
 };

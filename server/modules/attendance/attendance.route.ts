@@ -1,21 +1,20 @@
-import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
-import { attendanceController } from "./attendance.controller";
-import {
-  attendanceHistorySchema,
-  completeDaySchema,
-} from "./attendance.validation";
+import { protectedProcedure } from "@/server/api/trpc";
+import { router } from "@/server/trpc";
 
-export const attendanceRouter = createTRPCRouter({
+import { attendanceController } from "./attendance.controller";
+import { AttendanceValidation } from "./attendance.validation";
+
+export const attendanceRouter = router({
   today: protectedProcedure.query(({ ctx }) =>
-    attendanceController.today({ ctx }),
+    attendanceController.today(ctx),
   ),
   startDay: protectedProcedure.mutation(({ ctx }) =>
-    attendanceController.startDay({ ctx }),
+    attendanceController.startDay(ctx),
   ),
   completeDay: protectedProcedure
-    .input(completeDaySchema)
-    .mutation(({ ctx, input }) => attendanceController.completeDay({ ctx, input })),
+    .input(AttendanceValidation.completeDay)
+    .mutation(({ ctx, input }) => attendanceController.completeDay(ctx, input)),
   history: protectedProcedure
-    .input(attendanceHistorySchema)
-    .query(({ ctx, input }) => attendanceController.history({ ctx, input })),
+    .input(AttendanceValidation.history)
+    .query(({ ctx, input }) => attendanceController.history(ctx, input)),
 });

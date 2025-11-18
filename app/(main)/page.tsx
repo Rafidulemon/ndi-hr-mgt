@@ -316,17 +316,6 @@ function HomePage() {
 
   return (
     <div className="relative space-y-8">
-      {showFetchingIndicator ? (
-        <div className="pointer-events-none absolute inset-x-0 top-4 z-20 flex justify-center">
-          <div className="w-full max-w-md">
-            <DashboardLoadingIndicator
-              label="Refreshing dashboard..."
-              helper="Updating the latest stats."
-              subtle
-            />
-          </div>
-        </div>
-      ) : null}
       <section className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-indigo-600 via-sky-500 to-cyan-400 p-8 text-white shadow-2xl dark:shadow-slate-950/60">
           <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">

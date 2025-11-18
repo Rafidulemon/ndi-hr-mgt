@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Modal } from "../../components/atoms/frame/Modal";
 import { EmployeeHeader } from "../../components/layouts/EmployeeHeader";
 import { useRouter } from "next/navigation";
+import DashboardLoadingIndicator from "../../components/dashboard/DashboardLoadingIndicator";
 import { trpc } from "@/trpc/client";
 
 const STORAGE_KEY = "ndi.attendance.timer.v1";
@@ -223,6 +224,12 @@ function AttendancePage() {
   };
   const hasExistingServerAttendance = Boolean(todayAttendanceQuery.data?.record);
 
+  const isInitialLoading = todayAttendanceQuery.isLoading || todayAttendanceQuery.isPending;
+  const hasError = todayAttendanceQuery.isError;
+  const refetchToday = () => {
+    void todayAttendanceQuery.refetch();
+  };
+
   const handleStart = async () => {
     const currentState = stateRef.current;
     if (currentState.hasStarted && !currentState.isLeaved) {
@@ -334,8 +341,46 @@ function AttendancePage() {
     return () => window.clearInterval(intervalId);
   }, []);
 
+  if (isInitialLoading) {
+    return (
+      <DashboardLoadingIndicator
+        fullscreen
+        label="Loading attendance"
+        helper="Fetching today’s log and timer state."
+      />
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center">
+        <Text
+          text="We couldn’t load your attendance right now."
+          className="text-lg text-text_primary"
+        />
+        <Button onClick={refetchToday} disabled={todayAttendanceQuery.isFetching}>
+          <Text
+            text={todayAttendanceQuery.isFetching ? "Refreshing..." : "Try again"}
+            className="font-semibold"
+          />
+        </Button>
+      </div>
+    );
+  }
+
+  const showInlineLoader =
+    todayAttendanceQuery.isFetching ||
+    startDayMutation.isPending ||
+    completeDayMutation.isPending;
+
+  const inlineLoaderLabel = startDayMutation.isPending
+    ? "Starting your workday..."
+    : completeDayMutation.isPending
+      ? "Wrapping up your hours..."
+      : "Syncing attendance...";
+
   return (
-    <div className="w-full h-[calc(100vh-100px)] flex flex-col gap-6 justify-center items-center">
+    <div className="relative flex h-[calc(100vh-100px)] w-full flex-col items-center justify-center gap-6">
       <EmployeeHeader
         name="Md. Rafidul Islam"
         designation="Software Engineer"
@@ -421,26 +466,27 @@ function AttendancePage() {
             )}
           </div>
         )}
+        </div>
+        <Modal
+          doneButtonText="Leave"
+          cancelButtonText="Cancel"
+          isCancelButton
+          className="h-auto w-[40%]"
+          open={isLeaveModalOpen}
+          setOpen={setIsLeaveModalOpen}
+          title="Are you sure?"
+          titleTextSize="text-[24px]"
+          buttonWidth="120px"
+          buttonHeight="40px"
+          onDoneClick={() => handleLeave()}
+          closeOnClick={() => setIsLeaveModalOpen(false)}
+        >
+          <Text
+            text="Are you sure to leave from work for today?"
+            className="my-6 text-[24px] font-semibold text-text_primary"
+          />
+        </Modal>
       </div>
-
-      <Modal
-        doneButtonText="Leave"
-        cancelButtonText="Cancel"
-        isCancelButton
-        className="h-auto w-[40%]"
-        open={isLeaveModalOpen}
-        setOpen={setIsLeaveModalOpen}
-        title="Are you sure?"
-        titleTextSize="text-[24px]"
-        buttonWidth="120px"
-        buttonHeight="40px"
-        onDoneClick={() => handleLeave()}
-        closeOnClick={() => setIsLeaveModalOpen(false)}
-      >
-        <Text text="Are you sure to leave from work for today?" className="my-6 text-[24px] font-semibold text-text_primary"/>
-      </Modal>
-    </div>
   );
 }
-
 export default AttendancePage;

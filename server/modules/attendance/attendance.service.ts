@@ -1,7 +1,7 @@
 import { AttendanceStatus } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
-import type { TRPCContext } from "@/server/api/trpc";
+import { prisma } from "@/server/db";
 import type {
   AttendanceHistoryInput,
   CompleteDayInput,
@@ -53,17 +53,29 @@ const resolveHistoryRange = (input?: AttendanceHistoryInput) => {
   return { rangeStart, rangeEnd };
 };
 
+type AttendanceServiceInput = {
+  userId: string;
+};
+
+type CompleteDayServiceInput = AttendanceServiceInput & {
+  input: CompleteDayInput;
+};
+
+type AttendanceHistoryServiceInput = AttendanceServiceInput & {
+  params?: AttendanceHistoryInput;
+};
+
 export const attendanceService = {
-  async today(ctx: TRPCContext) {
-    if (!ctx.session) {
+  async today({ userId }: AttendanceServiceInput) {
+    if (!userId) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
     const attendanceDate = startOfDay(new Date());
-    const record = await ctx.prisma.attendanceRecord.findUnique({
+    const record = await prisma.attendanceRecord.findUnique({
       where: {
         employeeId_attendanceDate: {
-          employeeId: ctx.session.user.id,
+          employeeId: userId,
           attendanceDate,
         },
       },
@@ -74,19 +86,18 @@ export const attendanceService = {
     };
   },
 
-  async startDay(ctx: TRPCContext) {
-    if (!ctx.session) {
+  async startDay({ userId }: AttendanceServiceInput) {
+    if (!userId) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
     const now = new Date();
     const attendanceDate = startOfDay(now);
-    const employeeId = ctx.session.user.id;
 
-    const existing = await ctx.prisma.attendanceRecord.findUnique({
+    const existing = await prisma.attendanceRecord.findUnique({
       where: {
         employeeId_attendanceDate: {
-          employeeId,
+          employeeId: userId,
           attendanceDate,
         },
       },
@@ -94,7 +105,7 @@ export const attendanceService = {
 
     if (existing) {
       if (!existing.checkInAt) {
-        const updated = await ctx.prisma.attendanceRecord.update({
+        const updated = await prisma.attendanceRecord.update({
           where: { id: existing.id },
           data: {
             checkInAt: now,
@@ -105,9 +116,9 @@ export const attendanceService = {
       return formatRecord(existing);
     }
 
-    const created = await ctx.prisma.attendanceRecord.create({
+    const created = await prisma.attendanceRecord.create({
       data: {
-        employeeId,
+        employeeId: userId,
         attendanceDate,
         checkInAt: now,
         status: AttendanceStatus.PRESENT,
@@ -120,16 +131,14 @@ export const attendanceService = {
     return formatRecord(created);
   },
 
-  async completeDay(ctx: TRPCContext, input: CompleteDayInput) {
-    if (!ctx.session) {
+  async completeDay({ userId, input }: CompleteDayServiceInput) {
+    if (!userId) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
-    const employeeId = ctx.session.user.id;
-
-    const activeRecord = await ctx.prisma.attendanceRecord.findFirst({
+    const activeRecord = await prisma.attendanceRecord.findFirst({
       where: {
-        employeeId,
+        employeeId: userId,
         checkInAt: {
           not: null,
         },
@@ -147,7 +156,7 @@ export const attendanceService = {
       });
     }
 
-    const updated = await ctx.prisma.attendanceRecord.update({
+    const updated = await prisma.attendanceRecord.update({
       where: { id: activeRecord.id },
       data: {
         checkOutAt: new Date(),
@@ -159,16 +168,16 @@ export const attendanceService = {
     return formatRecord(updated);
   },
 
-  async history(ctx: TRPCContext, input?: AttendanceHistoryInput) {
-    if (!ctx.session) {
+  async history({ userId, params }: AttendanceHistoryServiceInput) {
+    if (!userId) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
-    const { rangeStart, rangeEnd } = resolveHistoryRange(input);
+    const { rangeStart, rangeEnd } = resolveHistoryRange(params);
 
-    const records = await ctx.prisma.attendanceRecord.findMany({
+    const records = await prisma.attendanceRecord.findMany({
       where: {
-        employeeId: ctx.session.user.id,
+        employeeId: userId,
         attendanceDate: {
           gte: rangeStart,
           lt: rangeEnd,
