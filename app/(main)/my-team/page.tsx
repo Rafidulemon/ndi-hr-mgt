@@ -258,8 +258,8 @@ function MyTeamPage() {
   );
 
   return (
-    <div className="w-full px-4 py-6">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pb-16">
+    <div className="w-full">
+      <div className="flex w-full flex-col gap-6 pb-16">
         <section className="space-y-6 rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm dark:border-slate-700/70 dark:bg-slate-900/80">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="space-y-2">

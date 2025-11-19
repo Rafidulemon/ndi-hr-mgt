@@ -257,6 +257,27 @@ export const teamService = {
             department: {
               select: {
                 name: true,
+                head: {
+                  select: {
+                    id: true,
+                    email: true,
+                    profile: {
+                      select: {
+                        firstName: true,
+                        lastName: true,
+                        preferredName: true,
+                        profilePhotoUrl: true,
+                        workEmail: true,
+                        workModel: true,
+                      },
+                    },
+                    employment: {
+                      select: {
+                        designation: true,
+                      },
+                    },
+                  },
+                },
               },
             },
             lead: {
@@ -514,6 +535,11 @@ export const teamService = {
       })
       .filter((value): value is NonNullable<typeof value> => Boolean(value));
 
+    const departmentManager = buildPersonSummary(
+      employment.team.department?.head ?? null,
+    );
+    const reportingManager = buildPersonSummary(employment.manager);
+
     return {
       hasTeam: true,
       timezone,
@@ -523,7 +549,7 @@ export const teamService = {
         description: employment.team.description ?? null,
         departmentName: employment.team.department?.name ?? null,
         lead: buildPersonSummary(employment.team.lead),
-        manager: buildPersonSummary(employment.manager),
+        manager: departmentManager ?? reportingManager,
         locationHint: topLocation ?? employment.primaryLocation ?? null,
       },
       stats: {

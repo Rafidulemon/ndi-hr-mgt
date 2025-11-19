@@ -226,11 +226,7 @@ export default function EditEmployeePage() {
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <EmployeeHeader
-          name={headerForm.fullName}
-          designation={headerForm.role}
-          joining_date={headerForm.startDate ? new Date(headerForm.startDate).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
-        />
+        <EmployeeHeader/>
         <div className="flex flex-wrap gap-3">
           <Link
             href={`/hr-admin/employees/view/${encodeURIComponent(employeeId)}`}

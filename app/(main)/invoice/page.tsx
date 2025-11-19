@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import Table from "../../components/atoms/tables/Table";
 import { ReactElement, useState } from "react";
 import { IoEye } from "react-icons/io5";
@@ -7,7 +7,6 @@ import PasswordInput from "../../components/atoms/inputs/PasswordInput";
 import { EmployeeHeader } from "../../components/layouts/EmployeeHeader";
 import Pagination from "../../components/pagination/Pagination";
 import { useRouter } from "next/navigation";
-
 
 const invoiceTableHeader = ["Month", "Year", "Status", "Action"];
 
@@ -162,11 +161,7 @@ function InvoicePage() {
   const navigate = useRouter();
   return (
     <div className="flex w-full flex-col gap-10">
-      <EmployeeHeader
-        name="Md. Rafidul Islam"
-        designation="Software Engineer"
-        joining_date="Aug 17, 2023"
-      />
+      <EmployeeHeader />
 
       <div className="flex w-full flex-col gap-6 rounded-[32px] border border-white/60 bg-white/85 py-8 shadow-xl shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
         {currentPageData && (
@@ -197,9 +192,9 @@ function InvoicePage() {
         cancelButtonText="Cancel"
         buttonWidth="120px"
         buttonHeight="40px"
-        onDoneClick={()=>navigate.push("/invoice/details")}
-        closeOnClick={()=>setIsModalOpen(false)}
-        crossOnClick={()=>setIsModalOpen(false)}
+        onDoneClick={() => navigate.push("/invoice/details")}
+        closeOnClick={() => setIsModalOpen(false)}
+        crossOnClick={() => setIsModalOpen(false)}
       >
         <PasswordInput label="Please enter password to view Invoice" />
       </Modal>

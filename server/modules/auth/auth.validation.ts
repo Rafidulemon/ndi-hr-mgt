@@ -16,6 +16,12 @@ export const registerSchema = z.object({
   designation: z.string().min(2, "Designation is required"),
   email: z.string().email(),
   password: z.string().min(8, "Password must be at least 8 characters"),
+  profilePhotoUrl: z
+    .string()
+    .url("Profile photo must be a valid URL")
+    .max(2048, "Profile photo URL is too long")
+    .optional()
+    .nullable(),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
@@ -48,4 +54,5 @@ export type TrialStatusInput = z.infer<typeof trialStatusSchema>;
 export const AuthZodSchema = {
   userEmailParams: sendResetPasswordLinkSchema,
   userPasswordUpdateParams: updateUserPasswordSchema,
+  userRegistrationParams: registerSchema,
 };

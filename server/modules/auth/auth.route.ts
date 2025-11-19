@@ -4,6 +4,12 @@ import { AuthController } from "./auth.controller";
 import { AuthZodSchema } from "./auth.validation";
 
 export const AuthRouter = router({
+  register: procedure
+    .input(AuthZodSchema.userRegistrationParams)
+    .mutation(({ input }) => {
+      return AuthController.registerUserHandler(input);
+    }),
+
   sendUserResetPasswordLink: procedure
     .input(AuthZodSchema.userEmailParams)
     .mutation(({ input }) => {

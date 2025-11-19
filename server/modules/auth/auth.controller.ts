@@ -2,6 +2,23 @@ import { UserPasswordUpdateType } from "@/types/types";
 import { TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import { AuthService } from "./auth.service";
+import type { RegisterInput } from "./auth.validation";
+
+const registerUserHandler = async (input: RegisterInput) => {
+  try {
+    const result = await AuthService.registerUser(input);
+    return result;
+  } catch (error) {
+    if (error instanceof TRPCError) {
+      throw error;
+    }
+
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to create account",
+    });
+  }
+};
 
 const sendResetPasswordLinkHandler = async (email: string) => {
   try {
@@ -97,6 +114,7 @@ const getIsTrialExpired = async (email: string) => {
 };
 
 export const AuthController = {
+  registerUserHandler,
   sendResetPasswordLinkHandler,
   updateUserPasswordHandler,
   getUserRegistrationPayloadHandler,

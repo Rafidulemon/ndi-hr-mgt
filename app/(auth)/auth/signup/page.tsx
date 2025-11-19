@@ -5,6 +5,8 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { ChangeEvent } from "react";
+import { trpc } from "@/trpc/client";
 
 import AuthLayout from "../_components/AuthLayout";
 import Button from "../../../components/atoms/buttons/Button";
@@ -42,7 +44,9 @@ function SignupPage() {
   const router = useRouter();
   const [serverMessage, setServerMessage] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const {
     register,
     handleSubmit,
@@ -50,6 +54,19 @@ function SignupPage() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
+  const signupMutation = trpc.auth.register.useMutation({
+    onSuccess: (data) => {
+      setServerError(null);
+      setServerMessage(
+        `Account created for ${data.email}. Sign in to ${data.organizationName} to continue.`,
+      );
+    },
+    onError: (error) => {
+      setServerMessage(null);
+      setServerError(error.message || "Unable to create the account right now.");
+    },
+  });
+  const isSubmitting = signupMutation.isPending;
 
   const handleLoginButton = () => {
     router.push("/auth/login");
@@ -58,11 +75,49 @@ function SignupPage() {
   const handleOnSubmit = (data: FormData) => {
     setServerError(null);
     setServerMessage(null);
-    setIsSubmitting(true);
-    setServerMessage(
-      "Self-service sign-up is no longer available. Please use your invitation link or contact your administrator.",
-    );
-    setIsSubmitting(false);
+    if (!profilePhotoUrl) {
+      setImageError("Please upload your profile photo.");
+      return;
+    }
+    signupMutation.mutate({
+      employeeId: data.employeeId,
+      department: data.department,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      designation: data.designation,
+      email: data.email,
+      password: data.password,
+      profilePhotoUrl: profilePhotoUrl ?? undefined,
+    });
+  };
+
+  const handleProfilePhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setImageError(null);
+    setIsUploadingImage(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/signup/photo", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to upload image");
+      }
+      setProfilePhotoUrl(payload.url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to upload image";
+      setImageError(message);
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   return (
@@ -172,8 +227,10 @@ function SignupPage() {
             label="Upload Profile Picture"
             isRequired
             id="profilePic"
-            initialImage="/default_profile.png"
-            onChange={(event) => console.log(event.target.files)}
+            initialImage={profilePhotoUrl ?? "/default_profile.png"}
+            onChange={handleProfilePhotoChange}
+            isUploading={isUploadingImage}
+            error={imageError}
           />
         </div>
 
@@ -188,8 +245,22 @@ function SignupPage() {
           </p>
         ) : null}
 
-        <Button type="submit" theme="primary" isWidthFull disabled={isSubmitting}>
-          <Text text={isSubmitting ? "Submitting..." : "Create account"} className="text-[16px] font-semibold" />
+        <Button
+          type="submit"
+          theme="primary"
+          isWidthFull
+          disabled={isSubmitting || isUploadingImage}
+        >
+          <Text
+            text={
+              isUploadingImage
+                ? "Uploading photo..."
+                : isSubmitting
+                  ? "Creating account..."
+                  : "Create account"
+            }
+            className="text-[16px] font-semibold"
+          />
         </Button>
       </form>
     </AuthLayout>

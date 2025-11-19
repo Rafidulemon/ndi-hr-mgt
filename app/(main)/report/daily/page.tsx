@@ -59,9 +59,6 @@ function DailyReportPage() {
   return (
     <div className="flex w-full flex-col gap-10">
       <EmployeeHeader
-        name="Md. Rafidul Islam"
-        designation="Software Engineer"
-        joining_date="Aug 17, 2023"
         hasRightButton
         buttonText="History"
         onButtonClick={() => navigate.push("/report/daily/history")}

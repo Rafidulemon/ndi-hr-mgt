@@ -173,12 +173,9 @@ export default function EmployeeLeavePage() {
   const incrementYear = () => setYear((prevYear) => prevYear + 1);
 
   return (
-    <div className="px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <div>
+      <div className="space-y-6">
         <EmployeeHeader
-          name="Md. Rafidul Islam"
-          designation="Software Engineer"
-          joining_date="Aug 17, 2023"
           hasRightButton
           buttonText="New application"
           onButtonClick={() => router.push("/leave/application")}

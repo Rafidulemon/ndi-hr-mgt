@@ -1,18 +1,14 @@
-"use client"
-import { EmployeeHeader } from "../../../components/layouts/EmployeeHeader"
-import Text from "../../../components/atoms/Text/Text"
-import Button from "../../../components/atoms/buttons/Button"
+"use client";
+import { EmployeeHeader } from "../../../components/layouts/EmployeeHeader";
+import Text from "../../../components/atoms/Text/Text";
+import Button from "../../../components/atoms/buttons/Button";
 import { useRouter } from "next/navigation";
 
 function NotificationDetails() {
-    const navigate = useRouter();
+  const navigate = useRouter();
   return (
     <div className="flex w-full flex-col gap-10">
-      <EmployeeHeader
-        name="Md. Rafidul Islam"
-        designation="Software Engineer"
-        joining_date="Aug 17, 2023"
-      />
+      <EmployeeHeader />
 
       <div className="flex w-full flex-col gap-6 rounded-[32px] border border-white/60 bg-white/85 py-8 shadow-xl shadow-indigo-100 transition-colors duration-200 md:min-h-[500px] xl:min-h-[680px] dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
         <div className="flex flex-col gap-2 px-8">
@@ -41,7 +37,7 @@ function NotificationDetails() {
         </Button>
       </div>
     </div>
-  )
+  );
 }
 
-export default NotificationDetails
+export default NotificationDetails;

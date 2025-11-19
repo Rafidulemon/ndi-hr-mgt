@@ -41,8 +41,7 @@ const documentStatusColor: Record<string, string> = {
     "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200",
   Pending:
     "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200",
-  Missing:
-    "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200",
+  Missing: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200",
 };
 
 const EmptyState = ({ message }: { message: string }) => (
@@ -68,11 +67,13 @@ export default function EmployeeProfilePage() {
   const employeeId = useMemo(() => extractEmployeeId(pathname), [pathname]);
   const profileQuery = trpc.hrEmployees.profile.useQuery(
     { employeeId: employeeId ?? "" },
-    { enabled: Boolean(employeeId) },
+    { enabled: Boolean(employeeId) }
   );
 
   if (!employeeId) {
-    return <EmptyState message="Pick an employee from the directory to view their profile." />;
+    return (
+      <EmptyState message="Pick an employee from the directory to view their profile." />
+    );
   }
 
   if (profileQuery.isLoading) {
@@ -84,14 +85,20 @@ export default function EmployeeProfilePage() {
   }
 
   if (profileQuery.isError || !profileQuery.data?.profile) {
-    return <EmptyState message="We couldn’t load the employee profile. Try opening it from the directory again." />;
+    return (
+      <EmptyState message="We couldn’t load the employee profile. Try opening it from the directory again." />
+    );
   }
 
   const employee = profileQuery.data.profile;
   return <EmployeeProfileContent employee={employee} />;
 }
 
-const EmployeeProfileContent = ({ employee }: { employee: HrEmployeeProfile }) => {
+const EmployeeProfileContent = ({
+  employee,
+}: {
+  employee: HrEmployeeProfile;
+}) => {
   const personaTags = [
     employee.department,
     employee.squad,
@@ -130,7 +137,10 @@ const EmployeeProfileContent = ({ employee }: { employee: HrEmployeeProfile }) =
         { label: "Email", value: employee.email },
         { label: "Phone", value: formatValue(employee.phone) },
         { label: "Location", value: formatValue(employee.location) },
-        { label: "Work arrangement", value: formatValue(employee.workArrangement) },
+        {
+          label: "Work arrangement",
+          value: formatValue(employee.workArrangement),
+        },
       ],
     },
     {
@@ -170,16 +180,13 @@ const EmployeeProfileContent = ({ employee }: { employee: HrEmployeeProfile }) =
   ];
 
   const joiningDate = formatDate(employee.startDate);
-  const statusStyle = employeeStatusStyles[employee.status] ?? employeeStatusStyles.Active;
+  const statusStyle =
+    employeeStatusStyles[employee.status] ?? employeeStatusStyles.Active;
 
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <EmployeeHeader
-          name={employee.name}
-          designation={employee.role}
-          joining_date={joiningDate}
-        />
+        <EmployeeHeader />
         <div className="flex flex-wrap gap-3">
           <Link
             href={`/hr-admin/employees/edit/${encodeURIComponent(employee.id)}`}
@@ -216,7 +223,8 @@ const EmployeeProfileContent = ({ employee }: { employee: HrEmployeeProfile }) =
                 className="text-xl font-semibold text-slate-900 dark:text-white"
               />
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {formatValue(employee.department)} · {formatValue(employee.workArrangement)}
+                {formatValue(employee.department)} ·{" "}
+                {formatValue(employee.workArrangement)}
               </p>
               <div className="flex flex-wrap gap-2">
                 <span
@@ -357,10 +365,17 @@ const EmployeeProfileContent = ({ employee }: { employee: HrEmployeeProfile }) =
           ) : (
             <ul className="mt-4 space-y-3 text-sm">
               {employee.documents.map((document) => (
-                <li key={document.name} className="flex items-center justify-between">
-                  <span className="text-slate-600 dark:text-slate-300">{document.name}</span>
+                <li
+                  key={document.name}
+                  className="flex items-center justify-between"
+                >
+                  <span className="text-slate-600 dark:text-slate-300">
+                    {document.name}
+                  </span>
                   <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${documentStatusColor[document.status]}`}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      documentStatusColor[document.status]
+                    }`}
                   >
                     {document.status}
                   </span>

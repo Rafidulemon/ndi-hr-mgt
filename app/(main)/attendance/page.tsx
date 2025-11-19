@@ -559,11 +559,8 @@ function AttendancePage() {
 
   return (
     <div className="relative w-full">
-      <div className="flex w-full max-w-4xl flex-col gap-6">
+      <div className="flex w-full flex-col gap-6">
         <EmployeeHeader
-          name="Md. Rafidul Islam"
-          designation="Software Engineer"
-          joining_date="Aug 17, 2023"
           hasRightButton
           buttonText="Attendance History"
           onButtonClick={handleButtonClick}

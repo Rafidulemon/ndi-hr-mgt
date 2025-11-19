@@ -12,7 +12,7 @@ import Text from "../../components/atoms/Text/Text";
 import { EmployeeHeader } from "../../components/layouts/EmployeeHeader";
 import { trpc } from "@/trpc/client";
 
-const formatDate = (input?: Date | string | null) => {
+export const formatDate = (input?: Date | string | null) => {
   if (!input) return "—";
   const date = input instanceof Date ? input : new Date(input);
   if (Number.isNaN(date.getTime())) return "—";
@@ -172,9 +172,6 @@ function ProfilePage() {
   return (
     <div className="space-y-8">
       <EmployeeHeader
-        name={fullName}
-        designation={designation}
-        joining_date={joiningDate}
         hasRightButton
         buttonText="Edit Profile"
         onButtonClick={() => router.push("/profile/edit")}

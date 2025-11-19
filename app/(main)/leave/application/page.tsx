@@ -415,12 +415,12 @@ export default function LeaveApplicationPage() {
   };
 
   return (
-    <div className="px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <div>
+      <div className="space-y-6">
         <EmployeeHeader
-          name={headerName}
-          designation={headerDesignation}
-          joining_date={headerJoiningDate}
+          hasRightButton
+          buttonText="Leave History"
+          onButtonClick={() => router.push("/leave")}
         />
 
         {profileError && (
