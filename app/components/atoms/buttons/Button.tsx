@@ -24,7 +24,7 @@ type Props = {
 
 const themeClasses: Record<ButtonTheme, string> = {
   primary:
-    "border border-transparent bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 text-white shadow-lg shadow-indigo-500/30 hover:from-indigo-600 hover:via-sky-600 hover:to-cyan-500 focus-visible:outline-indigo-500 dark:from-sky-600 dark:via-sky-500 dark:to-cyan-400 dark:hover:from-sky-700 dark:hover:via-sky-600 dark:hover:to-cyan-500 dark:shadow-sky-900/40",
+    "bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 text-white shadow-lg shadow-indigo-500/30 hover:from-indigo-600 hover:via-sky-600 hover:to-cyan-500 focus-visible:outline-indigo-500 dark:from-sky-600 dark:via-sky-500 dark:to-cyan-400 dark:hover:from-sky-700 dark:hover:via-sky-600 dark:hover:to-cyan-500 dark:shadow-sky-900/40",
   secondary:
     "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus-visible:outline-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:outline-slate-500",
   cancel:

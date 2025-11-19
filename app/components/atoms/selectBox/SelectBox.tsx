@@ -15,6 +15,7 @@ type SelectBoxProps = {
   error?: FieldError | undefined;
   includePlaceholder?: boolean;
   placeholderLabel?: string;
+  isDisabled?: boolean;
 };
 
 export default function SelectBox({
@@ -27,6 +28,7 @@ export default function SelectBox({
   register,
   includePlaceholder = true,
   placeholderLabel = "Select Any",
+  isDisabled = false,
 }: SelectBoxProps) {
   const placeholderOptions = includePlaceholder ? [{ label: placeholderLabel, value: "" }] : [];
   const allOptions = [...placeholderOptions, ...options];
@@ -48,6 +50,7 @@ export default function SelectBox({
         id={label}
         {...register?.(name)}
         className={`h-[40px] rounded-lg border border-white/60 bg-white px-4 text-[16px] text-text_primary shadow-sm shadow-slate-200/70 transition-colors duration-200 focus:outline-none hover:cursor-pointer dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-100 dark:shadow-slate-900/40 ${className}`}
+        disabled={isDisabled}
       >
         {options.length > 0 ? (
           allOptions.map((option, index) => (

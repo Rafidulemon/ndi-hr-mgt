@@ -4,6 +4,22 @@ import jwt from "jsonwebtoken";
 import { AuthService } from "./auth.service";
 import type { RegisterInput } from "./auth.validation";
 
+const getSignupOptionsHandler = async () => {
+  try {
+    const options = await AuthService.getSignupOptions();
+    return options;
+  } catch (error) {
+    if (error instanceof TRPCError) {
+      throw error;
+    }
+
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to load signup options",
+    });
+  }
+};
+
 const registerUserHandler = async (input: RegisterInput) => {
   try {
     const result = await AuthService.registerUser(input);
@@ -114,6 +130,7 @@ const getIsTrialExpired = async (email: string) => {
 };
 
 export const AuthController = {
+  getSignupOptionsHandler,
   registerUserHandler,
   sendResetPasswordLinkHandler,
   updateUserPasswordHandler,

@@ -1,16 +1,63 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
+import type { IconType } from "react-icons";
+import { FiEdit2, FiEye, FiTrash2 } from "react-icons/fi";
+
 import Button from "../../../components/atoms/buttons/Button";
 import TextArea from "../../../components/atoms/inputs/TextArea";
 import TextInput from "../../../components/atoms/inputs/TextInput";
-import Image from "next/image";
 import {
   employeeStatusStyles,
   pendingApprovalStatusStyles,
 } from "./statusStyles";
 import { trpc } from "@/trpc/client";
 import type { EmployeeDirectoryEntry, EmployeeStatus } from "@/types/hr-admin";
+
+const IconActionButton = ({
+  label,
+  icon: Icon,
+  href,
+  onClick,
+  disabled = false,
+}: {
+  label: string;
+  icon: IconType;
+  href?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+}) => {
+  const baseClasses =
+    "flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-indigo-400 hover:text-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-500";
+  const styles = disabled ? `${baseClasses} pointer-events-none opacity-40` : baseClasses;
+  const content = (
+    <span className={styles}>
+      <Icon className="text-base" />
+    </span>
+  );
+
+  if (href && !disabled) {
+    return (
+      <Link href={href} aria-label={label}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      disabled={disabled}
+      className="disabled:cursor-not-allowed"
+    >
+      {content}
+    </button>
+  );
+};
 
 const formatDate = (value?: string | null) => {
   if (!value) return "—";
@@ -69,14 +116,109 @@ const statusFilterOptions: EmployeeStatus[] = [
 ];
 
 export default function EmployeeManagementPage() {
+  const utils = trpc.useUtils();
   const dashboardQuery = trpc.hrEmployees.dashboard.useQuery();
   const employeeDirectory = dashboardQuery.data?.directory ?? [];
   const pendingApprovals = dashboardQuery.data?.pendingApprovals ?? [];
+  const viewerRole = dashboardQuery.data?.viewerRole ?? "EMPLOYEE";
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState<"all" | EmployeeStatus>(
-    "all"
-  );
+  const [statusFilter, setStatusFilter] = useState<"all" | EmployeeStatus>("all");
+  const [actionAlert, setActionAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [pendingAction, setPendingAction] = useState<{
+    id: string;
+    type: "approve" | "reject" | "delete";
+  } | null>(null);
+
+  const canDeleteEmployees = ["SUPER_ADMIN", "ORG_ADMIN", "MANAGER"].includes(viewerRole);
+
+  useEffect(() => {
+    if (!actionAlert) {
+      return;
+    }
+    const timer = window.setTimeout(() => setActionAlert(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [actionAlert]);
+
+  const approveMutation = trpc.hrEmployees.approveSignup.useMutation({
+    onSettled: () => setPendingAction(null),
+  });
+  const rejectMutation = trpc.hrEmployees.rejectSignup.useMutation({
+    onSettled: () => setPendingAction(null),
+  });
+  const deleteMutation = trpc.hrEmployees.deleteEmployee.useMutation({
+    onSettled: () => setPendingAction(null),
+  });
+
+  const isProcessingAction = (type: "approve" | "reject" | "delete", id: string) =>
+    pendingAction?.type === type && pendingAction?.id === id;
+
+  const handleApprove = (employeeId: string, name: string) => {
+    setPendingAction({ id: employeeId, type: "approve" });
+    approveMutation.mutate(
+      { employeeId },
+      {
+        onSuccess: () => {
+          void utils.hrEmployees.dashboard.invalidate();
+          setActionAlert({ type: "success", message: `${name} has been approved.` });
+        },
+        onError: (error) => {
+          setActionAlert({ type: "error", message: error.message });
+        },
+      },
+    );
+  };
+
+  const handleReject = (employeeId: string, name: string) => {
+    setPendingAction({ id: employeeId, type: "reject" });
+    rejectMutation.mutate(
+      { employeeId },
+      {
+        onSuccess: () => {
+          void utils.hrEmployees.dashboard.invalidate();
+          setActionAlert({ type: "success", message: `${name} has been rejected.` });
+        },
+        onError: (error) => {
+          setActionAlert({ type: "error", message: error.message });
+        },
+      },
+    );
+  };
+
+  const handleDeleteEmployee = (employeeId: string, name: string) => {
+    if (!canDeleteEmployees) {
+      setActionAlert({
+        type: "error",
+        message: "You do not have permission to delete employee records.",
+      });
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${name}? This action cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    setPendingAction({ id: employeeId, type: "delete" });
+    deleteMutation.mutate(
+      { employeeId },
+      {
+        onSuccess: () => {
+          void utils.hrEmployees.dashboard.invalidate();
+          setActionAlert({ type: "success", message: `${name} has been deleted.` });
+        },
+        onError: (error) => {
+          setActionAlert({ type: "error", message: error.message });
+        },
+      },
+    );
+  };
 
   const filteredDirectory = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -198,6 +340,18 @@ export default function EmployeeManagementPage() {
 
   return (
     <div className="space-y-8">
+      {actionAlert ? (
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            actionAlert.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200"
+              : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200"
+          }`}
+        >
+          {actionAlert.message}
+        </div>
+      ) : null}
+
       <section className="rounded-[32px] border border-white/60 bg-white/95 p-8 shadow-xl shadow-indigo-100 transition dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-4">
@@ -347,9 +501,6 @@ export default function EmployeeManagementPage() {
                             <p className="font-semibold text-slate-900 dark:text-white">
                               {employee.name}
                             </p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                              {employee.email}
-                            </p>
                           </div>
                         </div>
                       </td>
@@ -385,23 +536,28 @@ export default function EmployeeManagementPage() {
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex flex-wrap justify-end gap-2">
-                          <Button
+                          <IconActionButton
+                            label={`View ${employee.name}`}
+                            icon={FiEye}
                             href={`/hr-admin/employees/view/${encodeURIComponent(
-                              employee.id
+                              employee.id,
                             )}`}
-                            theme="white"
-                            className="px-4 py-2 text-xs"
-                          >
-                            View
-                          </Button>
-                          <Button
+                          />
+                          <IconActionButton
+                            label={`Edit ${employee.name}`}
+                            icon={FiEdit2}
                             href={`/hr-admin/employees/edit/${encodeURIComponent(
-                              employee.id
+                              employee.id,
                             )}`}
-                            className="px-4 py-2 text-xs"
-                          >
-                            Edit
-                          </Button>
+                          />
+                          {canDeleteEmployees ? (
+                            <IconActionButton
+                              label={`Delete ${employee.name}`}
+                              icon={FiTrash2}
+                              onClick={() => handleDeleteEmployee(employee.id, employee.name)}
+                              disabled={isProcessingAction("delete", employee.id)}
+                            />
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -579,90 +735,111 @@ export default function EmployeeManagementPage() {
         </div>
 
         <div className="mt-6 grid gap-4">
-          {pendingApprovals.map((request) => {
-            const approvalStatusClass =
-              pendingApprovalStatusStyles[request.status] ??
-              pendingApprovalStatusStyles["Awaiting Review"];
-            return (
-              <div
-                key={request.id}
-                className="grid gap-4 rounded-[28px] border border-slate-100 p-5 text-sm shadow-sm shadow-white/40 transition hover:border-slate-200 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-200"
-              >
-                <div className="flex flex-wrap items-center gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      {request.id}
-                    </p>
-                    <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                      {request.name}
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${approvalStatusClass}`}
-                  >
-                    {request.status}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800/70 dark:text-slate-300">
-                    {request.channel}
-                  </span>
-                  <p className="ml-auto text-xs text-slate-500 dark:text-slate-400">
-                    {formatRelativeTime(request.requestedAt)}
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-slate-400">
-                      Role
-                    </p>
-                    <p className="font-semibold text-slate-900 dark:text-white">
-                      {request.role}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-slate-400">
-                      Department
-                    </p>
-                    <p className="font-semibold text-slate-900 dark:text-white">
-                      {request.department ?? "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-slate-400">
-                      Experience
-                    </p>
-                    <p className="font-semibold text-slate-900 dark:text-white">
-                      {request.experience}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-slate-400">
-                      Email
-                    </p>
-                    <p className="font-mono text-sm text-slate-700 dark:text-slate-200">
-                      {request.email}
-                    </p>
-                  </div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {request.note}
-                  </p>
-                  <div className="flex gap-2">
-                    <Button theme="secondary" className="px-4 py-2 text-xs">
-                      Request update
-                    </Button>
-                    <Button className="px-4 py-2 text-xs">Approve</Button>
-                    <Button
-                      theme="cancel-secondary"
-                      className="px-4 py-2 text-xs"
+          {pendingApprovals.length === 0 ? (
+            <p className="rounded-3xl border border-dashed border-slate-200 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700/70 dark:text-slate-400">
+              No pending signup requests right now.
+            </p>
+          ) : (
+            pendingApprovals.map((request) => {
+              const approvalStatusClass =
+                pendingApprovalStatusStyles[request.status] ??
+                pendingApprovalStatusStyles["Awaiting Review"];
+              const isApproving = isProcessingAction("approve", request.id);
+              const isRejecting = isProcessingAction("reject", request.id);
+
+              return (
+                <div
+                  key={request.id}
+                  className="grid gap-4 rounded-[28px] border border-slate-100 p-5 text-sm shadow-sm shadow-white/40 transition hover:border-slate-200 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-200"
+                >
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        {request.id}
+                      </p>
+                      <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                        {request.name}
+                      </p>
+                    </div>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${approvalStatusClass}`}
                     >
-                      Reject
-                    </Button>
+                      {request.status}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800/70 dark:text-slate-300">
+                      {request.channel}
+                    </span>
+                    <p className="ml-auto text-xs text-slate-500 dark:text-slate-400">
+                      {formatRelativeTime(request.requestedAt)}
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-slate-400">
+                        Role
+                      </p>
+                      <p className="font-semibold text-slate-900 dark:text-white">
+                        {request.role}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-slate-400">
+                        Department
+                      </p>
+                      <p className="font-semibold text-slate-900 dark:text-white">
+                        {request.department ?? "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-slate-400">
+                        Experience
+                      </p>
+                      <p className="font-semibold text-slate-900 dark:text-white">
+                        {request.experience}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-slate-400">
+                        Email
+                      </p>
+                      <p className="font-mono text-sm text-slate-700 dark:text-slate-200">
+                        {request.email}
+                      </p>
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      {request.note}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        theme="white"
+                        className="px-4 py-2 text-xs"
+                        href={`/hr-admin/employees/view/${encodeURIComponent(request.id)}`}
+                      >
+                        View profile
+                      </Button>
+                      <Button
+                        className="px-4 py-2 text-xs"
+                        disabled={isApproving}
+                        onClick={() => handleApprove(request.id, request.name)}
+                      >
+                        {isApproving ? "Approving..." : "Approve"}
+                      </Button>
+                      <Button
+                        theme="cancel-secondary"
+                        className="px-4 py-2 text-xs"
+                        disabled={isRejecting}
+                        onClick={() => handleReject(request.id, request.name)}
+                      >
+                        {isRejecting ? "Rejecting..." : "Reject"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </section>
     </div>

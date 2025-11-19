@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { EmploymentStatus } from "@prisma/client";
 
 import { prisma } from "@/prisma";
 import { authUserSelect } from "@/server/auth/selection";
@@ -38,6 +39,10 @@ export const nextAuthOptions: NextAuthOptions = {
         );
 
         if (!isValidPassword) {
+          return null;
+        }
+
+        if (userRecord.status === EmploymentStatus.INACTIVE) {
           return null;
         }
 

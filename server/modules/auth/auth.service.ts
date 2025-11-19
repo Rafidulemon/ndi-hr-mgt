@@ -11,8 +11,6 @@ import type { RegisterInput } from "./auth.validation";
 
 const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
 
-type PrismaClientOrTx = typeof prisma | Prisma.TransactionClient;
-
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const normalizeText = (value: string) => value.trim();
 const sanitizeUrl = (value?: string | null) => {
@@ -23,100 +21,42 @@ const sanitizeUrl = (value?: string | null) => {
   return trimmed.length ? trimmed : null;
 };
 
-const getDomainFromEmail = (email: string) => {
-  const [, domain] = email.split("@");
-  return domain ? domain.trim().toLowerCase().replace(/^www\./, "") : null;
-};
+const getOrganizationOrThrow = async (organizationId: string) => {
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { id: true, name: true },
+  });
 
-const findOrganizationForEmail = async (email: string) => {
-  const domain = getDomainFromEmail(email);
-
-  if (domain) {
-    const matchedOrganization = await prisma.organization.findFirst({
-      where: {
-        domain: {
-          equals: domain,
-          mode: "insensitive",
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-        domain: true,
-      },
+  if (!organization) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Selected organization is no longer available.",
     });
-
-    if (matchedOrganization) {
-      return matchedOrganization;
-    }
   }
 
-  const organizations = await prisma.organization.findMany({
-    orderBy: { createdAt: "asc" },
+  return organization;
+};
+
+const getDepartmentOrThrow = async (organizationId: string, departmentId: string) => {
+  const department = await prisma.department.findFirst({
+    where: {
+      id: departmentId,
+      organizationId,
+    },
     select: {
       id: true,
       name: true,
-      domain: true,
     },
-    take: 2,
   });
 
-  if (!organizations.length) {
-    throw new TRPCError({
-      code: "PRECONDITION_FAILED",
-      message: "No organization is configured for sign ups yet.",
-    });
-  }
-
-  if (domain && organizations.length > 1) {
+  if (!department) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message:
-        "We couldn't match your email domain to a workspace. Please use your company email or ask your administrator to invite you.",
+      message: "Selected department is no longer available.",
     });
   }
 
-  return organizations[0]!;
-};
-
-const findOrCreateDepartment = async (
-  client: PrismaClientOrTx,
-  organizationId: string,
-  departmentName?: string,
-) => {
-  const normalizedDepartment = departmentName?.trim();
-  if (!normalizedDepartment) {
-    return null;
-  }
-
-  const existingDepartment = await client.department.findFirst({
-    where: {
-      organizationId,
-      name: {
-        equals: normalizedDepartment,
-        mode: "insensitive",
-      },
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (existingDepartment) {
-    return existingDepartment.id;
-  }
-
-  const createdDepartment = await client.department.create({
-    data: {
-      organizationId,
-      name: normalizedDepartment,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  return createdDepartment.id;
+  return department;
 };
 
 const registerUser = async (input: RegisterInput) => {
@@ -124,19 +64,28 @@ const registerUser = async (input: RegisterInput) => {
   const firstName = normalizeText(input.firstName);
   const lastName = normalizeText(input.lastName);
   const designation = normalizeText(input.designation);
-  const departmentName = normalizeText(input.department);
   const employeeCode = normalizeText(input.employeeId);
+  const organizationId = input.organizationId?.trim?.() ?? "";
+  const departmentId = input.departmentId?.trim?.() ?? "";
   const profilePhotoUrl = sanitizeUrl(input.profilePhotoUrl);
 
-  if (!firstName || !lastName || !designation || !departmentName || !employeeCode) {
+  if (!firstName || !lastName || !designation || !employeeCode) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "All fields are required.",
     });
   }
 
+  if (!organizationId || !departmentId) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Organization and department selections are required.",
+    });
+  }
+
   try {
-    const organization = await findOrganizationForEmail(email);
+    const organization = await getOrganizationOrThrow(organizationId);
+    const department = await getDepartmentOrThrow(organization.id, departmentId);
 
     const existingUser = await prisma.user.findUnique({
       where: { email },
@@ -168,15 +117,14 @@ const registerUser = async (input: RegisterInput) => {
     const passwordHash = await bcrypt.hash(input.password, 10);
 
     const createdUser = await prisma.$transaction(async (tx) => {
-      const departmentId = await findOrCreateDepartment(tx, organization.id, departmentName);
-
       const user = await tx.user.create({
         data: {
           organizationId: organization.id,
           email,
           passwordHash,
           role: "EMPLOYEE",
-          status: EmploymentStatus.PROBATION,
+          status: EmploymentStatus.INACTIVE,
+          invitedAt: new Date(),
         },
         select: {
           id: true,
@@ -201,9 +149,9 @@ const registerUser = async (input: RegisterInput) => {
           employeeCode,
           designation,
           employmentType: EmploymentType.FULL_TIME,
-          status: EmploymentStatus.PROBATION,
+          status: EmploymentStatus.INACTIVE,
           startDate: new Date(),
-          departmentId: departmentId ?? undefined,
+          departmentId: department.id,
         },
       });
 
@@ -215,6 +163,7 @@ const registerUser = async (input: RegisterInput) => {
       email,
       organizationId: organization.id,
       organizationName: organization.name,
+      departmentName: department.name,
     };
   } catch (error) {
     if (error instanceof TRPCError) {
@@ -231,6 +180,34 @@ const registerUser = async (input: RegisterInput) => {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
       message: "Unable to create account right now.",
+    });
+  }
+};
+
+const getSignupOptions = async () => {
+  try {
+    const organizations = await prisma.organization.findMany({
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        departments: {
+          orderBy: { name: "asc" },
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return {
+      organizations,
+    };
+  } catch (error) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Unable to load signup options.",
     });
   }
 };
@@ -387,6 +364,7 @@ const isTrialExpired = async (email: string) => {
 
 export const AuthService = {
   registerUser,
+  getSignupOptions,
   sendResetPasswordLinkService,
   updateUserPassworIntoDb,
   tokenValidate,

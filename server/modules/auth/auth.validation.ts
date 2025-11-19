@@ -10,7 +10,8 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 export const registerSchema = z.object({
   employeeId: z.string().min(3, "Employee ID is required"),
-  department: z.string().min(2, "Department is required"),
+  organizationId: z.string().min(1, "Organization is required"),
+  departmentId: z.string().min(1, "Department is required"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   designation: z.string().min(2, "Designation is required"),

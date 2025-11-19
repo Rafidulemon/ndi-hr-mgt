@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
 import { trpc } from "@/trpc/client";
 
@@ -15,11 +15,13 @@ import ImageInput from "../../../components/atoms/inputs/ImageInput";
 import PasswordInput from "../../../components/atoms/inputs/PasswordInput";
 import Text from "../../../components/atoms/Text/Text";
 import TextInput from "../../../components/atoms/inputs/TextInput";
+import SelectBox from "../../../components/atoms/selectBox/SelectBox";
 
 const schema = z
   .object({
     employeeId: z.string().nonempty("Employee ID is required"),
-    department: z.string().nonempty("Employee Department is required"),
+    organizationId: z.string().nonempty("Organization is required"),
+    departmentId: z.string().nonempty("Department is required"),
     firstName: z.string().nonempty("Employee First Name is required"),
     lastName: z.string().nonempty("Employee Last Name is required"),
     designation: z.string().nonempty("Employee Designation is required"),
@@ -47,19 +49,26 @@ function SignupPage() {
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const {
     register,
     handleSubmit,
     formState: { errors },
+    watch,
+    setValue,
   } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: {
+      organizationId: "",
+      departmentId: "",
+    },
   });
+  const signupOptionsQuery = trpc.auth.signupOptions.useQuery();
   const signupMutation = trpc.auth.register.useMutation({
-    onSuccess: (data) => {
+    onSuccess: () => {
       setServerError(null);
-      setServerMessage(
-        `Account created for ${data.email}. Sign in to ${data.organizationName} to continue.`,
-      );
+      setServerMessage(null);
+      setShowSuccessModal(true);
     },
     onError: (error) => {
       setServerMessage(null);
@@ -67,6 +76,34 @@ function SignupPage() {
     },
   });
   const isSubmitting = signupMutation.isPending;
+  const selectedOrganizationId = watch("organizationId");
+  const organizations = signupOptionsQuery.data?.organizations ?? [];
+  const organizationOptions = organizations.map((organization) => ({
+    label: organization.name,
+    value: organization.id,
+  }));
+  const selectedOrganization = organizations.find(
+    (organization) => organization.id === selectedOrganizationId,
+  );
+  const departmentOptions =
+    selectedOrganization?.departments.map((department) => ({
+      label: department.name,
+      value: department.id,
+    })) ?? [];
+
+  useEffect(() => {
+    setValue("departmentId", "");
+  }, [selectedOrganizationId, setValue]);
+
+  useEffect(() => {
+    if (!showSuccessModal) {
+      return;
+    }
+    const timeout = setTimeout(() => {
+      router.push("/auth/login");
+    }, 4000);
+    return () => clearTimeout(timeout);
+  }, [showSuccessModal, router]);
 
   const handleLoginButton = () => {
     router.push("/auth/login");
@@ -81,7 +118,8 @@ function SignupPage() {
     }
     signupMutation.mutate({
       employeeId: data.employeeId,
-      department: data.department,
+      organizationId: data.organizationId,
+      departmentId: data.departmentId,
       firstName: data.firstName,
       lastName: data.lastName,
       designation: data.designation,
@@ -121,7 +159,8 @@ function SignupPage() {
   };
 
   return (
-    <AuthLayout
+    <>
+      <AuthLayout
       title="Create workspace access"
       subtitle="Let’s get your employee workspace ready."
       description="Complete the onboarding form so we can tailor your dashboard, permissions and payroll lanes automatically."
@@ -152,6 +191,12 @@ function SignupPage() {
         className="space-y-6"
         autoComplete="off"
       >
+        {signupOptionsQuery.isError ? (
+          <p className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-800 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
+            {signupOptionsQuery.error?.message ?? "Unable to load organization options right now."}
+          </p>
+        ) : null}
+
         <div className="grid gap-4 md:grid-cols-2">
           <TextInput
             label="Employee ID"
@@ -161,13 +206,33 @@ function SignupPage() {
             name="employeeId"
             error={errors.employeeId}
           />
-          <TextInput
+          <SelectBox
+            label="Organization"
+            isRequired
+            name="organizationId"
+            register={register}
+            options={organizationOptions}
+            error={errors.organizationId}
+            placeholderLabel={
+              signupOptionsQuery.isLoading ? "Loading organizations..." : "Select organization"
+            }
+            isDisabled={signupOptionsQuery.isLoading}
+          />
+          <SelectBox
             label="Department"
             isRequired
-            placeholder="Frontend"
+            name="departmentId"
             register={register}
-            name="department"
-            error={errors.department}
+            options={departmentOptions}
+            error={errors.departmentId}
+            placeholderLabel={
+              selectedOrganization
+                ? departmentOptions.length
+                  ? "Select department"
+                  : "No departments found"
+                : "Select organization first"
+            }
+            isDisabled={!selectedOrganization || signupOptionsQuery.isLoading}
           />
           <TextInput
             label="First Name"
@@ -249,7 +314,7 @@ function SignupPage() {
           type="submit"
           theme="primary"
           isWidthFull
-          disabled={isSubmitting || isUploadingImage}
+          disabled={isSubmitting || isUploadingImage || signupOptionsQuery.isLoading}
         >
           <Text
             text={
@@ -263,7 +328,22 @@ function SignupPage() {
           />
         </Button>
       </form>
-    </AuthLayout>
+      </AuthLayout>
+      {showSuccessModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4">
+          <div className="w-full max-w-md space-y-4 rounded-3xl border border-white/20 bg-white p-8 text-center shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <Text text="Signup request submitted" className="text-2xl font-semibold text-text_primary" />
+            <p className="text-sm text-text_secondary">
+              Your signup request has been submitted. After confirmation you will get email. Please
+              wait.
+            </p>
+            <Button theme="primary" isWidthFull onClick={() => router.push("/auth/login")}>
+              <Text text="Go to login" className="font-semibold" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 

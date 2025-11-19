@@ -43,4 +43,19 @@ export const hrEmployeesRouter = createTRPCRouter({
   update: protectedProcedure
     .input(updateEmployeeInput)
     .mutation(({ ctx, input }) => hrEmployeesController.update({ ctx, input })),
+  approveSignup: protectedProcedure
+    .input(employeeIdParam)
+    .mutation(({ ctx, input }) =>
+      hrEmployeesController.approveSignup({ ctx, employeeId: input.employeeId }),
+    ),
+  rejectSignup: protectedProcedure
+    .input(employeeIdParam)
+    .mutation(({ ctx, input }) =>
+      hrEmployeesController.rejectSignup({ ctx, employeeId: input.employeeId }),
+    ),
+  deleteEmployee: protectedProcedure
+    .input(employeeIdParam)
+    .mutation(({ ctx, input }) =>
+      hrEmployeesController.delete({ ctx, employeeId: input.employeeId }),
+    ),
 });

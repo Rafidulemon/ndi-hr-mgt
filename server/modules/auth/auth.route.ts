@@ -4,6 +4,10 @@ import { AuthController } from "./auth.controller";
 import { AuthZodSchema } from "./auth.validation";
 
 export const AuthRouter = router({
+  signupOptions: procedure.query(() => {
+    return AuthController.getSignupOptionsHandler();
+  }),
+
   register: procedure
     .input(AuthZodSchema.userRegistrationParams)
     .mutation(({ input }) => {

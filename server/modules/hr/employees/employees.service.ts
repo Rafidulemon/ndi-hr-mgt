@@ -1,4 +1,4 @@
-import { EmploymentStatus, EmploymentType, Prisma, WorkModel } from "@prisma/client";
+import { EmploymentStatus, EmploymentType, Prisma, UserRole, WorkModel } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import type { TRPCContext } from "@/server/api/trpc";
@@ -16,6 +16,10 @@ import type {
 } from "@/types/hr-admin";
 
 import { requireHrAdmin } from "@/server/modules/hr/utils";
+
+type PrismaTransaction = Prisma.TransactionClient;
+
+const privilegedDeletionRoles: UserRole[] = ["SUPER_ADMIN", "ORG_ADMIN", "MANAGER"];
 
 const employmentStatusToDirectoryStatus: Record<
   EmploymentStatus,
@@ -483,6 +487,47 @@ const mapEmployeeForm = (record: EmployeeDetailRecord): HrEmployeeForm => {
   };
 };
 
+const deleteUserCascade = async (tx: PrismaTransaction, userId: string) => {
+  await tx.department.updateMany({
+    where: { headId: userId },
+    data: { headId: null },
+  });
+
+  await tx.team.updateMany({
+    where: { leadId: userId },
+    data: { leadId: null },
+  });
+
+  await tx.organization.updateMany({
+    where: { orgAdminId: userId },
+    data: { orgAdminId: null },
+  });
+
+  await tx.organization.updateMany({
+    where: { managerId: userId },
+    data: { managerId: null },
+  });
+
+  await tx.notification.updateMany({
+    where: { senderId: userId },
+    data: { senderId: null },
+  });
+
+  await tx.emergencyContact.deleteMany({ where: { userId } });
+  await tx.employeeBankAccount.deleteMany({ where: { userId } });
+  await tx.attendanceRecord.deleteMany({ where: { employeeId: userId } });
+  await tx.leaveRequest.deleteMany({
+    where: {
+      OR: [{ employeeId: userId }, { reviewerId: userId }],
+    },
+  });
+  await tx.employeeProfile.deleteMany({ where: { userId } });
+  await tx.employmentDetail.deleteMany({ where: { userId } });
+  await tx.session.deleteMany({ where: { userId } });
+  await tx.passwordResetToken.deleteMany({ where: { userId } });
+  await tx.user.delete({ where: { id: userId } });
+};
+
 export const hrEmployeesService = {
   async getDashboard(ctx: TRPCContext): Promise<HrEmployeeDashboardResponse> {
     const user = requireHrAdmin(ctx);
@@ -500,6 +545,7 @@ export const hrEmployeesService = {
       ctx.prisma.user.findMany({
         where: {
           organizationId: user.organizationId,
+          status: EmploymentStatus.INACTIVE,
           invitedAt: {
             not: null,
           },
@@ -513,6 +559,7 @@ export const hrEmployeesService = {
     ]);
 
     return {
+      viewerRole: user.role as UserRole,
       directory: employees.map(mapEmployeeRecord),
       pendingApprovals: pendingApprovals.map(mapPendingRecord),
     };
@@ -687,5 +734,125 @@ export const hrEmployeesService = {
     });
 
     return this.getEmployeeForm(ctx, input.employeeId);
+  },
+
+  async approvePendingEmployee(ctx: TRPCContext, employeeId: string) {
+    const sessionUser = requireHrAdmin(ctx);
+    const employee = await ctx.prisma.user.findFirst({
+      where: {
+        id: employeeId,
+        ...(sessionUser.role === "SUPER_ADMIN"
+          ? {}
+          : { organizationId: sessionUser.organizationId }),
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (!employee) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
+    }
+
+    if (employee.status !== EmploymentStatus.INACTIVE) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Only pending signups can be approved.",
+      });
+    }
+
+    await ctx.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: employeeId },
+        data: {
+          status: EmploymentStatus.ACTIVE,
+          invitedAt: null,
+        },
+      });
+
+      await tx.employmentDetail.updateMany({
+        where: { userId: employeeId },
+        data: {
+          status: EmploymentStatus.ACTIVE,
+        },
+      });
+    });
+
+    return { message: "Signup request approved." };
+  },
+
+  async rejectPendingEmployee(ctx: TRPCContext, employeeId: string) {
+    const sessionUser = requireHrAdmin(ctx);
+    const employee = await ctx.prisma.user.findFirst({
+      where: {
+        id: employeeId,
+        ...(sessionUser.role === "SUPER_ADMIN"
+          ? {}
+          : { organizationId: sessionUser.organizationId }),
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (!employee) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
+    }
+
+    if (employee.status !== EmploymentStatus.INACTIVE) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Only pending signups can be rejected.",
+      });
+    }
+
+    await ctx.prisma.$transaction(async (tx) => {
+      await deleteUserCascade(tx, employeeId);
+    });
+
+    return { message: "Signup request rejected." };
+  },
+
+  async deleteEmployee(ctx: TRPCContext, employeeId: string) {
+    const sessionUser = requireHrAdmin(ctx);
+    const viewerRole = sessionUser.role as UserRole;
+
+    if (!privilegedDeletionRoles.includes(viewerRole)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You are not allowed to delete employee accounts.",
+      });
+    }
+
+    if (sessionUser.id === employeeId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "You cannot delete your own account.",
+      });
+    }
+
+    const employee = await ctx.prisma.user.findFirst({
+      where: {
+        id: employeeId,
+        ...(viewerRole === "SUPER_ADMIN"
+          ? {}
+          : { organizationId: sessionUser.organizationId }),
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!employee) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
+    }
+
+    await ctx.prisma.$transaction(async (tx) => {
+      await deleteUserCascade(tx, employeeId);
+    });
+
+    return { message: "Employee deleted." };
   },
 };

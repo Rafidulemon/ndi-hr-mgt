@@ -10,4 +10,10 @@ export const hrEmployeesController = {
     hrEmployeesService.getEmployeeForm(ctx, employeeId),
   update: ({ ctx, input }: { ctx: TRPCContext; input: HrEmployeeUpdateInput }) =>
     hrEmployeesService.updateEmployee(ctx, input),
+  approveSignup: ({ ctx, employeeId }: { ctx: TRPCContext; employeeId: string }) =>
+    hrEmployeesService.approvePendingEmployee(ctx, employeeId),
+  rejectSignup: ({ ctx, employeeId }: { ctx: TRPCContext; employeeId: string }) =>
+    hrEmployeesService.rejectPendingEmployee(ctx, employeeId),
+  delete: ({ ctx, employeeId }: { ctx: TRPCContext; employeeId: string }) =>
+    hrEmployeesService.deleteEmployee(ctx, employeeId),
 };

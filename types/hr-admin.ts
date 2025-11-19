@@ -37,9 +37,12 @@ export type PendingApproval = {
   status: PendingApprovalStatus;
 };
 
+import type { UserRole } from "@prisma/client";
+
 export type HrEmployeeDashboardResponse = {
   directory: EmployeeDirectoryEntry[];
   pendingApprovals: PendingApproval[];
+  viewerRole: UserRole;
 };
 
 export type HrEmployeeDocument = {
