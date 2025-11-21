@@ -45,10 +45,14 @@ const leaveApplicationSchema = z
 
 type FormData = z.infer<typeof leaveApplicationSchema>;
 
-type AttachmentPreview = {
+type UploadedAttachment = {
   id: string;
-  file: File;
-  dataUrl: string;
+  name: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  storageKey: string;
+  downloadUrl: string;
+  uploadedAt: string;
 };
 
 const MAX_ATTACHMENTS = 3;
@@ -59,31 +63,6 @@ const helperSteps = [
   "Attach supporting documents (medical slips, approvals) if needed.",
   "Preview the generated letter and export it as PDF for your records.",
 ];
-
-const formatReadableDate = (value?: Date | string | null) => {
-  if (!value) return "";
-  const parsed = typeof value === "string" ? new Date(value) : value;
-  if (Number.isNaN(parsed.getTime())) return "";
-  return parsed.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-};
-
-const generateLocalId = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-const fileToDataUrl = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () =>
-      reject(new Error("Unable to read the selected attachment. Please try again."));
-    reader.readAsDataURL(file);
-  });
 
 const calculateInclusiveDays = (start?: Date | string | null, end?: Date | string | null) => {
   if (!start || !end) return 0;
@@ -99,6 +78,14 @@ const calculateInclusiveDays = (start?: Date | string | null, end?: Date | strin
   const diffMs = normalizedEnd.getTime() - normalizedStart.getTime();
   const dayMs = 1000 * 60 * 60 * 24;
   return Math.floor(diffMs / dayMs) + 1;
+};
+
+const formatFileSize = (bytes?: number | null) => {
+  if (!bytes || bytes <= 0) return "—";
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${(bytes / 1024).toFixed(1)} KB`;
 };
 
 export default function LeaveApplicationPage() {
@@ -118,8 +105,10 @@ export default function LeaveApplicationPage() {
   const formattedDate = today.toLocaleDateString("en-GB");
 
   const [isFormSubmitted, setIsFormSubmitted] = useState(false);
-  const [attachments, setAttachments] = useState<AttachmentPreview[]>([]);
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [attachmentRequirementError, setAttachmentRequirementError] = useState<string | null>(null);
+  const [pendingUploads, setPendingUploads] = useState(0);
   const [formMessage, setFormMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -189,13 +178,6 @@ export default function LeaveApplicationPage() {
     return isProfileLoading ? "Loading..." : "—";
   };
 
-  const joiningDateDisplay = profileData?.employment?.startDate
-    ? formatReadableDate(profileData.employment.startDate)
-    : "";
-  const headerJoiningDate = joiningDateDisplay || valueOrFallback("");
-  const headerName = valueOrFallback(userData.name);
-  const headerDesignation = valueOrFallback(userData.designation);
-
   const highlightCards = [
     {
       label: "Department",
@@ -238,8 +220,23 @@ export default function LeaveApplicationPage() {
     : false;
   const quotaBlocked = hasNoBalance || exceedsBalance;
   const requestIsValid = requestedDays > 0;
+  const requiresMedicalAttachment = selectedLeaveType === "SICK";
+  const missingRequiredAttachment = requiresMedicalAttachment && attachments.length === 0;
   const submitDisabled =
-    leaveMutation.isPending || quotaBlocked || !requestIsValid || summaryQuery.isLoading;
+    leaveMutation.isPending ||
+    quotaBlocked ||
+    !requestIsValid ||
+    summaryQuery.isLoading ||
+    pendingUploads > 0 ||
+    missingRequiredAttachment;
+
+  useEffect(() => {
+    if (requiresMedicalAttachment && attachments.length === 0) {
+      setAttachmentRequirementError("Sick leave requests must include at least one supporting document.");
+    } else {
+      setAttachmentRequirementError(null);
+    }
+  }, [requiresMedicalAttachment, attachments.length]);
   const quotaMessage = summaryQuery.isLoading
     ? "Checking available days..."
     : summaryQuery.error
@@ -258,13 +255,44 @@ export default function LeaveApplicationPage() {
                 selectedBalance.remaining === 1 ? "" : "s"
               } available.`;
 
+  const uploadLeaveAttachment = async (file: File): Promise<UploadedAttachment> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/leave/attachments", {
+      method: "POST",
+      body: formData,
+    });
+
+    const payload = (await response.json().catch(() => ({}))) as {
+      attachment?: UploadedAttachment;
+      message?: string;
+    };
+
+    if (!response.ok || !payload.attachment) {
+      throw new Error(payload?.message || "Unable to upload the attachment.");
+    }
+
+    return payload.attachment;
+  };
+
+  const deleteLeaveAttachment = async (storageKey: string) => {
+    await fetch("/api/leave/attachments", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: storageKey }),
+    }).catch(() => {
+      // Deletion failures are non-blocking; orphan files can be cleaned up separately.
+    });
+  };
+
   const handleAttachmentChange = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const files = Array.from(event.target.files ?? []);
     if (!files.length) return;
 
-    const availableSlots = MAX_ATTACHMENTS - attachments.length;
+    const availableSlots = MAX_ATTACHMENTS - attachments.length - pendingUploads;
     if (availableSlots <= 0) {
       setAttachmentError(`You can attach up to ${MAX_ATTACHMENTS} files.`);
       event.target.value = "";
@@ -272,7 +300,6 @@ export default function LeaveApplicationPage() {
     }
 
     const filesToProcess = files.slice(0, availableSlots);
-    const processed: AttachmentPreview[] = [];
 
     for (const file of filesToProcess) {
       if (file.size > MAX_ATTACHMENT_SIZE) {
@@ -280,29 +307,33 @@ export default function LeaveApplicationPage() {
         continue;
       }
 
+      setPendingUploads((prev) => prev + 1);
       try {
-        const dataUrl = await fileToDataUrl(file);
-        processed.push({
-          id: generateLocalId(),
-          file,
-          dataUrl,
-        });
+        const uploaded = await uploadLeaveAttachment(file);
+        setAttachments((prev) => [...prev, uploaded]);
+        setAttachmentError(null);
       } catch (error) {
         setAttachmentError(
-          error instanceof Error ? error.message : "Failed to read the file.",
+          error instanceof Error ? error.message : "Failed to upload the attachment.",
         );
+      } finally {
+        setPendingUploads((prev) => Math.max(0, prev - 1));
       }
     }
 
-    setAttachments((prev) => [...prev, ...processed]);
-    if (processed.length > 0) {
-      setAttachmentError(null);
-    }
     event.target.value = "";
   };
 
-  const removeAttachment = (id: string) =>
-    setAttachments((prev) => prev.filter((attachment) => attachment.id !== id));
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => {
+      const next = prev.filter((attachment) => attachment.id !== id);
+      const removed = prev.find((attachment) => attachment.id === id);
+      if (removed) {
+        void deleteLeaveAttachment(removed.storageKey);
+      }
+      return next;
+    });
+  };
 
   const onSubmit = async (data: FormData) => {
     setFormMessage(null);
@@ -351,6 +382,16 @@ export default function LeaveApplicationPage() {
       return;
     }
 
+    if (pendingUploads > 0) {
+      setAttachmentError("Please wait while your attachments finish uploading.");
+      return;
+    }
+
+    if (missingRequiredAttachment) {
+      setAttachmentRequirementError("Supporting documentation is required for sick leave.");
+      return;
+    }
+
     try {
       await leaveMutation.mutateAsync({
         leaveType: requestedType,
@@ -360,10 +401,11 @@ export default function LeaveApplicationPage() {
         endDate: data.endDate,
         attachments: attachments.length
           ? attachments.map((attachment) => ({
-              name: attachment.file.name,
-              type: attachment.file.type,
-              size: attachment.file.size,
-              content: attachment.dataUrl,
+              id: attachment.id,
+              name: attachment.name,
+              type: attachment.mimeType ?? undefined,
+              size: attachment.sizeBytes ?? undefined,
+              storageKey: attachment.storageKey,
             }))
           : undefined,
       });
@@ -380,12 +422,14 @@ export default function LeaveApplicationPage() {
         date: new Date().toLocaleDateString("en-GB"),
       }));
       setIsFormSubmitted(true);
-      setAttachments([]);
       setFormMessage({
         type: "success",
-        text: "Leave application submitted successfully.",
+        text: "Leave application submitted successfully. Redirecting you to history...",
       });
       await utils.leave.summary.invalidate();
+      setTimeout(() => {
+        router.push("/leave");
+      }, 1500);
     } catch (error) {
       setFormMessage({
         type: "error",
@@ -590,10 +634,12 @@ export default function LeaveApplicationPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        Attachments (optional)
+                        Attachments{" "}
+                        {requiresMedicalAttachment ? "(required for sick leave)" : "(optional)"}
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Upload PDFs or images. Max {MAX_ATTACHMENTS} files, 5 MB each.
+                        Upload PDFs or images. Max {MAX_ATTACHMENTS} files, 5 MB each. Files are
+                        stored securely in R2.
                       </p>
                     </div>
                     <label className="cursor-pointer rounded-full border border-slate-200 px-4 py-1 text-xs font-semibold text-slate-600 transition-colors duration-200 hover:border-primary_dark/40 hover:text-primary_dark dark:border-slate-600 dark:text-slate-200 dark:hover:border-sky-500/60 dark:hover:text-sky-300">
@@ -610,20 +656,41 @@ export default function LeaveApplicationPage() {
                   {attachmentError && (
                     <p className="text-xs text-rose-500 dark:text-rose-300">{attachmentError}</p>
                   )}
+                  {attachmentRequirementError && (
+                    <p className="text-xs text-amber-600 dark:text-amber-300">
+                      {attachmentRequirementError}
+                    </p>
+                  )}
+                  {pendingUploads > 0 && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Uploading {pendingUploads} file{pendingUploads === 1 ? "" : "s"} to secure
+                      storage...
+                    </p>
+                  )}
                   {attachments.length > 0 && (
                     <ul className="space-y-2">
                       {attachments.map((attachment) => (
                         <li
                           key={attachment.id}
-                          className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600 transition-colors duration-200 dark:bg-slate-900/70 dark:text-slate-300"
+                          className="flex flex-col gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600 transition-colors duration-200 dark:bg-slate-900/70 dark:text-slate-300 md:flex-row md:items-center md:justify-between"
                         >
                           <div>
                             <p className="font-semibold text-slate-800 dark:text-slate-100">
-                              {attachment.file.name}
+                              {attachment.name}
                             </p>
                             <p className="text-xs text-slate-500 dark:text-slate-400">
-                              {(attachment.file.size / 1024).toFixed(1)} KB
+                              {formatFileSize(attachment.sizeBytes)}
                             </p>
+                            {attachment.downloadUrl ? (
+                              <a
+                                href={attachment.downloadUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs font-semibold text-primary_dark underline-offset-4 hover:underline dark:text-sky-300"
+                              >
+                                Open secure copy
+                              </a>
+                            ) : null}
                           </div>
                           <button
                             type="button"
@@ -701,7 +768,14 @@ export default function LeaveApplicationPage() {
                     id="application-preview"
                     className="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
                   >
-                    <ApplicationPreview userData={userData} />
+                    <ApplicationPreview
+                      userData={userData}
+                      attachments={attachments.map((attachment) => ({
+                        id: attachment.id,
+                        name: attachment.name,
+                        downloadUrl: attachment.downloadUrl,
+                      }))}
+                    />
                   </div>
                   <div className="flex flex-wrap gap-3">
                     <Button

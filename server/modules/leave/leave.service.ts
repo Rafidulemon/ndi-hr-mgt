@@ -4,7 +4,7 @@ import { LeaveStatus, LeaveType, Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import type { TRPCContext } from "@/server/api/trpc";
-import { leaveTypeLabelMap, type LeaveTypeValue } from "@/lib/leave-types";
+import { leaveTypeLabelMap } from "@/lib/leave-types";
 import {
   buildBalanceResponse,
   decimalToNumber,
@@ -14,7 +14,6 @@ import {
   toLeaveTypeValue,
   type EmploymentLeaveBalances,
   type LeaveAttachmentResponse,
-  type LeaveBalanceResponse,
   type StoredAttachment,
 } from "./leave.shared";
 import type {
@@ -82,14 +81,23 @@ const serializeLeaveRequest = (record: {
 });
 
 const toStoredAttachments = (attachments?: LeaveAttachmentInput[]) =>
-  attachments?.map<StoredAttachment>((attachment) => ({
-    id: randomUUID(),
-    name: attachment.name,
-    mimeType: attachment.type ?? null,
-    sizeBytes: attachment.size ?? null,
-    dataUrl: attachment.content,
-    uploadedAt: new Date().toISOString(),
-  }));
+  attachments?.map<StoredAttachment>((attachment) => {
+    if (!attachment.storageKey) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Attachment reference missing.",
+      });
+    }
+    return {
+      id: attachment.id ?? randomUUID(),
+      name: attachment.name,
+      mimeType: attachment.type ?? null,
+      sizeBytes: attachment.size ?? null,
+      storageKey: attachment.storageKey,
+      dataUrl: null,
+      uploadedAt: new Date().toISOString(),
+    };
+  });
 
 export const leaveService = {
   async summary(ctx: TRPCContext, input?: LeaveSummaryInput) {

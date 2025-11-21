@@ -16,9 +16,14 @@ interface ApplicationPreviewProps {
     date: string;
     organization: string;
   };
+  attachments?: {
+    id: string;
+    name: string;
+    downloadUrl?: string | null;
+  }[];
 }
 
-function ApplicationPreview({ userData }: ApplicationPreviewProps) {
+function ApplicationPreview({ userData, attachments }: ApplicationPreviewProps) {
   return (
     <div className="bg-white shadow-lg px-6 py-8 w-full max-w-3xl mx-auto">
       <Text
@@ -90,6 +95,33 @@ function ApplicationPreview({ userData }: ApplicationPreviewProps) {
           </div>
           <Text text={`${userData.organization}`} />
         </div>
+
+        {attachments && attachments.length > 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3">
+            <Text
+              text="Supporting documents"
+              className="text-sm font-semibold text-slate-800"
+            />
+            <ul className="mt-2 space-y-1 text-sm text-slate-600">
+              {attachments.map((attachment) => (
+                <li key={attachment.id}>
+                  {attachment.downloadUrl ? (
+                    <a
+                      href={attachment.downloadUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-semibold text-primary_dark underline-offset-4 hover:underline dark:text-sky-400"
+                    >
+                      {attachment.name}
+                    </a>
+                  ) : (
+                    <span>{attachment.name}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     </div>
   );

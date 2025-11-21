@@ -1,8 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { EmploymentType, Gender, WorkModel } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 import type { TRPCContext } from "@/server/api/trpc";
-import type { UpdateProfileInput } from "./user.validation";
+import type { UpdateProfileInput, UpdatePasswordInput } from "./user.validation";
 
 export type UserProfileResponse = {
   id: string;
@@ -349,5 +350,46 @@ export const userService = {
     });
 
     return this.getProfile(ctx);
+  },
+
+  async updatePassword(ctx: TRPCContext, input: UpdatePasswordInput) {
+    if (!ctx.session) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    const user = await ctx.prisma.user.findUnique({
+      where: { id: ctx.session.user.id },
+      select: { passwordHash: true },
+    });
+
+    if (!user?.passwordHash) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "User account not found.",
+      });
+    }
+
+    const isCurrentValid = await bcrypt.compare(input.currentPassword, user.passwordHash);
+    if (!isCurrentValid) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Current password is incorrect.",
+      });
+    }
+
+    if (input.currentPassword === input.newPassword) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "New password must be different from the current password.",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(input.newPassword, 10);
+    await ctx.prisma.user.update({
+      where: { id: ctx.session.user.id },
+      data: { passwordHash: hashedPassword },
+    });
+
+    return { message: "Password updated successfully." };
   },
 };

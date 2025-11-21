@@ -3,6 +3,9 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 import Button from "../../components/atoms/buttons/Button";
 import PasswordInput from "../../components/atoms/inputs/PasswordInput";
@@ -38,10 +41,38 @@ const calculateExperience = (start?: Date | string | null) => {
   return years < 1 ? "< 1 yr" : `${years} yr${years > 1 ? "s" : ""}`;
 };
 
+const passwordSchema = z
+  .object({
+    currentPassword: z.string().min(1, { message: "Current password is required." }),
+    newPassword: z.string().min(8, { message: "New password must be at least 8 characters." }),
+    confirmPassword: z.string().min(1, { message: "Please confirm your new password." }),
+  })
+  .refine((values) => values.newPassword === values.confirmPassword, {
+    message: "New passwords do not match.",
+    path: ["confirmPassword"],
+  });
+
+type PasswordFormValues = z.infer<typeof passwordSchema>;
+
 function ProfilePage() {
   const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const { data, isLoading, error } = trpc.user.profile.useQuery();
+  const passwordMutation = trpc.user.updatePassword.useMutation();
+  const {
+    register: passwordRegister,
+    handleSubmit: handlePasswordSubmit,
+    reset: resetPasswordForm,
+    formState: { errors: passwordErrors },
+  } = useForm<PasswordFormValues>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
 
   const infoSections = useMemo(() => {
     if (!data) {
@@ -138,6 +169,36 @@ function ProfilePage() {
       },
     ];
   }, [data]);
+
+  const handlePasswordModalClose = () => {
+    setIsModalOpen(false);
+    setPasswordMessage(null);
+    resetPasswordForm();
+    passwordMutation.reset();
+  };
+
+  const onPasswordSubmit = handlePasswordSubmit(async (values) => {
+    setPasswordMessage(null);
+    try {
+      await passwordMutation.mutateAsync({
+        currentPassword: values.currentPassword,
+        newPassword: values.newPassword,
+      });
+      setPasswordMessage({
+        type: "success",
+        text: "Password updated successfully.",
+      });
+      resetPasswordForm();
+    } catch (mutationError) {
+      setPasswordMessage({
+        type: "error",
+        text:
+          mutationError instanceof Error
+            ? mutationError.message
+            : "Unable to update password right now.",
+      });
+    }
+  });
 
   if (isLoading) {
     return (
@@ -259,21 +320,57 @@ function ProfilePage() {
         title="Change Password"
         open={isModalOpen}
         setOpen={setIsModalOpen}
-        isDoneButton
-        doneButtonText="Save"
-        isCancelButton
-        cancelButtonText="Cancel"
-        buttonWidth="140px"
-        buttonHeight="44px"
-        onDoneClick={() => setIsModalOpen(false)}
-        closeOnClick={() => setIsModalOpen(false)}
-        crossOnClick={() => setIsModalOpen(false)}
+        isDoneButton={false}
+        isCancelButton={false}
+        doneButtonText=""
+        closeOnClick={handlePasswordModalClose}
+        crossOnClick={handlePasswordModalClose}
       >
-        <div className="space-y-4">
-          <PasswordInput label="Current Password" />
-          <PasswordInput label="New Password" />
-          <PasswordInput label="Confirm New Password" />
-        </div>
+        <form onSubmit={onPasswordSubmit} className="space-y-5">
+          <PasswordInput
+            label="Current Password"
+            isRequired
+            name="currentPassword"
+            register={passwordRegister}
+            error={passwordErrors.currentPassword}
+          />
+          <PasswordInput
+            label="New Password"
+            isRequired
+            name="newPassword"
+            register={passwordRegister}
+            error={passwordErrors.newPassword}
+          />
+          <PasswordInput
+            label="Confirm New Password"
+            isRequired
+            name="confirmPassword"
+            register={passwordRegister}
+            error={passwordErrors.confirmPassword}
+          />
+          {passwordMessage ? (
+            <div
+              className={`rounded-2xl border px-4 py-3 text-sm ${
+                passwordMessage.type === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100"
+                  : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-100"
+              }`}
+            >
+              {passwordMessage.text}
+            </div>
+          ) : null}
+          <div className="flex flex-wrap justify-end gap-3 pt-2">
+            <Button theme="secondary" type="button" onClick={handlePasswordModalClose}>
+              <Text text="Cancel" className="font-semibold" />
+            </Button>
+            <Button type="submit" disabled={passwordMutation.isPending}>
+              <Text
+                text={passwordMutation.isPending ? "Saving..." : "Save password"}
+                className="font-semibold"
+              />
+            </Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

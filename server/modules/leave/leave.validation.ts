@@ -3,6 +3,7 @@ import { z } from "zod";
 import { leaveTypeValues } from "@/lib/leave-types";
 
 export const leaveAttachmentSchema = z.object({
+  id: z.string().uuid().optional(),
   name: z.string().min(1).max(120),
   type: z.string().max(120).optional(),
   size: z
@@ -11,7 +12,7 @@ export const leaveAttachmentSchema = z.object({
     .min(0)
     .max(5 * 1024 * 1024, { message: "Attachments must be smaller than 5 MB." })
     .optional(),
-  content: z.string().min(1),
+  storageKey: z.string().min(1, { message: "Attachment reference is missing." }),
 });
 
 export type LeaveAttachmentInput = z.infer<typeof leaveAttachmentSchema>;
@@ -31,6 +32,13 @@ export const createLeaveApplicationSchema = z
         code: z.ZodIssueCode.custom,
         message: "End date must be on or after the start date.",
         path: ["endDate"],
+      });
+    }
+    if (data.leaveType === "SICK" && (!data.attachments || data.attachments.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Supporting documentation is required for sick leave.",
+        path: ["attachments"],
       });
     }
   });

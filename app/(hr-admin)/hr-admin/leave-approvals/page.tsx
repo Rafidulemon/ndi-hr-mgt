@@ -596,7 +596,14 @@ export default function HrAdminLeaveManagementPage() {
       >
         {selectedRequest && previewData ? (
           <div className="space-y-4">
-            <ApplicationPreview userData={previewData} />
+            <ApplicationPreview
+              userData={previewData}
+              attachments={selectedRequest.attachments.map((attachment) => ({
+                id: attachment.id,
+                name: attachment.name,
+                downloadUrl: attachment.downloadUrl ?? attachment.dataUrl ?? undefined,
+              }))}
+            />
             <div className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-600 dark:border-slate-800/70 dark:bg-slate-900/70 dark:text-slate-300">
               <p className="text-xs uppercase tracking-wide text-slate-400">
                 Remaining quota
@@ -614,7 +621,7 @@ export default function HrAdminLeaveManagementPage() {
                   {selectedRequest.attachments.map((attachment) => (
                     <li key={attachment.id}>
                       <a
-                        href={attachment.dataUrl ?? "#"}
+                        href={attachment.downloadUrl ?? attachment.dataUrl ?? "#"}
                         download={attachment.name}
                         className="text-sm font-semibold text-primary_dark hover:underline dark:text-sky-400"
                       >

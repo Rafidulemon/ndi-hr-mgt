@@ -67,6 +67,22 @@ const leaveRequestSelect = {
   },
 } as const;
 
+const leaveRequestUpdateSelect = {
+  id: true,
+  leaveType: true,
+  totalDays: true,
+  status: true,
+  employee: {
+    select: {
+      id: true,
+      organizationId: true,
+      employment: {
+        select: employmentBalanceSelect,
+      },
+    },
+  },
+} as const;
+
 type LeaveRequestWithEmployee = Prisma.LeaveRequestGetPayload<{
   select: typeof leaveRequestSelect;
 }>;
@@ -223,10 +239,10 @@ export const hrLeaveService = {
   async updateStatus(ctx: TRPCContext, input: HrLeaveUpdateStatusInput): Promise<HrLeaveRequest> {
     const sessionUser = requireHrAdmin(ctx);
 
-    const result = await ctx.prisma.$transaction(async (tx) => {
+    const updatedRequestId = await ctx.prisma.$transaction(async (tx) => {
       const existing = await tx.leaveRequest.findUnique({
         where: { id: input.requestId },
-        select: leaveRequestSelect,
+        select: leaveRequestUpdateSelect,
       });
 
       if (!existing || existing.employee.organizationId !== sessionUser.organizationId) {
@@ -267,20 +283,38 @@ export const hrLeaveService = {
         });
       }
 
+      const updateData: Prisma.LeaveRequestUpdateInput = {
+        status: input.status as LeaveStatus,
+        reviewer: {
+          connect: { id: sessionUser.id },
+        },
+        reviewedAt: new Date(),
+      };
+
+      if (typeof input.note !== "undefined") {
+        updateData.note = input.note ?? null;
+      }
+
       const updated = await tx.leaveRequest.update({
         where: { id: input.requestId },
-        data: {
-          status: input.status as LeaveStatus,
-          note: input.note ?? existing.note,
-          reviewerId: sessionUser.id,
-          reviewedAt: new Date(),
-        },
-        select: leaveRequestSelect,
+        data: updateData,
       });
 
-      return updated;
+      return updated.id;
     });
 
-    return mapLeaveRequest(result);
+    const refreshed = await ctx.prisma.leaveRequest.findUnique({
+      where: { id: updatedRequestId },
+      select: leaveRequestSelect,
+    });
+
+    if (!refreshed) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Updated leave request could not be loaded.",
+      });
+    }
+
+    return mapLeaveRequest(refreshed);
   },
 };
