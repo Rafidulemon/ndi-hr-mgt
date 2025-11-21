@@ -63,6 +63,13 @@ function ForgetPasswordPage() {
         payload = undefined;
       }
 
+      if (response.status === 404) {
+        const message =
+          payload?.message || "We couldn't find an account with that email address.";
+        window.alert(message);
+        throw new Error(message);
+      }
+
       if (!response.ok) {
         throw new Error(payload?.message || "Unable to process the request.");
       }

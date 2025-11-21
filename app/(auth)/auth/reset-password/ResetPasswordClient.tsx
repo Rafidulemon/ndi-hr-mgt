@@ -3,8 +3,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import AuthLayout from "../_components/AuthLayout";
 import Button from "../../../components/atoms/buttons/Button";
@@ -29,9 +29,13 @@ const schema = z
 
 type FormData = z.infer<typeof schema>;
 
-export function ResetPasswordClient() {
+type ResetPasswordClientProps = {
+  token: string;
+  userId: string;
+};
+
+export function ResetPasswordClient({ token, userId }: ResetPasswordClientProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [serverMessage, setServerMessage] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const {
@@ -41,11 +45,6 @@ export function ResetPasswordClient() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
-  const resetToken = useMemo(() => searchParams.get("token") ?? "", [searchParams]);
-  const tokenValidationQuery = trpc.auth.getUserRegistrationPayload.useQuery(
-    { token: resetToken },
-    { enabled: Boolean(resetToken) },
-  );
   const updatePasswordMutation = trpc.auth.updateUserPassword.useMutation({
     onSuccess: () => {
       setServerError(null);
@@ -63,13 +62,7 @@ export function ResetPasswordClient() {
   };
 
   const handleLogin = (data: FormData) => {
-    if (!resetToken) {
-      setServerError("Reset token missing. Please use the link from your email.");
-      return;
-    }
-
-    const userId = tokenValidationQuery.data?.userId;
-    if (!userId) {
+    if (!token || !userId) {
       setServerError("Reset link is invalid or has expired.");
       return;
     }
@@ -132,21 +125,6 @@ export function ResetPasswordClient() {
           <li>Include a number or symbol</li>
           <li>Avoid reusing old passwords</li>
         </ul>
-        {!resetToken ? (
-          <p className="rounded-2xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-            Missing reset token. Please open this page using the link you received in your email.
-          </p>
-        ) : null}
-        {tokenValidationQuery.isLoading ? (
-          <p className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-200">
-            Validating reset link...
-          </p>
-        ) : null}
-        {tokenValidationQuery.error ? (
-          <p className="rounded-2xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-            {tokenValidationQuery.error.message || "Reset link is invalid or has expired."}
-          </p>
-        ) : null}
         {serverError ? (
           <p className="rounded-2xl border border-rose-200 bg-rose-50/60 px-4 py-3 text-sm text-rose-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
             {serverError}
@@ -162,7 +140,7 @@ export function ResetPasswordClient() {
           type="submit"
           theme="primary"
           isWidthFull
-          disabled={!resetToken || updatePasswordMutation.isPending}
+          disabled={!token || !userId || updatePasswordMutation.isPending}
         >
           <Text
             text={updatePasswordMutation.isPending ? "Updating password..." : "Update password"}
