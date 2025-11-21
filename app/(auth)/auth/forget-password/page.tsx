@@ -10,7 +10,6 @@ import AuthLayout from "../_components/AuthLayout";
 import Button from "../../../components/atoms/buttons/Button";
 import EmailInput from "../../../components/atoms/inputs/EmailInput";
 import Text from "../../../components/atoms/Text/Text";
-import { trpc } from "@/trpc/client";
 
 const schema = z.object({
   email: z
@@ -25,6 +24,7 @@ function ForgetPasswordPage() {
   const router = useRouter();
   const [serverMessage, setServerMessage] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     handleSubmit,
@@ -32,16 +32,6 @@ function ForgetPasswordPage() {
     register,
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-  });
-  const sendLinkMutation = trpc.auth.sendUserResetPasswordLink.useMutation({
-    onSuccess: () => {
-      setServerError(null);
-      setServerMessage("If that account exists, a reset link is on the way.");
-    },
-    onError: (error) => {
-      setServerMessage(null);
-      setServerError(error.message || "Unable to process the request.");
-    },
   });
 
   const handleSignUpButton = () => {
@@ -52,10 +42,43 @@ function ForgetPasswordPage() {
     router.push("/auth/login");
   };
 
-  const handleSubmitForm = (data: FormData) => {
+  const handleSubmitForm = async (data: FormData) => {
+    setIsSubmitting(true);
     setServerMessage(null);
     setServerError(null);
-    sendLinkMutation.mutate({ email: data.email });
+
+    try {
+      const response = await fetch("/api/forget-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: data.email }),
+      });
+
+      let payload: { message?: string } | undefined;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = undefined;
+      }
+
+      if (!response.ok) {
+        throw new Error(payload?.message || "Unable to process the request.");
+      }
+
+      setServerError(null);
+      setServerMessage(
+        payload?.message || "If that account exists, a reset link is on the way.",
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to process the request.";
+      setServerMessage(null);
+      setServerError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -105,9 +128,9 @@ function ForgetPasswordPage() {
           </p>
         ) : null}
 
-        <Button type="submit" theme="primary" isWidthFull disabled={sendLinkMutation.isPending}>
+        <Button type="submit" theme="primary" isWidthFull disabled={isSubmitting}>
           <Text
-            text={sendLinkMutation.isPending ? "Sending link..." : "Send reset link"}
+            text={isSubmitting ? "Sending link..." : "Send reset link"}
             className="text-[16px] font-semibold"
           />
         </Button>
