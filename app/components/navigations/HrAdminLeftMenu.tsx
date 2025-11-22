@@ -15,6 +15,7 @@ import {
   FaCalendarCheck,
   FaClipboardList,
   FaEnvelopeOpenText,
+  FaRegClock,
   FaUser,
   FaUsers,
   FaSitemap,
@@ -29,6 +30,7 @@ type MenuItem = {
     | "dashboard"
     | "employees"
     | "teams"
+    | "work"
     | "reports"
     | "attendance"
     | "leave"
@@ -54,6 +56,8 @@ type Props = {
   viewerRole?: UserRole;
 };
 
+const RESTRICTED_MENU_IDS: ReadonlyArray<MenuItem["id"]> = ["teams", "work"];
+
 const hrMenuItems: MenuItem[] = [
   {
     id: "dashboard",
@@ -72,6 +76,12 @@ const hrMenuItems: MenuItem[] = [
     label: "Team Management",
     icon: <FaSitemap />,
     href: "/hr-admin/team-management",
+  },
+  {
+    id: "work",
+    label: "Work Management",
+    icon: <FaRegClock />,
+    href: "/hr-admin/work-management",
   },
   {
     id: "attendance",
@@ -177,7 +187,7 @@ const HrAdminLeftMenu = ({
 
   const allowedMenuItems = useMemo(() => {
     return hrMenuItems.filter((item) => {
-      if (item.id === "teams") {
+      if (RESTRICTED_MENU_IDS.includes(item.id)) {
         return canManageTeams(viewerRole);
       }
       return true;

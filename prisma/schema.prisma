@@ -108,6 +108,8 @@ model Organization {
   teams             Team[]
   projects          Project[]
   notifications     Notification[]
+  holidays          Holiday[]
+  workPolicy        WorkPolicy?
   orgAdmin          User?          @relation("OrganizationAdmin", fields: [orgAdminId], references: [id])
   manager           User?          @relation("OrganizationManager", fields: [managerId], references: [id])
 
@@ -418,4 +420,34 @@ model Notification {
   sender       User?        @relation("NotificationSender", fields: [senderId], references: [id])
 
   @@index([organizationId])
+}
+
+model Holiday {
+  id             String   @id @default(uuid())
+  organizationId String
+  title          String
+  description    String?
+  date           DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, date])
+  @@index([organizationId, date])
+}
+
+model WorkPolicy {
+  id               String   @id @default(uuid())
+  organizationId   String   @unique
+  onsiteStartTime  String
+  onsiteEndTime    String
+  remoteStartTime  String
+  remoteEndTime    String
+  workingDays      String[]
+  weekendDays      String[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
 }

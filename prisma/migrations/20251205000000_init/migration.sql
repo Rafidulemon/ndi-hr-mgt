@@ -287,6 +287,35 @@ CREATE TABLE "Notification" (
     CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "Holiday" (
+    "id" TEXT NOT NULL,
+    "organizationId" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "date" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Holiday_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "WorkPolicy" (
+    "id" TEXT NOT NULL,
+    "organizationId" TEXT NOT NULL,
+    "onsiteStartTime" TEXT NOT NULL,
+    "onsiteEndTime" TEXT NOT NULL,
+    "remoteStartTime" TEXT NOT NULL,
+    "remoteEndTime" TEXT NOT NULL,
+    "workingDays" TEXT[],
+    "weekendDays" TEXT[],
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "WorkPolicy_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Organization_domain_key" ON "Organization"("domain");
 
@@ -401,6 +430,15 @@ CREATE UNIQUE INDEX "Project_organizationId_code_key" ON "Project"("organization
 -- CreateIndex
 CREATE INDEX "Notification_organizationId_idx" ON "Notification"("organizationId");
 
+-- CreateIndex
+CREATE INDEX "Holiday_organizationId_date_idx" ON "Holiday"("organizationId", "date");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Holiday_organizationId_date_key" ON "Holiday"("organizationId", "date");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "WorkPolicy_organizationId_key" ON "WorkPolicy"("organizationId");
+
 -- AddForeignKey
 ALTER TABLE "Organization" ADD CONSTRAINT "Organization_orgAdminId_fkey" FOREIGN KEY ("orgAdminId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -481,3 +519,10 @@ ALTER TABLE "Notification" ADD CONSTRAINT "Notification_organizationId_fkey" FOR
 
 -- AddForeignKey
 ALTER TABLE "Notification" ADD CONSTRAINT "Notification_senderId_fkey" FOREIGN KEY ("senderId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Holiday" ADD CONSTRAINT "Holiday_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "WorkPolicy" ADD CONSTRAINT "WorkPolicy_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+

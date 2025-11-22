@@ -9,6 +9,7 @@ import { hrAttendanceRouter } from "@/server/modules/hr/attendance/attendance.ro
 import { hrLeaveRouter } from "@/server/modules/hr/leave/leave.route";
 import { hrDashboardRouter } from "@/server/modules/hr/dashboard/dashboard.route";
 import { hrTeamRouter } from "@/server/modules/hr/team/team.route";
+import { hrWorkRouter } from "@/server/modules/hr/work/work.route";
 import { dashboardRouter } from "@/server/modules/dashboard/dashboard.route";
 import { teamRouter } from "@/server/modules/team/team.route";
 
@@ -25,6 +26,7 @@ export const appRouter = createTRPCRouter({
   hrLeave: hrLeaveRouter,
   hrDashboard: hrDashboardRouter,
   hrTeam: hrTeamRouter,
+  hrWork: hrWorkRouter,
 });
 
 export type AppRouter = typeof appRouter;
