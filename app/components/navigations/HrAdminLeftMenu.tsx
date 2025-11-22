@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 import type { ReactNode } from "react";
+import type { UserRole } from "@prisma/client";
 import { BiLogOut } from "react-icons/bi";
 import { FiSettings } from "react-icons/fi";
 import { MdOutlineDashboard } from "react-icons/md";
@@ -16,15 +17,18 @@ import {
   FaEnvelopeOpenText,
   FaUser,
   FaUsers,
+  FaSitemap,
 } from "react-icons/fa";
 import { TbReportAnalytics } from "react-icons/tb";
 
 import { Modal } from "../atoms/frame/Modal";
+import { canManageTeams } from "@/types/hr-team";
 
 type MenuItem = {
   id:
     | "dashboard"
     | "employees"
+    | "teams"
     | "reports"
     | "attendance"
     | "leave"
@@ -47,6 +51,7 @@ type Props = {
   userFullName?: string;
   showEmployeeDashboardLink?: boolean;
   pendingLeaveCount?: number;
+  viewerRole?: UserRole;
 };
 
 const hrMenuItems: MenuItem[] = [
@@ -61,6 +66,12 @@ const hrMenuItems: MenuItem[] = [
     label: "Employee Management",
     icon: <FaUsers />,
     href: "/hr-admin/employees",
+  },
+  {
+    id: "teams",
+    label: "Team Management",
+    icon: <FaSitemap />,
+    href: "/hr-admin/team-management",
   },
   {
     id: "attendance",
@@ -106,6 +117,7 @@ const HrAdminLeftMenu = ({
   userFullName,
   showEmployeeDashboardLink = false,
   pendingLeaveCount = 0,
+  viewerRole,
 }: Props) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -163,6 +175,15 @@ const HrAdminLeftMenu = ({
         : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-slate-100",
     ].join(" ");
 
+  const allowedMenuItems = useMemo(() => {
+    return hrMenuItems.filter((item) => {
+      if (item.id === "teams") {
+        return canManageTeams(viewerRole);
+      }
+      return true;
+    });
+  }, [viewerRole]);
+
   return (
     <div className={containerClasses}>
       <div className="sticky top-0 z-20 flex flex-col items-center gap-3 rounded-[24px] bg-white/95 pb-2 text-center backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:text-left dark:bg-slate-900/85">
@@ -188,7 +209,7 @@ const HrAdminLeftMenu = ({
 
       <nav className="flex flex-1 flex-col">
         <ul className="space-y-1">
-          {hrMenuItems.map((item) => {
+          {allowedMenuItems.map((item) => {
             const showPendingBadge = item.id === "leave" && pendingLeaveCount > 0;
             return (
               <li key={item.id}>

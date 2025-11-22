@@ -54,6 +54,7 @@ export default async function HrAdminLayout({
               userFullName={fullName}
               showEmployeeDashboardLink
               pendingLeaveCount={Number(pendingLeaveCount) || 0}
+              viewerRole={user.role}
             />
           </div>
         </aside>

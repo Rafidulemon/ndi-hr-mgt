@@ -14,6 +14,8 @@ type Props = {
   onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   name?: string;
   register?: UseFormRegister<any>;
+  readOnly?: boolean;
+  disabled?: boolean;
 };
 
 function TextArea(props: Props) {
@@ -30,6 +32,8 @@ function TextArea(props: Props) {
     error,
     height,
     onChange,
+    readOnly = false,
+    disabled = false,
   } = props;
 
 
@@ -51,6 +55,8 @@ function TextArea(props: Props) {
         value={value}
         placeholder={placeholder}
         onChange={onChange}
+        readOnly={readOnly}
+        disabled={disabled}
         {...register?.(name)}
       />
       {error && <div className="text-[14px] text-tertiary">{error.message}</div>}

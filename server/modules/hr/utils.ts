@@ -2,6 +2,7 @@ import { UserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import type { TRPCContext } from "@/server/api/trpc";
+import { canManageTeams } from "@/types/hr-team";
 
 const HR_ALLOWED_ROLES: UserRole[] = [
   "HR_ADMIN",
@@ -27,5 +28,16 @@ export const requireHrAdmin = (ctx: TRPCContext) => {
     });
   }
 
+  return user;
+};
+
+export const requireTeamManager = (ctx: TRPCContext) => {
+  const user = requireHrAdmin(ctx);
+  if (!canManageTeams(user.role as UserRole)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Manager, org admin, or super admin access required.",
+    });
+  }
   return user;
 };
