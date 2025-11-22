@@ -109,6 +109,8 @@ model Organization {
   projects          Project[]
   notifications     Notification[]
   holidays          Holiday[]
+  dailyReports      DailyReport[]
+  monthlyReports    MonthlyReport[]
   workPolicy        WorkPolicy?
   orgAdmin          User?          @relation("OrganizationAdmin", fields: [orgAdminId], references: [id])
   manager           User?          @relation("OrganizationManager", fields: [managerId], references: [id])
@@ -141,6 +143,8 @@ model User {
   attendanceRecords     AttendanceRecord[]
   leaveRequests         LeaveRequest[]        @relation("LeaveAuthor")
   reviewedLeaveRequests LeaveRequest[]        @relation("LeaveReviewer")
+  dailyReports          DailyReport[]
+  monthlyReports        MonthlyReport[]
   notificationsSent     Notification[]        @relation("NotificationSender")
   headedDepartments     Department[]          @relation("DepartmentHead")
   ledTeams              Team[]                @relation("TeamLead")
@@ -356,6 +360,39 @@ model AttendanceRecord {
   @@index([employeeId])
 }
 
+model DailyReport {
+  id             String        @id @default(uuid())
+  organizationId String
+  employeeId     String
+  reportDate     DateTime
+  note           String?
+  submittedAt    DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  employee     User         @relation(fields: [employeeId], references: [id])
+  entries      DailyReportEntry[]
+
+  @@unique([employeeId, reportDate])
+  @@index([organizationId, reportDate])
+}
+
+model DailyReportEntry {
+  id            String      @id @default(uuid())
+  dailyReportId String
+  workType      String
+  taskName      String
+  others        String?
+  details       String
+  workingHours  Decimal     @db.Decimal(5, 2)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  report DailyReport @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+
+  @@index([dailyReportId])
+}
+
 model LeaveRequest {
   id          String      @id @default(uuid())
   employeeId  String
@@ -450,4 +487,34 @@ model WorkPolicy {
   updatedAt        DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
+}
+
+model MonthlyReport {
+  id             String        @id @default(uuid())
+  organizationId String
+  employeeId     String
+  reportMonth    DateTime
+  submittedAt    DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  employee     User             @relation(fields: [employeeId], references: [id])
+  entries      MonthlyReportEntry[]
+
+  @@unique([employeeId, reportMonth])
+  @@index([organizationId, reportMonth])
+}
+
+model MonthlyReportEntry {
+  id              String         @id @default(uuid())
+  monthlyReportId String
+  taskName        String
+  storyPoint      Decimal        @db.Decimal(6, 2)
+  workingHours    Decimal        @db.Decimal(6, 2)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  report MonthlyReport @relation(fields: [monthlyReportId], references: [id], onDelete: Cascade)
+
+  @@index([monthlyReportId])
 }

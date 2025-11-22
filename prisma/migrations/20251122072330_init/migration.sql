@@ -231,6 +231,34 @@ CREATE TABLE "AttendanceRecord" (
 );
 
 -- CreateTable
+CREATE TABLE "DailyReport" (
+    "id" TEXT NOT NULL,
+    "organizationId" TEXT NOT NULL,
+    "employeeId" TEXT NOT NULL,
+    "reportDate" TIMESTAMP(3) NOT NULL,
+    "note" TEXT,
+    "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "DailyReport_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "DailyReportEntry" (
+    "id" TEXT NOT NULL,
+    "dailyReportId" TEXT NOT NULL,
+    "workType" TEXT NOT NULL,
+    "taskName" TEXT NOT NULL,
+    "others" TEXT,
+    "details" TEXT NOT NULL,
+    "workingHours" DECIMAL(5,2) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "DailyReportEntry_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "LeaveRequest" (
     "id" TEXT NOT NULL,
     "employeeId" TEXT NOT NULL,
@@ -314,6 +342,31 @@ CREATE TABLE "WorkPolicy" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "WorkPolicy_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "MonthlyReport" (
+    "id" TEXT NOT NULL,
+    "organizationId" TEXT NOT NULL,
+    "employeeId" TEXT NOT NULL,
+    "reportMonth" TIMESTAMP(3) NOT NULL,
+    "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "MonthlyReport_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "MonthlyReportEntry" (
+    "id" TEXT NOT NULL,
+    "monthlyReportId" TEXT NOT NULL,
+    "taskName" TEXT NOT NULL,
+    "storyPoint" DECIMAL(6,2) NOT NULL,
+    "workingHours" DECIMAL(6,2) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "MonthlyReportEntry_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -413,6 +466,15 @@ CREATE INDEX "AttendanceRecord_employeeId_idx" ON "AttendanceRecord"("employeeId
 CREATE UNIQUE INDEX "AttendanceRecord_employeeId_attendanceDate_key" ON "AttendanceRecord"("employeeId", "attendanceDate");
 
 -- CreateIndex
+CREATE INDEX "DailyReport_organizationId_reportDate_idx" ON "DailyReport"("organizationId", "reportDate");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "DailyReport_employeeId_reportDate_key" ON "DailyReport"("employeeId", "reportDate");
+
+-- CreateIndex
+CREATE INDEX "DailyReportEntry_dailyReportId_idx" ON "DailyReportEntry"("dailyReportId");
+
+-- CreateIndex
 CREATE INDEX "LeaveRequest_employeeId_startDate_idx" ON "LeaveRequest"("employeeId", "startDate");
 
 -- CreateIndex
@@ -438,6 +500,15 @@ CREATE UNIQUE INDEX "Holiday_organizationId_date_key" ON "Holiday"("organization
 
 -- CreateIndex
 CREATE UNIQUE INDEX "WorkPolicy_organizationId_key" ON "WorkPolicy"("organizationId");
+
+-- CreateIndex
+CREATE INDEX "MonthlyReport_organizationId_reportMonth_idx" ON "MonthlyReport"("organizationId", "reportMonth");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "MonthlyReport_employeeId_reportMonth_key" ON "MonthlyReport"("employeeId", "reportMonth");
+
+-- CreateIndex
+CREATE INDEX "MonthlyReportEntry_monthlyReportId_idx" ON "MonthlyReportEntry"("monthlyReportId");
 
 -- AddForeignKey
 ALTER TABLE "Organization" ADD CONSTRAINT "Organization_orgAdminId_fkey" FOREIGN KEY ("orgAdminId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -506,6 +577,15 @@ ALTER TABLE "TeamManager" ADD CONSTRAINT "TeamManager_managerId_fkey" FOREIGN KE
 ALTER TABLE "AttendanceRecord" ADD CONSTRAINT "AttendanceRecord_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "DailyReport" ADD CONSTRAINT "DailyReport_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "DailyReport" ADD CONSTRAINT "DailyReport_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "DailyReportEntry" ADD CONSTRAINT "DailyReportEntry_dailyReportId_fkey" FOREIGN KEY ("dailyReportId") REFERENCES "DailyReport"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "LeaveRequest" ADD CONSTRAINT "LeaveRequest_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -526,3 +606,11 @@ ALTER TABLE "Holiday" ADD CONSTRAINT "Holiday_organizationId_fkey" FOREIGN KEY (
 -- AddForeignKey
 ALTER TABLE "WorkPolicy" ADD CONSTRAINT "WorkPolicy_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
+-- AddForeignKey
+ALTER TABLE "MonthlyReport" ADD CONSTRAINT "MonthlyReport_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "MonthlyReport" ADD CONSTRAINT "MonthlyReport_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "MonthlyReportEntry" ADD CONSTRAINT "MonthlyReportEntry_monthlyReportId_fkey" FOREIGN KEY ("monthlyReportId") REFERENCES "MonthlyReport"("id") ON DELETE CASCADE ON UPDATE CASCADE;

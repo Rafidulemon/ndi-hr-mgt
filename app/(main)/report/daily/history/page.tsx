@@ -1,285 +1,219 @@
-"use client"
-import Pagination from "@/app/components/pagination/Pagination";
-import { months } from "@/app/utils/dateAndMonth";
-import Table from "@/app/components/atoms/tables/Table";
+"use client";
+
+import { useMemo, useState } from "react";
+import { MdDownload } from "react-icons/md";
+
 import Text from "@/app/components/atoms/Text/Text";
-import { useState } from "react";
-import { MdKeyboardArrowLeft, MdKeyboardArrowRight } from "react-icons/md";
+import Button from "@/app/components/atoms/buttons/Button";
+import TextInput from "@/app/components/atoms/inputs/TextInput";
+import { Table } from "@/app/components/atoms/tables/Table";
+import TextFeild from "@/app/components/atoms/TextFeild/TextFeild";
+import Pagination from "@/app/components/pagination/Pagination";
+import DashboardLoadingIndicator from "@/app/components/dashboard/DashboardLoadingIndicator";
+import { exportToExcel } from "@/lib/export-to-excel";
+import { trpc } from "@/trpc/client";
 
-const attendenceTableHeader = [
-  "Date",
-  "Type",
-  "Project Name",
-  "Others",
-  "Details",
-  "Working Hours",
-];
+const dateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
-interface Row {
-  Date: string;
-  Type: string;
-  "Project Name": string;
-  Others: string;
-  Details: string;
-  "Working Hours": string;
+const hoursFormatter = (value: number) => `${value.toFixed(2)}h`;
 
-  [key: string]: string | number;
-}
+type TableRow = Record<string, string | number>;
 
-const rows: Row[] = [
-  {
-    Date: "01/11",
-    Type: "Office",
-    "Project Name": "Project Alpha",
-    Others: " ",
-    Details: "Team meeting and updates",
-    "Working Hours": "8:00",
-  },
-  {
-    Date: "02/11",
-    Type: "Remote",
-    "Project Name": "Project Beta",
-    Others: " ",
-    Details: "Completed module testing",
-    "Working Hours": "7:30",
-  },
-  {
-    Date: "03/11",
-    Type: "Office",
-    "Project Name": "Project Gamma",
-    Others: "Client Interaction",
-    Details: "Presented project updates to the client",
-    "Working Hours": "8:00",
-  },
-  {
-    Date: "04/11",
-    Type: "Office",
-    "Project Name": "Project Delta",
-    Others: "  ",
-    Details: "Sprint planning session",
-    "Working Hours": "8:15",
-  },
-  {
-    Date: "05/11",
-    Type: "Remote",
-    "Project Name": "Project Epsilon",
-    Others: "  ",
-    Details: "Code review and debugging",
-    "Working Hours": "7:45",
-  },
-  {
-    Date: "06/11",
-    Type: "Office",
-    "Project Name": "Project Zeta",
-    Others: "  ",
-    Details: "Developed new features",
-    "Working Hours": "8:30",
-  },
-  {
-    Date: "07/11",
-    Type: "Office",
-    "Project Name": "Project Eta",
-    Others: "Team Lunch",
-    Details: "Collaborative team work",
-    "Working Hours": "8:00",
-  },
-  {
-    Date: "08/11",
-    Type: "Remote",
-    "Project Name": "Project Theta",
-    Others: "  ",
-    Details: "Prepared documentation",
-    "Working Hours": "7:00",
-  },
-  {
-    Date: "09/11",
-    Type: "Office",
-    "Project Name": "Project Iota",
-    Others: "Training",
-    Details: "Attended technical training",
-    "Working Hours": "6:00",
-  },
-  {
-    Date: "10/11",
-    Type: "Office",
-    "Project Name": "Project Kappa",
-    Others: "  ",
-    Details: "Bug fixing",
-    "Working Hours": "8:20",
-  },
-  {
-    Date: "11/11",
-    Type: "Remote",
-    "Project Name": "Project Lambda",
-    Others: "Client Feedback",
-    Details: "Implemented feedback changes",
-    "Working Hours": "7:50",
-  },
-  {
-    Date: "12/11",
-    Type: "Office",
-    "Project Name": "Project Mu",
-    Others: "  ",
-    Details: "Team brainstorming session",
-    "Working Hours": "8:10",
-  },
-  {
-    Date: "13/11",
-    Type: "Office",
-    "Project Name": "Project Nu",
-    Others: "  ",
-    Details: "Worked on backend API integration",
-    "Working Hours": "8:00",
-  },
-  {
-    Date: "14/11",
-    Type: "Remote",
-    "Project Name": "Project Xi",
-    Others: "  ",
-    Details: "Prepared project presentation",
-    "Working Hours": "7:15",
-  },
-  {
-    Date: "15/11",
-    Type: "Office",
-    "Project Name": "Project Omicron",
-    Others: "Client Meeting",
-    Details: "Discussed project scope",
-    "Working Hours": "8:25",
-  },
-  {
-    Date: "16/11",
-    Type: "Remote",
-    "Project Name": "Project Pi",
-    Others: "  ",
-    Details: "Unit testing",
-    "Working Hours": "7:40",
-  },
-  {
-    Date: "17/11",
-    Type: "Office",
-    "Project Name": "Project Rho",
-    Others: "  ",
-    Details: "UI enhancements",
-    "Working Hours": "8:00",
-  },
-  {
-    Date: "18/11",
-    Type: "Office",
-    "Project Name": "Project Sigma",
-    Others: "  ",
-    Details: "Deployed new version",
-    "Working Hours": "8:00",
-  },
-  {
-    Date: "19/11",
-    Type: "Remote",
-    "Project Name": "Project Tau",
-    Others: "  ",
-    Details: "Team retrospective",
-    "Working Hours": "7:30",
-  },
-  {
-    Date: "20/11",
-    Type: "Office",
-    "Project Name": "Project Upsilon",
-    Others: "  ",
-    Details: "Collaborative coding session",
-    "Working Hours": "8:00",
-  },
-  {
-    Date: "21/11",
-    Type: "Office",
-    "Project Name": "Project Phi",
-    Others: "  ",
-    Details: "Conducted code review",
-    "Working Hours": "8:10",
-  },
-  {
-    Date: "22/11",
-    Type: "Remote",
-    "Project Name": "Project Chi",
-    Others: " ",
-    Details: "Worked on bug fixes",
-    "Working Hours": "7:45",
-  },
-  {
-    Date: "23/11",
-    Type: "Office",
-    "Project Name": "Project Psi",
-    Others: " ",
-    Details: "Prepared for client demo",
-    "Working Hours": "8:20",
-  },
-  {
-    Date: "24/11",
-    Type: "Office",
-    "Project Name": "Project Omega",
-    Others: "Client Presentation",
-    Details: "Delivered project demo",
-    "Working Hours": "8:00",
-  },
-];
+const buildDefaultFilters = () => {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 14);
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+    search: "",
+    sort: "recent" as "recent" | "oldest",
+  };
+};
 
-export default function DailyReportHistoryPage() {
-  const date = new Date();
-  const currentMonthIndex = date.getMonth();
-  const [currentMonth, setCurrentMonth] = useState<number>(currentMonthIndex);
-  const [currentPageData, setCurrentPageData] = useState<Row[]>();
+export default function DailyReportHistory() {
+  const [filters, setFilters] = useState(buildDefaultFilters);
+  const [appliedFilters, setAppliedFilters] = useState(filters);
+  const [visibleRows, setVisibleRows] = useState<TableRow[]>([]);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
-  const preMonth = () => {
-    setCurrentMonth((prev) => (prev === 0 ? 11 : prev - 1));
+  const { data, isLoading, isFetching } = trpc.report.dailyHistory.useQuery(
+    {
+      ...appliedFilters,
+      pageSize: 200,
+      page: 1,
+    },
+    {
+      refetchOnWindowFocus: false,
+    },
+  );
+
+  const tableRows = useMemo<TableRow[]>(() => {
+    if (!data?.items) {
+      return [];
+    }
+    return data.items.flatMap((report) =>
+      report.entries.map((entry) => ({
+        Date: dateFormatter.format(new Date(report.reportDate)),
+        "Work Type": entry.workType,
+        "Task / Project": entry.taskName,
+        Details: entry.details,
+        Notes: entry.others ?? "—",
+        Hours: Number(entry.workingHours.toFixed(2)),
+      })),
+    );
+  }, [data]);
+
+  const totalHours = data?.totals.workingHours ?? 0;
+  const totalEntries = data?.totals.entryCount ?? 0;
+
+  const applyFilters = () => {
+    setAppliedFilters(filters);
   };
 
-  const nextMonth = () => {
-    setCurrentMonth((prev) => (prev === 11 ? 0 : prev + 1));
+  const resetFilters = () => {
+    const defaults = buildDefaultFilters();
+    setFilters(defaults);
+    setAppliedFilters(defaults);
+  };
+
+  const handleDownload = async () => {
+    if (tableRows.length === 0) {
+      setDownloadError("No records available to download.");
+      return;
+    }
+    setDownloadError(null);
+    try {
+      exportToExcel(tableRows, {
+        fileName: "daily-report-history",
+        sheetName: "Daily Reports",
+      });
+    } catch (error) {
+      setDownloadError((error as Error).message ?? "Failed to prepare Excel file.");
+    }
   };
 
   return (
     <div className="flex w-full flex-col gap-10">
-      <div className="flex items-center justify-between">
-        <Text
-          text="Daily Report History"
-          className="text-[30px] font-semibold text-slate-900 dark:text-slate-100"
-        />
-        <div className="flex h-[46px] w-[250px] items-center justify-between rounded-md bg-primary px-[4px] text-white shadow-sm shadow-indigo-200 transition-colors duration-200 dark:bg-sky-600 dark:shadow-sky-900/50">
-          <MdKeyboardArrowLeft
-            size={20}
-            color="white"
-            className="cursor-pointer"
-            onClick={preMonth}
-          />
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div>
           <Text
-            text={months[currentMonth]}
-            className="text-[16px] font-semibold text-white"
+            text="Daily Report History"
+            className="text-[30px] font-semibold text-slate-900 dark:text-slate-100"
           />
-          <MdKeyboardArrowRight
-            size={20}
-            color="white"
-            className="cursor-pointer"
-            onClick={nextMonth}
-          />
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Filter, review, and download your past daily submissions.
+          </p>
+        </div>
+        <Button
+          type="button"
+          className="w-full gap-2 lg:w-auto"
+          theme="secondary"
+          onClick={handleDownload}
+          disabled={isFetching || isLoading || tableRows.length === 0}
+        >
+          <MdDownload size={18} />
+          <Text text="Download as Excel" className="font-semibold" />
+        </Button>
+      </div>
+
+      {downloadError && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+          {downloadError}
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <TextInput
+          label="Start Date"
+          type="date"
+          value={filters.startDate}
+          onChange={(event) => setFilters((prev) => ({ ...prev, startDate: event.target.value }))}
+        />
+        <TextInput
+          label="End Date"
+          type="date"
+          value={filters.endDate}
+          onChange={(event) => setFilters((prev) => ({ ...prev, endDate: event.target.value }))}
+        />
+        <TextInput
+          label="Search"
+          placeholder="Task, work type, notes..."
+          value={filters.search}
+          onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
+        />
+        <div className="flex flex-col">
+          <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
+            Sort
+          </label>
+          <select
+            className="h-[40px] rounded-lg border border-white/60 bg-white px-4 text-[16px] text-text_primary shadow-sm shadow-slate-200/70 transition-colors duration-200 focus:outline-none hover:cursor-pointer dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-100 dark:shadow-slate-900/40"
+            value={filters.sort}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, sort: event.target.value as "recent" | "oldest" }))
+            }
+          >
+            <option value="recent">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </select>
         </div>
       </div>
 
-      <div className="mt-[20px]">
-        {currentPageData && (
-          <Table
-            headers={attendenceTableHeader}
-            rows={currentPageData}
-            className="rounded-[28px] py-6"
-            isTextCenter
-          />
-        )}
+      <div className="flex flex-wrap gap-4">
+        <Button type="button" className="w-[180px]" onClick={applyFilters} theme="secondary">
+          <Text text="Apply Filters" className="font-semibold" />
+        </Button>
+        <Button
+          type="button"
+          className="w-[140px]"
+          theme="cancel-secondary"
+          onClick={resetFilters}
+        >
+          <Text text="Reset" className="font-semibold" />
+        </Button>
       </div>
 
-      <div>
-        <Pagination
-          data={rows}
-          postsPerPage={15}
-          setCurrentPageData={setCurrentPageData}
+      <div className="grid gap-4 md:grid-cols-3">
+        <TextFeild
+          label="Total Entries"
+          text={totalEntries.toString()}
+          className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-inner shadow-white/40 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40"
+        />
+        <TextFeild
+          label="Hours Logged"
+          text={hoursFormatter(totalHours)}
+          className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-inner shadow-white/40 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40"
+        />
+        <TextFeild
+          label="Current Range"
+          text={`${
+            filters.startDate ? dateFormatter.format(new Date(filters.startDate)) : "—"
+          } → ${filters.endDate ? dateFormatter.format(new Date(filters.endDate)) : "—"}`}
+          className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-inner shadow-white/40 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40"
         />
       </div>
+
+      {isLoading ? (
+        <div className="flex min-h-64 items-center justify-center rounded-[32px] border border-white/60 bg-white/90 p-6 shadow-lg shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/70">
+          <DashboardLoadingIndicator />
+        </div>
+      ) : tableRows.length === 0 ? (
+        <div className="rounded-[32px] border border-dashed border-slate-200 bg-white/70 p-10 text-center text-slate-500 dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-400">
+          No daily reports found for the selected filters.
+        </div>
+      ) : (
+        <>
+          <Table
+            headers={["Date", "Work Type", "Task / Project", "Details", "Notes", "Hours"]}
+            rows={visibleRows}
+          />
+          <Pagination data={tableRows} postsPerPage={10} setCurrentPageData={setVisibleRows} />
+        </>
+      )}
     </div>
   );
 }

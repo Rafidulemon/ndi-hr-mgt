@@ -1,121 +1,212 @@
-"use client"
-import { useState } from "react";
-import { MdKeyboardArrowLeft, MdKeyboardArrowRight } from "react-icons/md";
+"use client";
+
+import { useMemo, useState } from "react";
+import { MdDownload } from "react-icons/md";
+
 import Text from "@/app/components/atoms/Text/Text";
-import { useRouter } from "next/navigation";
-import TextFeild from "@/app/components/atoms/TextFeild/TextFeild";
-import { months } from "@/app/utils/dateAndMonth";
 import Button from "@/app/components/atoms/buttons/Button";
+import TextInput from "@/app/components/atoms/inputs/TextInput";
+import TextFeild from "@/app/components/atoms/TextFeild/TextFeild";
+import { Table } from "@/app/components/atoms/tables/Table";
+import Pagination from "@/app/components/pagination/Pagination";
+import DashboardLoadingIndicator from "@/app/components/dashboard/DashboardLoadingIndicator";
+import { exportToExcel } from "@/lib/export-to-excel";
+import { trpc } from "@/trpc/client";
 
-function MonthlyHistory() {
-  const navigate = useRouter();
-  const date = new Date();
-  const currentMonthIndex = date.getMonth();
-  const currentYear = date.getFullYear();
-  const [currentMonth, setCurrentMonth] = useState<number>(currentMonthIndex);
-  const [year, setYear] = useState<number>(currentYear);
+type TableRow = Record<string, string | number>;
 
-  const preMonth = () => {
-    setCurrentMonth((prev) => {
-      if (prev === 0) {
-        setYear((prevYear) => prevYear - 1);
-        return 11;
-      }
-      return prev - 1;
-    });
+const monthFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  year: "numeric",
+});
+
+const buildDefaultFilters = () => {
+  const now = new Date();
+  const start = new Date();
+  start.setMonth(start.getMonth() - 5);
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: now.toISOString().slice(0, 10),
+    search: "",
+    sort: "recent" as "recent" | "oldest",
+  };
+};
+
+export default function MonthlyReportHistory() {
+  const [filters, setFilters] = useState(buildDefaultFilters);
+  const [appliedFilters, setAppliedFilters] = useState(filters);
+  const [visibleRows, setVisibleRows] = useState<TableRow[]>([]);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  const { data, isLoading, isFetching } = trpc.report.monthlyHistory.useQuery(
+    {
+      ...appliedFilters,
+      pageSize: 120,
+      page: 1,
+    },
+    {
+      refetchOnWindowFocus: false,
+    },
+  );
+
+  const tableRows = useMemo<TableRow[]>(() => {
+    if (!data?.items) {
+      return [];
+    }
+    return data.items.flatMap((report) =>
+      report.entries.map((entry) => ({
+        Month: monthFormatter.format(new Date(report.reportMonth)),
+        "Task / Ticket": entry.taskName,
+        "Story Points": Number(entry.storyPoint.toFixed(2)),
+        Hours: Number(entry.workingHours.toFixed(2)),
+      })),
+    );
+  }, [data]);
+
+  const summary = {
+    entries: data?.totals.entryCount ?? 0,
+    hours: data?.totals.workingHours ?? 0,
+    storyPoints: data?.totals.storyPoints ?? 0,
   };
 
-  const nextMonth = () => {
-    setCurrentMonth((prev) => {
-      if (prev === 11) {
-        setYear((prevYear) => prevYear + 1);
-        return 0;
-      }
-      return prev + 1;
-    });
+  const applyFilters = () => {
+    setAppliedFilters(filters);
+  };
+
+  const resetFilters = () => {
+    const defaults = buildDefaultFilters();
+    setFilters(defaults);
+    setAppliedFilters(defaults);
+  };
+
+  const handleDownload = () => {
+    if (tableRows.length === 0) {
+      setDownloadError("No monthly report data available to download.");
+      return;
+    }
+    setDownloadError(null);
+    try {
+      exportToExcel(tableRows, {
+        fileName: "monthly-report-history",
+        sheetName: "Monthly Reports",
+      });
+    } catch (error) {
+      setDownloadError((error as Error).message ?? "Failed to prepare Excel file.");
+    }
   };
 
   return (
     <div className="flex w-full flex-col gap-10">
-      <div className="flex items-center justify-between">
-        <Text
-          text="Monthly Report History"
-          className="text-[30px] font-semibold text-slate-900 dark:text-slate-100"
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <Text
+            text="Monthly Report History"
+            className="text-[30px] font-semibold text-slate-900 dark:text-slate-100"
+          />
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Track cumulative output, story points, and delivery momentum.
+          </p>
+        </div>
+        <Button
+          type="button"
+          className="w-full gap-2 lg:w-auto"
+          theme="secondary"
+          onClick={handleDownload}
+          disabled={isFetching || isLoading || tableRows.length === 0}
+        >
+          <MdDownload size={18} />
+          <Text text="Download as Excel" className="font-semibold" />
+        </Button>
+      </div>
+
+      {downloadError && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+          {downloadError}
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <TextInput
+          label="Start Date"
+          type="date"
+          value={filters.startDate}
+          onChange={(event) => setFilters((prev) => ({ ...prev, startDate: event.target.value }))}
         />
-        <div className="flex h-[46px] w-[250px] items-center justify-between rounded-md bg-primary px-[4px] text-white shadow-sm shadow-indigo-200 transition-colors duration-200 dark:bg-sky-600 dark:shadow-sky-900/50">
-          <MdKeyboardArrowLeft
-            size={20}
-            color="white"
-            className="cursor-pointer"
-            onClick={preMonth}
-          />
-          <Text
-            text={`${months[currentMonth]}, ${year}`}
-            className="text-[16px] font-semibold text-white"
-          />
-          <MdKeyboardArrowRight
-            size={20}
-            color="white"
-            className="cursor-pointer"
-            onClick={nextMonth}
-          />
+        <TextInput
+          label="End Date"
+          type="date"
+          value={filters.endDate}
+          onChange={(event) => setFilters((prev) => ({ ...prev, endDate: event.target.value }))}
+        />
+        <TextInput
+          label="Search"
+          placeholder="Ticket or keyword"
+          value={filters.search}
+          onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
+        />
+        <div className="flex flex-col">
+          <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
+            Sort
+          </label>
+          <select
+            className="h-[40px] rounded-lg border border-white/60 bg-white px-4 text-[16px] text-text_primary shadow-sm shadow-slate-200/70 transition-colors duration-200 focus:outline-none hover:cursor-pointer dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-100 dark:shadow-slate-900/40"
+            value={filters.sort}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, sort: event.target.value as "recent" | "oldest" }))
+            }
+          >
+            <option value="recent">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </select>
         </div>
       </div>
 
-      <div className="flex w-full flex-col gap-6 rounded-[32px] border border-white/60 bg-white/85 p-8 shadow-xl shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
-        <div className="flex flex-col gap-2">
-          <Text
-            text="Monthly Report"
-            className="text-[24px] font-semibold text-slate-900 dark:text-slate-100"
-          />
-          <Text
-            text={`${months[currentMonth]}, ${year}`}
-            className="text-text_bold dark:text-slate-300"
-          />
-        </div>
-
-        <div className="mt-4 grid w-full grid-cols-1 gap-6 md:grid-cols-2">
-          <div className="col-span-1 flex flex-col gap-12">
-            <TextFeild
-              label="Task Done"
-              text="5"
-              className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
-            />
-            <TextFeild
-              label="Story Point"
-              text="20"
-              className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
-            />
-            <TextFeild
-              label="Working Hours"
-              text="80"
-              className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70"
-            />
-            <Button
-              theme="secondary"
-              className="w-[185px]"
-              onClick={() => navigate.push("/report/monthly")}
-            >
-              <Text text="Add New Report" className="font-semibold" />
-            </Button>
-          </div>
-          <div className="col-span-1 flex flex-col gap-2">
-            <Text
-              text="Task Name/ Ticket Number"
-              className="font-semibold text-text_bold dark:text-slate-200"
-            />
-            <div className="flex flex-col gap-1 font-semibold text-text_primary dark:text-slate-300">
-              <Text text="Task-1" />
-              <Text text="Task-2" />
-              <Text text="Task-3" />
-              <Text text="Task-4" />
-              <Text text="Task-5" />
-            </div>
-          </div>
-        </div>
+      <div className="flex flex-wrap gap-4">
+        <Button type="button" className="w-[180px]" onClick={applyFilters} theme="secondary">
+          <Text text="Apply Filters" className="font-semibold" />
+        </Button>
+        <Button
+          type="button"
+          className="w-[140px]"
+          theme="cancel-secondary"
+          onClick={resetFilters}
+        >
+          <Text text="Reset" className="font-semibold" />
+        </Button>
       </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <TextFeild
+          label="Entries"
+          text={summary.entries.toString()}
+          className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-inner shadow-white/40 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40"
+        />
+        <TextFeild
+          label="Story Points"
+          text={summary.storyPoints.toFixed(2)}
+          className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-inner shadow-white/40 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40"
+        />
+        <TextFeild
+          label="Hours"
+          text={summary.hours.toFixed(2)}
+          className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-inner shadow-white/40 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40"
+        />
+      </div>
+
+      {isLoading ? (
+        <div className="flex min-h-[300px] items-center justify-center rounded-[32px] border border-white/60 bg-white/90 p-6 shadow-lg shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/70">
+          <DashboardLoadingIndicator />
+        </div>
+      ) : tableRows.length === 0 ? (
+        <div className="rounded-[32px] border border-dashed border-slate-200 bg-white/70 p-10 text-center text-slate-500 dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-400">
+          No monthly reports matched your filters.
+        </div>
+      ) : (
+        <>
+          <Table headers={["Month", "Task / Ticket", "Story Points", "Hours"]} rows={visibleRows} />
+          <Pagination data={tableRows} postsPerPage={8} setCurrentPageData={setVisibleRows} />
+        </>
+      )}
     </div>
   );
 }
-
-export default MonthlyHistory;
