@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { trpc } from "@/trpc/client";
 import type { EmployeeDashboardResponse } from "@/types/employee-dashboard";
+import { getNotificationTypeLabel } from "@/lib/notification";
 import Button from "../components/atoms/buttons/Button";
 import { CardWithHeader } from "../components/atoms/frame/CardWithHeader";
 import DashboardLoadingIndicator from "../components/dashboard/DashboardLoadingIndicator";
@@ -504,7 +505,7 @@ function HomePage() {
                       {notification.title}
                     </p>
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                      {notification.type}
+                      {getNotificationTypeLabel(notification.type)}
                     </span>
                   </div>
                   <p className="mt-1 text-slate-500 dark:text-slate-400">{notification.body}</p>

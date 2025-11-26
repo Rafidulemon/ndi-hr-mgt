@@ -1,6 +1,14 @@
 import { randomUUID } from "crypto";
 
-import { LeaveStatus, LeaveType, Prisma } from "@prisma/client";
+import {
+  LeaveStatus,
+  LeaveType,
+  NotificationAudience,
+  NotificationStatus,
+  NotificationType,
+  Prisma,
+  UserRole,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import type { TRPCContext } from "@/server/api/trpc";
@@ -23,6 +31,35 @@ import type {
 } from "./leave.validation";
 
 export type { LeaveAttachmentResponse, LeaveBalanceResponse } from "./leave.shared";
+
+const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+});
+
+const formatDateRangeLabel = (start: Date, end: Date) => {
+  const startLabel = shortDateFormatter.format(start);
+  const endLabel = shortDateFormatter.format(end);
+  return startLabel === endLabel ? startLabel : `${startLabel} - ${endLabel}`;
+};
+
+const formatDisplayName = (input: {
+  preferredName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  fallback: string;
+}) => {
+  if (input.preferredName && input.preferredName.trim().length > 0) {
+    return input.preferredName.trim();
+  }
+  const parts = [input.firstName, input.lastName].filter(
+    (value): value is string => Boolean(value && value.trim().length > 0),
+  );
+  if (parts.length > 0) {
+    return parts.join(" ");
+  }
+  return input.fallback;
+};
 
 export type LeaveRequestResponse = {
   id: string;
@@ -139,6 +176,21 @@ export const leaveService = {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
+    const organizationId = session.user.organizationId ?? session.user.organization?.id ?? null;
+    if (!organizationId) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "Missing organization context for leave submission.",
+      });
+    }
+
+    const employeeName = formatDisplayName({
+      preferredName: session.user.profile?.preferredName ?? null,
+      firstName: session.user.profile?.firstName ?? null,
+      lastName: session.user.profile?.lastName ?? null,
+      fallback: session.user.email,
+    });
+
     const leaveType = input.leaveType as LeaveType;
     const startDate = input.startDate;
     const endDate = input.endDate;
@@ -152,6 +204,10 @@ export const leaveService = {
 
     const totalDaysDecimal = new Prisma.Decimal(totalDays);
     const storedAttachments = toStoredAttachments(input.attachments);
+
+    const leaveTypeLabel = leaveTypeLabelMap[toLeaveTypeValue(leaveType)];
+    const dateRangeLabel = formatDateRangeLabel(startDate, endDate);
+    const dayLabel = totalDays === 1 ? "day" : "days";
 
     const result = await ctx.prisma.$transaction(async (tx) => {
       const employment = await tx.employmentDetail.findUnique({
@@ -199,6 +255,30 @@ export const leaveService = {
           reason: input.reason,
           note: input.note,
           attachments: storedAttachments ?? undefined,
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          organizationId,
+          senderId: session.user.id,
+          title: `${employeeName} requested ${leaveTypeLabel}`,
+          body: `${leaveTypeLabel} • ${dateRangeLabel} (${totalDays} ${dayLabel})`,
+          type: NotificationType.LEAVE,
+          status: NotificationStatus.SENT,
+          actionUrl: "/hr-admin/leave-approvals",
+          audience: NotificationAudience.ROLE,
+          targetRoles: [UserRole.HR_ADMIN],
+          metadata: {
+            leaveRequestId: createdRequest.id,
+            employeeId: session.user.id,
+            leaveType,
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            totalDays,
+            status: createdRequest.status,
+          },
+          sentAt: new Date(),
         },
       });
 

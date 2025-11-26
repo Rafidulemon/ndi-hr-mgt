@@ -1,4 +1,10 @@
-import { LeaveStatus, Prisma } from "@prisma/client";
+import {
+  LeaveStatus,
+  NotificationAudience,
+  NotificationStatus,
+  NotificationType,
+  Prisma,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import type { TRPCContext } from "@/server/api/trpc";
@@ -86,6 +92,22 @@ const leaveRequestUpdateSelect = {
 type LeaveRequestWithEmployee = Prisma.LeaveRequestGetPayload<{
   select: typeof leaveRequestSelect;
 }>;
+
+const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+});
+
+const formatDateRangeLabel = (start: Date, end: Date) => {
+  const startLabel = shortDateFormatter.format(start);
+  const endLabel = shortDateFormatter.format(end);
+  return startLabel === endLabel ? startLabel : `${startLabel} - ${endLabel}`;
+};
+
+const EMPLOYEE_NOTIFICATION_STATUSES: LeaveStatus[] = [
+  LeaveStatus.APPROVED,
+  LeaveStatus.DENIED,
+];
 
 const formatEmployeeName = (record: {
   preferredName: string | null | undefined;
@@ -313,6 +335,41 @@ export const hrLeaveService = {
         code: "NOT_FOUND",
         message: "Updated leave request could not be loaded.",
       });
+    }
+
+    const nextStatus = input.status as LeaveStatus;
+    const notifyEmployee = EMPLOYEE_NOTIFICATION_STATUSES.includes(nextStatus);
+
+    if (notifyEmployee) {
+      const organizationId = refreshed.employee.organizationId ?? sessionUser.organizationId;
+      if (organizationId) {
+        const leaveTypeLabel = leaveTypeLabelMap[toLeaveTypeValue(refreshed.leaveType)];
+        const rangeLabel = formatDateRangeLabel(refreshed.startDate, refreshed.endDate);
+        const actionVerb = nextStatus === LeaveStatus.APPROVED ? "approved" : "denied";
+
+        await ctx.prisma.notification.create({
+          data: {
+            organizationId,
+            senderId: sessionUser.id,
+            title: `Leave request ${actionVerb}`,
+            body: `Your ${leaveTypeLabel} (${rangeLabel}) was ${actionVerb}.`,
+            type: NotificationType.LEAVE,
+            status: NotificationStatus.SENT,
+            audience: NotificationAudience.INDIVIDUAL,
+            targetUserId: refreshed.employee.id,
+            actionUrl: "/leave",
+            metadata: {
+              leaveRequestId: refreshed.id,
+              status: nextStatus,
+              reviewerId: sessionUser.id,
+              startDate: refreshed.startDate.toISOString(),
+              endDate: refreshed.endDate.toISOString(),
+              note: input.note ?? null,
+            },
+            sentAt: new Date(),
+          },
+        });
+      }
     }
 
     return mapLeaveRequest(refreshed);

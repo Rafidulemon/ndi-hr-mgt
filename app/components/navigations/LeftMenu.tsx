@@ -23,6 +23,7 @@ import { HiOutlineDocumentText } from "react-icons/hi";
 import { IoIosPaper } from "react-icons/io";
 import { FiSettings } from "react-icons/fi";
 import { Modal } from "../atoms/frame/Modal";
+import { trpc } from "@/trpc/client";
 
 type Props = {
   isLeader?: boolean;
@@ -107,6 +108,10 @@ const LeftMenu = ({
   const router = useRouter();
   const pathname = usePathname();
   const currentPath = pathname ?? "/";
+  const unseenNotificationQuery = trpc.notification.unseenCount.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const unseenNotifications = unseenNotificationQuery.data?.unseen ?? 0;
 
   const deriveSectionFromPath = (path: string): DropdownKey => {
     if (path.startsWith("/profile")) return "profile";
@@ -324,6 +329,11 @@ const LeftMenu = ({
                   <span className="text-[16px] font-semibold">
                     {item.label}
                   </span>
+                  {unseenNotifications > 0 ? (
+                    <span className="ml-auto rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-600 dark:bg-rose-500/20 dark:text-rose-100">
+                      {unseenNotifications}
+                    </span>
+                  ) : null}
                 </Link>
               ) : item.label === "Invoice" ? (
                 <Link

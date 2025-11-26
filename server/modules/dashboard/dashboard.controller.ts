@@ -37,6 +37,7 @@ const buildDashboardInput = (ctx: TRPCContext) => {
     userId: ctx.session.user.id,
     organizationId,
     organizationNameHint: ctx.session.user.organization?.name ?? null,
+    userRole: ctx.session.user.role,
   };
 };
 

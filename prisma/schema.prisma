@@ -76,11 +76,10 @@ enum ProjectStatus {
 }
 
 enum NotificationType {
-  SYSTEM
+  ANNOUNCEMENT
   LEAVE
   ATTENDANCE
-  PAYROLL
-  GENERAL
+  REPORT
 }
 
 enum NotificationStatus {
@@ -88,6 +87,12 @@ enum NotificationStatus {
   SCHEDULED
   SENT
   CANCELLED
+}
+
+enum NotificationAudience {
+  ORGANIZATION
+  ROLE
+  INDIVIDUAL
 }
 
 /// Top-level organisation/workspace that owns employees and policies.
@@ -146,6 +151,7 @@ model User {
   dailyReports          DailyReport[]
   monthlyReports        MonthlyReport[]
   notificationsSent     Notification[]        @relation("NotificationSender")
+  notificationsReceived Notification[]        @relation("NotificationTargetUser")
   headedDepartments     Department[]          @relation("DepartmentHead")
   ledTeams              Team[]                @relation("TeamLead")
   directReports         EmploymentDetail[]    @relation("ManagerReports")
@@ -444,7 +450,10 @@ model Notification {
   senderId       String?
   title          String
   body           String
-  type           NotificationType   @default(GENERAL)
+  type           NotificationType   @default(ANNOUNCEMENT)
+  audience       NotificationAudience @default(ORGANIZATION)
+  targetRoles    UserRole[]         @default([])
+  targetUserId   String?
   status         NotificationStatus @default(DRAFT)
   actionUrl      String?
   metadata       Json?
@@ -455,8 +464,10 @@ model Notification {
 
   organization Organization @relation(fields: [organizationId], references: [id])
   sender       User?        @relation("NotificationSender", fields: [senderId], references: [id])
+  targetUser   User?        @relation("NotificationTargetUser", fields: [targetUserId], references: [id])
 
   @@index([organizationId])
+  @@index([targetUserId])
 }
 
 model Holiday {

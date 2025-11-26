@@ -1,8 +1,10 @@
 import {
   AttendanceStatus,
   LeaveStatus,
+  NotificationAudience,
   NotificationStatus,
   Prisma,
+  type UserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
@@ -144,6 +146,7 @@ const userDashboardSelect = {
   id: true,
   email: true,
   phone: true,
+  role: true,
   organization: {
     select: {
       name: true,
@@ -201,6 +204,27 @@ const notificationSelect = {
   createdAt: true,
 } as const satisfies Prisma.NotificationSelect;
 
+const notificationStatusesForDashboard: NotificationStatus[] = [
+  NotificationStatus.SENT,
+  NotificationStatus.SCHEDULED,
+];
+
+const buildNotificationAudienceFilter = (userId: string, role: UserRole) => ({
+  OR: [
+    { audience: NotificationAudience.ORGANIZATION },
+    {
+      audience: NotificationAudience.ROLE,
+      targetRoles: {
+        has: role,
+      },
+    },
+    {
+      audience: NotificationAudience.INDIVIDUAL,
+      targetUserId: userId,
+    },
+  ],
+});
+
 type AttendanceRecordForDashboard = Prisma.AttendanceRecordGetPayload<{
   select: typeof attendanceRecordSelect;
 }>;
@@ -228,6 +252,7 @@ type DashboardServiceInput = {
   userId: string;
   organizationId: string;
   organizationNameHint?: string | null;
+  userRole: UserRole;
 };
 
 const summarizeMonthlyAttendance = (
@@ -306,7 +331,7 @@ type DashboardSections = {
 const loadDashboardDataset = async (
   input: DashboardServiceInput,
 ): Promise<DashboardDataset> => {
-  const { userId, organizationId, organizationNameHint } = input;
+  const { userId, organizationId, organizationNameHint, userRole } = input;
   const now = new Date();
   const todayStart = startOfDay(now);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -372,12 +397,9 @@ const loadDashboardDataset = async (
       where: {
         organizationId,
         status: {
-          in: [
-            NotificationStatus.SENT,
-            NotificationStatus.SCHEDULED,
-            NotificationStatus.DRAFT,
-          ],
+          in: notificationStatusesForDashboard,
         },
+        AND: [buildNotificationAudienceFilter(userId, userRole)],
       },
       select: notificationSelect,
       orderBy: [
