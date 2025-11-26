@@ -5,6 +5,14 @@ import type { TRPCContext } from "@/server/api/trpc";
 
 type Nullable<T> = T | null | undefined;
 
+type DailyReportWithEntries = Prisma.DailyReportGetPayload<{
+  include: { entries: true };
+}>;
+
+type MonthlyReportWithEntries = Prisma.MonthlyReportGetPayload<{
+  include: { entries: true };
+}>;
+
 const decimalToNumber = (value: Nullable<Prisma.Decimal>): number =>
   value ? Number(value) : 0;
 
@@ -135,33 +143,36 @@ export type MonthlyHistoryResponse = {
   };
 };
 
-const buildSearchFilter = (search?: string | null) => {
+const buildSearchFilter = (search?: string | null): Prisma.DailyReportWhereInput => {
   if (!search?.trim()) {
     return {};
   }
   const value = search.trim();
+  const mode = Prisma.QueryMode.insensitive;
+  const clauses: Prisma.DailyReportEntryWhereInput[] = [
+    { taskName: { contains: value, mode } },
+    { details: { contains: value, mode } },
+    { others: { contains: value, mode } },
+    { workType: { contains: value, mode } },
+  ];
   return {
     entries: {
       some: {
-        OR: [
-          { taskName: { contains: value, mode: "insensitive" } },
-          { details: { contains: value, mode: "insensitive" } },
-          { others: { contains: value, mode: "insensitive" } },
-          { workType: { contains: value, mode: "insensitive" } },
-        ],
+        OR: clauses,
       },
     },
-  } satisfies Prisma.DailyReportWhereInput;
+  };
 };
 
-const buildMonthlySearchFilter = (search?: string | null) => {
+const buildMonthlySearchFilter = (search?: string | null): Prisma.MonthlyReportWhereInput => {
   if (!search?.trim()) {
     return {};
   }
   const value = search.trim();
+  const mode = Prisma.QueryMode.insensitive;
   const numericValue = Number(value);
   const clauses: Prisma.MonthlyReportEntryWhereInput[] = [
-    { taskName: { contains: value, mode: "insensitive" } },
+    { taskName: { contains: value, mode } },
   ];
   if (!Number.isNaN(numericValue)) {
     clauses.push({
@@ -174,27 +185,43 @@ const buildMonthlySearchFilter = (search?: string | null) => {
         OR: clauses,
       },
     },
-  } satisfies Prisma.MonthlyReportWhereInput;
+  };
 };
 
-const ensureDateRange = (
-  startDate?: string,
-  endDate?: string,
-  fallbackInDays = 14,
-): { start: Date; end: Date } => {
+type DateRange = {
+  start?: Date;
+  end?: Date;
+};
+
+const buildTodayRange = (): Required<DateRange> => {
   const now = new Date();
-  let start = startOfDay(new Date(now));
-  start.setDate(start.getDate() - fallbackInDays);
-  let end = endOfDay(now);
+  return {
+    start: startOfDay(now),
+    end: endOfDay(now),
+  };
+};
 
-  if (startDate) {
-    start = startOfDay(parseDate(startDate, "start date"));
-  }
-  if (endDate) {
-    end = endOfDay(parseDate(endDate, "end date"));
+const buildCurrentMonthRange = (): Required<DateRange> => {
+  const now = new Date();
+  const start = startOfMonth(now);
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + 1);
+  end.setDate(0); // move to last day of current month
+  return {
+    start,
+    end: endOfDay(end),
+  };
+};
+
+const ensureDateRange = (startDate?: string, endDate?: string, fallback?: () => DateRange | null) => {
+  if (!startDate && !endDate) {
+    return fallback ? fallback() : null;
   }
 
-  if (start > end) {
+  const start = startDate ? startOfDay(parseDate(startDate, "start date")) : undefined;
+  const end = endDate ? endOfDay(parseDate(endDate, "end date")) : undefined;
+
+  if (start && end && start > end) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "Start date cannot be after end date.",
@@ -207,21 +234,16 @@ const ensureDateRange = (
 const ensureMonthRange = (
   startDate?: string,
   endDate?: string,
-  fallbackMonths = 6,
+  fallback?: () => DateRange | null,
 ) => {
-  const now = new Date();
-  let start = startOfMonth(new Date(now));
-  start.setMonth(start.getMonth() - fallbackMonths);
-  let end = startOfMonth(now);
-
-  if (startDate) {
-    start = startOfMonth(parseDate(startDate, "start date"));
-  }
-  if (endDate) {
-    end = startOfMonth(parseDate(endDate, "end date"));
+  if (!startDate && !endDate) {
+    return fallback ? fallback() : null;
   }
 
-  if (start > end) {
+  const start = startDate ? startOfMonth(parseDate(startDate, "start date")) : undefined;
+  const end = endDate ? startOfMonth(parseDate(endDate, "end date")) : undefined;
+
+  if (start && end && start > end) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "Start date cannot be after end date.",
@@ -347,20 +369,24 @@ const getDailyHistory = async (
 ): Promise<DailyHistoryResponse> => {
   const { employeeId } = resolveEmployeeContext(ctx);
   const { page = 1, pageSize = 20, sort = "recent", startDate, endDate, search } = input;
-  const { start, end } = ensureDateRange(startDate, endDate);
+  const range = ensureDateRange(startDate, endDate, buildTodayRange);
 
   const where: Prisma.DailyReportWhereInput = {
     employeeId,
-    reportDate: {
-      gte: start,
-      lte: end,
-    },
+    ...(range
+      ? {
+          reportDate: {
+            ...(range.start ? { gte: range.start } : {}),
+            ...(range.end ? { lte: range.end } : {}),
+          },
+        }
+      : {}),
     ...buildSearchFilter(search),
   };
 
   const orderBy = { reportDate: sort === "recent" ? "desc" : "asc" } as const;
 
-  const [items, totalItems, aggregate] = await ctx.prisma.$transaction([
+  const [items, totalItems, aggregate] = (await ctx.prisma.$transaction([
     ctx.prisma.dailyReport.findMany({
       where,
       include: {
@@ -381,7 +407,7 @@ const getDailyHistory = async (
         },
       },
     }),
-  ]);
+  ])) as [DailyReportWithEntries[], number, Prisma.AggregateDailyReportEntry];
 
   const mapped: DailyReportResponse[] = items.map((report) => {
     const entryCount = report.entries.length;
@@ -408,7 +434,7 @@ const getDailyHistory = async (
   });
 
   const totals = {
-    workingHours: decimalToNumber(aggregate._sum.workingHours),
+    workingHours: decimalToNumber(aggregate._sum?.workingHours),
     entryCount: mapped.reduce((sum, item) => sum + item.entryCount, 0),
   };
 
@@ -437,20 +463,24 @@ const getMonthlyHistory = async (
 ): Promise<MonthlyHistoryResponse> => {
   const { employeeId } = resolveEmployeeContext(ctx);
   const { page = 1, pageSize = 12, sort = "recent", startDate, endDate, search } = input;
-  const { start, end } = ensureMonthRange(startDate, endDate);
+  const range = ensureMonthRange(startDate, endDate, buildCurrentMonthRange);
 
   const where: Prisma.MonthlyReportWhereInput = {
     employeeId,
-    reportMonth: {
-      gte: start,
-      lte: end,
-    },
+    ...(range
+      ? {
+          reportMonth: {
+            ...(range.start ? { gte: range.start } : {}),
+            ...(range.end ? { lte: range.end } : {}),
+          },
+        }
+      : {}),
     ...buildMonthlySearchFilter(search),
   };
 
   const orderBy = { reportMonth: sort === "recent" ? "desc" : "asc" } as const;
 
-  const [items, totalItems, aggregate] = await ctx.prisma.$transaction([
+  const [items, totalItems, aggregate] = (await ctx.prisma.$transaction([
     ctx.prisma.monthlyReport.findMany({
       where,
       include: {
@@ -474,7 +504,7 @@ const getMonthlyHistory = async (
         },
       },
     }),
-  ]);
+  ])) as [MonthlyReportWithEntries[], number, Prisma.AggregateMonthlyReportEntry];
 
   const mapped: MonthlyReportResponse[] = items.map((report) => {
     const entryCount = report.entries.length;
@@ -503,8 +533,8 @@ const getMonthlyHistory = async (
   });
 
   const totals = {
-    workingHours: decimalToNumber(aggregate._sum.workingHours),
-    storyPoints: decimalToNumber(aggregate._sum.storyPoint),
+    workingHours: decimalToNumber(aggregate._sum?.workingHours),
+    storyPoints: decimalToNumber(aggregate._sum?.storyPoint),
     entryCount: mapped.reduce((sum, item) => sum + item.entryCount, 0),
   };
 

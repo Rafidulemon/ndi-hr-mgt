@@ -87,12 +87,12 @@ const TrendChart = ({
         </div>
       </div>
       <div className="flex h-40 items-end gap-3 overflow-x-auto">
-        {points.map((point) => {
+        {points.map((point, index) => {
           const value = Number(point[valueKey] ?? 0);
           const height = Math.max(12, (value / maxValue) * 140);
           return (
             <div
-              key={`${valueKey}-${point.label}-${point[valueKey]}`}
+              key={`${valueKey}-${point.label}-${index}`}
               className="flex flex-col items-center gap-2 text-xs text-slate-500"
             >
               <div

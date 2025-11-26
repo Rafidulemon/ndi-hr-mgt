@@ -6,6 +6,7 @@ import { seedEmployees } from "./seeds/employee";
 import { seedLeaveRequests } from "./seeds/leaveRequest";
 import { seedNotifications } from "./seeds/notification";
 import { seedProjects } from "./seeds/project";
+import { seedReports } from "./seeds/report";
 import { seedUsers } from "./seeds/user";
 
 const prisma = new PrismaClient();
@@ -87,24 +88,31 @@ async function main() {
     where: { id: { in: organizations.map((org) => org.id) } },
   });
 
-  if (existing) {
-    console.log("Seed skipped: base organizations already exist.");
-    return;
+  let baseSeeded = false;
+
+  if (!existing) {
+    await seedOrganizations();
+    await seedDepartments();
+    await seedTeams();
+    await seedUsers(prisma);
+    await assignOrganizationLeadership();
+    await assignDepartmentHeads();
+    await seedEmployees(prisma);
+    await seedProjects(prisma);
+    await seedAttendance(prisma);
+    await seedLeaveRequests(prisma);
+    await seedNotifications(prisma);
+    baseSeeded = true;
+    console.log("Seeded organizations, people, attendance, projects, leave, and notifications.");
+  } else {
+    console.log("Base organizations already exist. Skipping structural seeds.");
   }
 
-  await seedOrganizations();
-  await seedDepartments();
-  await seedTeams();
-  await seedUsers(prisma);
-  await assignOrganizationLeadership();
-  await assignDepartmentHeads();
-  await seedEmployees(prisma);
-  await seedProjects(prisma);
-  await seedAttendance(prisma);
-  await seedLeaveRequests(prisma);
-  await seedNotifications(prisma);
+  await seedReports(prisma);
 
-  console.log("Seeded organizations, people, attendance, projects, leave, and notifications.");
+  if (!baseSeeded) {
+    console.log("Reports seeding executed against existing data set.");
+  }
 }
 
 main()

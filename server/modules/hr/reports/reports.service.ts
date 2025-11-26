@@ -90,34 +90,36 @@ const ensureMonthRange = (startDate?: string, endDate?: string, fallbackMonths =
   return { start, end };
 };
 
-const dailySearchFilter = (search?: string | null): Prisma.DailyReportWhereInput => {
+const dailySearchFilter = (search?: string | null) => {
   if (!search?.trim()) {
     return {};
   }
   const term = search.trim();
+  const mode = Prisma.QueryMode.insensitive;
   return {
     entries: {
       some: {
         OR: [
-          { taskName: { contains: term, mode: "insensitive" } },
-          { workType: { contains: term, mode: "insensitive" } },
-          { details: { contains: term, mode: "insensitive" } },
-          { others: { contains: term, mode: "insensitive" } },
+          { taskName: { contains: term, mode } },
+          { workType: { contains: term, mode } },
+          { details: { contains: term, mode } },
+          { others: { contains: term, mode } },
         ],
       },
     },
   };
 };
 
-const monthlySearchFilter = (search?: string | null): Prisma.MonthlyReportWhereInput => {
+const monthlySearchFilter = (search?: string | null) => {
   if (!search?.trim()) {
     return {};
   }
   const term = search.trim();
+  const mode = Prisma.QueryMode.insensitive;
   return {
     entries: {
       some: {
-        taskName: { contains: term, mode: "insensitive" },
+        taskName: { contains: term, mode },
       },
     },
   };
@@ -219,14 +221,14 @@ const getOverview = async (
 
   const employeeFilter = employeeId ? { employeeId } : {};
 
-  const dailyWhere: Prisma.DailyReportWhereInput = {
+  const dailyWhere = {
     organizationId: viewer.organizationId,
     reportDate: { gte: start, lte: end },
     ...employeeFilter,
     ...dailySearchFilter(search),
   };
 
-  const monthlyWhere: Prisma.MonthlyReportWhereInput = {
+  const monthlyWhere = {
     organizationId: viewer.organizationId,
     reportMonth: { gte: monthStart, lte: monthEnd },
     ...employeeFilter,

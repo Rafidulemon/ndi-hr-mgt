@@ -20,34 +20,60 @@ const monthFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
 });
 
-const buildDefaultFilters = () => {
-  const now = new Date();
-  const start = new Date();
-  start.setMonth(start.getMonth() - 5);
+const formatDateInput = (date: Date) => date.toISOString().slice(0, 10);
+const formatMonthInput = (date: Date) =>
+  `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, "0")}`;
+
+const getMonthRange = (monthValue: string) => {
+  if (!monthValue) return null;
+  const [year, month] = monthValue.split("-").map((part) => Number(part));
+  if (!year || !month) return null;
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0);
   return {
-    startDate: start.toISOString().slice(0, 10),
-    endDate: now.toISOString().slice(0, 10),
+    startDate: formatDateInput(start),
+    endDate: formatDateInput(end),
+  };
+};
+
+const buildDefaultFilters = () => {
+  const currentMonth = new Date();
+  currentMonth.setDate(1);
+  const range = getMonthRange(formatMonthInput(currentMonth));
+  return {
+    startDate: range?.startDate ?? "",
+    endDate: range?.endDate ?? "",
     search: "",
     sort: "recent" as "recent" | "oldest",
   };
 };
 
 export default function MonthlyReportHistory() {
-  const [filters, setFilters] = useState(buildDefaultFilters);
-  const [appliedFilters, setAppliedFilters] = useState(filters);
+  const defaultFilters = useMemo(() => buildDefaultFilters(), []);
+  const [filters, setFilters] = useState(defaultFilters);
+  const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const baseDate = filters.startDate ? new Date(filters.startDate) : new Date();
+    return formatMonthInput(baseDate);
+  });
   const [visibleRows, setVisibleRows] = useState<TableRow[]>([]);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
-  const { data, isLoading, isFetching } = trpc.report.monthlyHistory.useQuery(
-    {
-      ...appliedFilters,
+  const queryInput = useMemo(
+    () => ({
       pageSize: 120,
       page: 1,
-    },
-    {
-      refetchOnWindowFocus: false,
-    },
+      sort: appliedFilters.sort,
+      search: appliedFilters.search || undefined,
+      startDate: appliedFilters.startDate || undefined,
+      endDate: appliedFilters.endDate || undefined,
+    }),
+    [appliedFilters],
   );
+
+  const { data, isLoading, isFetching } = trpc.report.monthlyHistory.useQuery(queryInput, {
+    refetchOnWindowFocus: false,
+  });
 
   const tableRows = useMemo<TableRow[]>(() => {
     if (!data?.items) {
@@ -77,6 +103,24 @@ export default function MonthlyReportHistory() {
     const defaults = buildDefaultFilters();
     setFilters(defaults);
     setAppliedFilters(defaults);
+    const baseDate = defaults.startDate ? new Date(defaults.startDate) : new Date();
+    setSelectedMonth(formatMonthInput(baseDate));
+  };
+
+  const handleMonthChange = (value: string) => {
+    setSelectedMonth(value);
+    const range = getMonthRange(value);
+    if (range) {
+      setFilters((prev) => {
+        const next = {
+          ...prev,
+          startDate: range.startDate,
+          endDate: range.endDate,
+        };
+        setAppliedFilters(next);
+        return next;
+      });
+    }
   };
 
   const handleDownload = () => {
@@ -125,18 +169,12 @@ export default function MonthlyReportHistory() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <TextInput
-          label="Start Date"
-          type="date"
-          value={filters.startDate}
-          onChange={(event) => setFilters((prev) => ({ ...prev, startDate: event.target.value }))}
-        />
-        <TextInput
-          label="End Date"
-          type="date"
-          value={filters.endDate}
-          onChange={(event) => setFilters((prev) => ({ ...prev, endDate: event.target.value }))}
+          label="Month"
+          type="month"
+          value={selectedMonth}
+          onChange={(event) => handleMonthChange(event.target.value)}
         />
         <TextInput
           label="Search"
@@ -175,7 +213,16 @@ export default function MonthlyReportHistory() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
+        <TextFeild
+          label="Current Month"
+          text={
+            appliedFilters.startDate
+              ? monthFormatter.format(new Date(appliedFilters.startDate))
+              : "—"
+          }
+          className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-inner shadow-white/40 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40"
+        />
         <TextFeild
           label="Entries"
           text={summary.entries.toString()}

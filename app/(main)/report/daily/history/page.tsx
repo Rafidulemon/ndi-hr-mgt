@@ -23,13 +23,14 @@ const hoursFormatter = (value: number) => `${value.toFixed(2)}h`;
 
 type TableRow = Record<string, string | number>;
 
+const formatDateInput = (date: Date) => date.toISOString().slice(0, 10);
+
 const buildDefaultFilters = () => {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - 14);
+  const today = new Date();
+  const todayValue = formatDateInput(today);
   return {
-    startDate: start.toISOString().slice(0, 10),
-    endDate: end.toISOString().slice(0, 10),
+    startDate: todayValue,
+    endDate: todayValue,
     search: "",
     sort: "recent" as "recent" | "oldest",
   };
@@ -41,16 +42,21 @@ export default function DailyReportHistory() {
   const [visibleRows, setVisibleRows] = useState<TableRow[]>([]);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
-  const { data, isLoading, isFetching } = trpc.report.dailyHistory.useQuery(
-    {
-      ...appliedFilters,
+  const queryInput = useMemo(
+    () => ({
       pageSize: 200,
       page: 1,
-    },
-    {
-      refetchOnWindowFocus: false,
-    },
+      sort: appliedFilters.sort,
+      search: appliedFilters.search || undefined,
+      startDate: appliedFilters.startDate || undefined,
+      endDate: appliedFilters.endDate || undefined,
+    }),
+    [appliedFilters],
   );
+
+  const { data, isLoading, isFetching } = trpc.report.dailyHistory.useQuery(queryInput, {
+    refetchOnWindowFocus: false,
+  });
 
   const tableRows = useMemo<TableRow[]>(() => {
     if (!data?.items) {
@@ -129,16 +135,21 @@ export default function DailyReportHistory() {
 
       <div className="grid gap-4 md:grid-cols-4">
         <TextInput
-          label="Start Date"
+          label="Report Date"
           type="date"
           value={filters.startDate}
-          onChange={(event) => setFilters((prev) => ({ ...prev, startDate: event.target.value }))}
-        />
-        <TextInput
-          label="End Date"
-          type="date"
-          value={filters.endDate}
-          onChange={(event) => setFilters((prev) => ({ ...prev, endDate: event.target.value }))}
+          onChange={(event) => {
+            const value = event.target.value;
+            setFilters((prev) => {
+              const next = {
+                ...prev,
+                startDate: value,
+                endDate: value,
+              };
+              setAppliedFilters(next);
+              return next;
+            });
+          }}
         />
         <TextInput
           label="Search"
@@ -191,8 +202,10 @@ export default function DailyReportHistory() {
         <TextFeild
           label="Current Range"
           text={`${
-            filters.startDate ? dateFormatter.format(new Date(filters.startDate)) : "—"
-          } → ${filters.endDate ? dateFormatter.format(new Date(filters.endDate)) : "—"}`}
+            appliedFilters.startDate ? dateFormatter.format(new Date(appliedFilters.startDate)) : "—"
+          } → ${
+            appliedFilters.endDate ? dateFormatter.format(new Date(appliedFilters.endDate)) : "—"
+          }`}
           className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-inner shadow-white/40 transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40"
         />
       </div>
