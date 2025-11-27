@@ -12,9 +12,15 @@ const completeDaySchema = z.object({
   breakSeconds: z.number().int().min(0),
 });
 
+const startDaySchema = z.object({
+  location: z.enum(["REMOTE", "ONSITE"]),
+});
+
 export type CompleteDayInput = z.infer<typeof completeDaySchema>;
+export type StartDayInput = z.infer<typeof startDaySchema>;
 
 export const AttendanceValidation = {
   history: historyParamsSchema.optional(),
   completeDay: completeDaySchema,
+  startDay: startDaySchema,
 };

@@ -8,9 +8,9 @@ export const attendanceRouter = router({
   today: protectedProcedure.query(({ ctx }) =>
     attendanceController.today(ctx),
   ),
-  startDay: protectedProcedure.mutation(({ ctx }) =>
-    attendanceController.startDay(ctx),
-  ),
+  startDay: protectedProcedure
+    .input(AttendanceValidation.startDay)
+    .mutation(({ ctx, input }) => attendanceController.startDay(ctx, input)),
   completeDay: protectedProcedure
     .input(AttendanceValidation.completeDay)
     .mutation(({ ctx, input }) => attendanceController.completeDay(ctx, input)),

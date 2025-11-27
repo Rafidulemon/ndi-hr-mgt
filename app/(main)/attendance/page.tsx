@@ -79,6 +79,36 @@ const fallbackStatusMeta = {
   description: "Attendance has already been logged for this day.",
 };
 
+type WorkLocationChoice = "REMOTE" | "ONSITE";
+
+const locationChoiceMeta: Record<
+  WorkLocationChoice,
+  { label: string; description: string }
+> = {
+  REMOTE: {
+    label: "Remote",
+    description: "Home setup, VPN, or client visit.",
+  },
+  ONSITE: {
+    label: "On-site",
+    description: "Office or in-person collaboration.",
+  },
+};
+
+const parseLocationChoice = (value?: string | null): WorkLocationChoice | null => {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized.includes("remote")) {
+    return "REMOTE";
+  }
+  if (normalized.includes("site")) {
+    return "ONSITE";
+  }
+  return null;
+};
+
+const locationChoices: WorkLocationChoice[] = ["REMOTE", "ONSITE"];
+
 type TimerState = {
   dateKey: string;
   hasStarted: boolean;
@@ -226,6 +256,7 @@ function AttendancePage() {
   );
   const [now, setNow] = useState<Date>(() => new Date());
   const [actionError, setActionError] = useState<string | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<WorkLocationChoice | null>(null);
   const stateRef = useRef<TimerState>(timerState);
   const startDayMutation = trpc.attendance.startDay.useMutation();
   const completeDayMutation = trpc.attendance.completeDay.useMutation();
@@ -234,6 +265,8 @@ function AttendancePage() {
   });
 
   const record = todayAttendanceQuery.data?.record ?? null;
+  const workModel = todayAttendanceQuery.data?.workModel ?? null;
+  const isHybridWorkModel = workModel === "HYBRID";
   const hasExistingServerAttendance = Boolean(record);
   const lockStartBecauseOfServerRecord = hasExistingServerAttendance && !timerState.hasStarted;
   const statusInfo =
@@ -290,6 +323,16 @@ function AttendancePage() {
         : undefined,
     },
   ];
+
+  const locationSelectionWarning = isHybridWorkModel && !selectedLocation;
+  const locationHelperText =
+    workModel === "REMOTE"
+      ? "Remote is selected automatically. Switch if you are visiting the office today."
+      : workModel === "ONSITE"
+        ? "On-site is selected automatically. Switch if you are working remotely."
+        : "Pick where you are working from before you start your day.";
+  const startButtonDisabled =
+    startDayMutation.isPending || lockStartBecauseOfServerRecord || !selectedLocation;
 
   const formatTime = (time: number) => {
     const safeTime = Math.max(0, time);
@@ -398,6 +441,58 @@ function AttendancePage() {
     return () => window.clearInterval(intervalId);
   }, []);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!record?.location) {
+      return;
+    }
+    const parsed = parseLocationChoice(record.location);
+    if (parsed && parsed !== selectedLocation) {
+      setSelectedLocation(parsed);
+    }
+  }, [record?.location, selectedLocation]);
+
+  useEffect(() => {
+    if (record || selectedLocation || !workModel) {
+      return;
+    }
+    if (workModel === "REMOTE") {
+      setSelectedLocation("REMOTE");
+    } else if (workModel === "ONSITE") {
+      setSelectedLocation("ONSITE");
+    }
+  }, [record, selectedLocation, workModel]);
+
+  useEffect(() => {
+    if (!record?.checkInAt || record.checkOutAt) {
+      return;
+    }
+    if (stateRef.current.hasStarted) {
+      return;
+    }
+    const timestamp = new Date(record.checkInAt).getTime();
+    if (Number.isNaN(timestamp)) {
+      return;
+    }
+    const baselineWorkSeconds = Math.max(0, record.totalWorkSeconds ?? 0);
+    const baselineBreakSeconds = Math.max(0, record.totalBreakSeconds ?? 0);
+    updateTimerState(() => ({
+      ...buildInitialState(),
+      hasStarted: true,
+      workSeconds: baselineWorkSeconds,
+      breakSeconds: baselineBreakSeconds,
+      workTimerStartedAt: timestamp,
+      breakTimerStartedAt: null,
+    }));
+  }, [
+    record?.checkInAt,
+    record?.checkOutAt,
+    record?.totalBreakSeconds,
+    record?.totalWorkSeconds,
+    updateTimerState,
+  ]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   const navigate = useRouter();
   const handleButtonClick = () => {
     navigate.push("/attendance/history");
@@ -418,10 +513,14 @@ function AttendancePage() {
     if (startDayMutation.isPending || lockStartBecauseOfServerRecord) {
       return;
     }
+    if (!selectedLocation) {
+      setActionError("Select where you’re working today before starting.");
+      return;
+    }
 
     try {
       setActionError(null);
-      await startDayMutation.mutateAsync();
+      await startDayMutation.mutateAsync({ location: selectedLocation });
       const nowTimestamp = Date.now();
       updateTimerState(() => ({
         ...buildInitialState(),
@@ -613,11 +712,66 @@ function AttendancePage() {
             />
             {!isStarted ? (
               <div className="w-full max-w-md space-y-4">
+                {!hasExistingServerAttendance && (
+                  <div className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 text-left shadow-sm dark:border-slate-700/70 dark:bg-slate-900/70">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      <Text
+                        text="Where are you working today?"
+                        className="text-sm font-semibold text-text_primary"
+                      />
+                      <span
+                        className={`text-xs font-semibold ${
+                          selectedLocation
+                            ? "text-emerald-600 dark:text-emerald-300"
+                            : "text-amber-600 dark:text-amber-300"
+                        }`}
+                      >
+                        {selectedLocation
+                          ? locationChoiceMeta[selectedLocation].label
+                          : "Selection required"}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {locationChoices.map((choice) => {
+                        const meta = locationChoiceMeta[choice];
+                        const isSelected = selectedLocation === choice;
+                        return (
+                          <button
+                            key={choice}
+                            type="button"
+                            onClick={() => setSelectedLocation(choice)}
+                            className={`rounded-2xl border px-4 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                              isSelected
+                                ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm focus-visible:outline-indigo-400 dark:border-indigo-400/80 dark:bg-indigo-500/10 dark:text-indigo-200"
+                                : "border-slate-200 text-slate-600 hover:border-slate-300 focus-visible:outline-slate-300 dark:border-slate-600 dark:text-slate-300 dark:hover:border-slate-500 dark:focus-visible:outline-slate-500"
+                            }`}
+                          >
+                            <p className="text-sm font-semibold">{meta.label}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              {meta.description}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p
+                      className={`mt-3 text-xs ${
+                        locationSelectionWarning
+                          ? "text-rose-500 dark:text-rose-300"
+                          : "text-slate-500 dark:text-slate-400"
+                      }`}
+                    >
+                      {locationSelectionWarning
+                        ? "Select remote or on-site to enable attendance."
+                        : locationHelperText}
+                    </p>
+                  </div>
+                )}
                 <Button
                   theme="primary"
                   onClick={() => void handleStart()}
                   className="w-full"
-                  disabled={startDayMutation.isPending || lockStartBecauseOfServerRecord}
+                  disabled={startButtonDisabled}
                 >
                   <Text text="Start Working" className="py-1" />
                 </Button>

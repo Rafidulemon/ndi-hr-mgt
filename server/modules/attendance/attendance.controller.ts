@@ -5,6 +5,7 @@ import { attendanceService } from "./attendance.service";
 import type {
   AttendanceHistoryInput,
   CompleteDayInput,
+  StartDayInput,
 } from "./attendance.validation";
 
 const buildInput = (ctx: TRPCContext) => {
@@ -14,12 +15,17 @@ const buildInput = (ctx: TRPCContext) => {
 
   return {
     userId: ctx.session.user.id,
+    organizationId: ctx.session.user.organizationId,
   };
 };
 
 export const attendanceController = {
   today: (ctx: TRPCContext) => attendanceService.today(buildInput(ctx)),
-  startDay: (ctx: TRPCContext) => attendanceService.startDay(buildInput(ctx)),
+  startDay: (ctx: TRPCContext, input: StartDayInput) =>
+    attendanceService.startDay({
+      ...buildInput(ctx),
+      input,
+    }),
   completeDay: (ctx: TRPCContext, input: CompleteDayInput) =>
     attendanceService.completeDay({
       ...buildInput(ctx),

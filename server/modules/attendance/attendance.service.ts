@@ -1,10 +1,11 @@
-import { AttendanceStatus } from "@prisma/client";
+import { AttendanceStatus, type WorkModel } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import { prisma } from "@/server/db";
 import type {
   AttendanceHistoryInput,
   CompleteDayInput,
+  StartDayInput,
 } from "./attendance.validation";
 
 export type AttendanceRecordResponse = {
@@ -17,6 +18,7 @@ export type AttendanceRecordResponse = {
   status: AttendanceStatus;
   note: string | null;
   source: string | null;
+  location: string | null;
 };
 
 const formatRecord = (record: {
@@ -29,6 +31,7 @@ const formatRecord = (record: {
   status: AttendanceStatus;
   note: string | null;
   source: string | null;
+  location: string | null;
 }): AttendanceRecordResponse => ({
   id: record.id,
   attendanceDate: record.attendanceDate.toISOString(),
@@ -39,7 +42,53 @@ const formatRecord = (record: {
   status: record.status,
   note: record.note ?? null,
   source: record.source ?? null,
+  location: record.location ?? null,
 });
+
+const DEFAULT_POLICY_TIMINGS = {
+  onsiteStartTime: "09:00",
+  remoteStartTime: "08:00",
+} as const;
+
+const LOCATION_LABELS: Record<StartDayInput["location"], string> = {
+  REMOTE: "Remote",
+  ONSITE: "On-site",
+};
+
+const LATE_TOLERANCE_MS = 10 * 60 * 1000;
+
+type PolicyTimings = {
+  onsiteStartTime: string;
+  remoteStartTime: string;
+};
+
+const resolvePolicyTimings = (record?: PolicyTimings | null): PolicyTimings => ({
+  onsiteStartTime: record?.onsiteStartTime ?? DEFAULT_POLICY_TIMINGS.onsiteStartTime,
+  remoteStartTime: record?.remoteStartTime ?? DEFAULT_POLICY_TIMINGS.remoteStartTime,
+});
+
+const buildScheduledStart = (timeValue: string, fallbackValue: string, reference: Date) => {
+  const scheduled = new Date(reference);
+  const [hourStr, minuteStr] = timeValue.split(":");
+  const hour = Number.parseInt(hourStr ?? "", 10);
+  const minute = Number.parseInt(minuteStr ?? "", 10);
+
+  if (Number.isNaN(hour) || Number.isNaN(minute)) {
+    const [fallbackHourStr, fallbackMinuteStr] = fallbackValue.split(":");
+    const fallbackHour = Number.parseInt(fallbackHourStr ?? "", 10) || 0;
+    const fallbackMinute = Number.parseInt(fallbackMinuteStr ?? "", 10) || 0;
+    scheduled.setHours(fallbackHour, fallbackMinute, 0, 0);
+    return scheduled;
+  }
+
+  scheduled.setHours(hour, minute, 0, 0);
+  return scheduled;
+};
+
+const resolveAttendanceStatus = (actual: Date, scheduled: Date) =>
+  actual.getTime() > scheduled.getTime() + LATE_TOLERANCE_MS
+    ? AttendanceStatus.LATE
+    : AttendanceStatus.PRESENT;
 
 const startOfDay = (date: Date) => {
   const result = new Date(date);
@@ -58,6 +107,11 @@ const resolveHistoryRange = (input?: AttendanceHistoryInput) => {
 
 type AttendanceServiceInput = {
   userId: string;
+  organizationId: string;
+};
+
+type StartDayServiceInput = AttendanceServiceInput & {
+  input: StartDayInput;
 };
 
 type CompleteDayServiceInput = AttendanceServiceInput & {
@@ -75,36 +129,55 @@ export const attendanceService = {
     }
 
     const attendanceDate = startOfDay(new Date());
-    const record = await prisma.attendanceRecord.findUnique({
-      where: {
-        employeeId_attendanceDate: {
-          employeeId: userId,
-          attendanceDate,
+    const [record, profile] = await Promise.all([
+      prisma.attendanceRecord.findUnique({
+        where: {
+          employeeId_attendanceDate: {
+            employeeId: userId,
+            attendanceDate,
+          },
         },
-      },
-    });
+      }),
+      prisma.employeeProfile.findUnique({
+        where: { userId },
+        select: { workModel: true },
+      }),
+    ]);
 
     return {
       record: record ? formatRecord(record) : null,
+      workModel: (profile?.workModel as WorkModel | null) ?? null,
     };
   },
 
-  async startDay({ userId }: AttendanceServiceInput) {
+  async startDay({ userId, organizationId, input }: StartDayServiceInput) {
     if (!userId) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+    if (!organizationId) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Organization context missing." });
     }
 
     const now = new Date();
     const attendanceDate = startOfDay(now);
 
-    const existing = await prisma.attendanceRecord.findUnique({
-      where: {
-        employeeId_attendanceDate: {
-          employeeId: userId,
-          attendanceDate,
+    const [existing, policyRecord] = await Promise.all([
+      prisma.attendanceRecord.findUnique({
+        where: {
+          employeeId_attendanceDate: {
+            employeeId: userId,
+            attendanceDate,
+          },
         },
-      },
-    });
+      }),
+      prisma.workPolicy.findUnique({
+        where: { organizationId },
+        select: {
+          onsiteStartTime: true,
+          remoteStartTime: true,
+        },
+      }),
+    ]);
 
     if (existing) {
       throw new TRPCError({
@@ -114,15 +187,32 @@ export const attendanceService = {
       });
     }
 
+    const timings = resolvePolicyTimings(policyRecord);
+    const scheduledStart =
+      input.location === "REMOTE"
+        ? buildScheduledStart(
+            timings.remoteStartTime,
+            DEFAULT_POLICY_TIMINGS.remoteStartTime,
+            now,
+          )
+        : buildScheduledStart(
+            timings.onsiteStartTime,
+            DEFAULT_POLICY_TIMINGS.onsiteStartTime,
+            now,
+          );
+    const status = resolveAttendanceStatus(now, scheduledStart);
+    const locationLabel = LOCATION_LABELS[input.location];
+
     const created = await prisma.attendanceRecord.create({
       data: {
         employeeId: userId,
         attendanceDate,
         checkInAt: now,
-        status: AttendanceStatus.PRESENT,
+        status,
         source: "WEB",
         totalWorkSeconds: 0,
         totalBreakSeconds: 0,
+        location: locationLabel,
       },
     });
 
