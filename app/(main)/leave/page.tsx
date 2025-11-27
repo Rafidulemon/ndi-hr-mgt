@@ -13,6 +13,7 @@ import {
   type LeaveTypeValue,
 } from "@/lib/leave-types";
 import { trpc } from "@/trpc/client";
+import { Card } from "@/app/components/atoms/frame/Card";
 
 const headers = [
   "Application ID",
@@ -181,7 +182,7 @@ export default function EmployeeLeavePage() {
           onButtonClick={() => router.push("/leave/application")}
         />
 
-        <section className="rounded-3xl border border-white/60 bg-white/85 p-6 shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
+        <Card>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
@@ -242,10 +243,10 @@ export default function EmployeeLeavePage() {
               );
             })}
           </div>
-        </section>
+        </Card>
 
         <div className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
-          <section className="rounded-3xl border border-white/60 bg-white/85 p-6 shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
+          <Card>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -296,9 +297,9 @@ export default function EmployeeLeavePage() {
                 </div>
               )}
             </div>
-          </section>
+          </Card>
 
-          <aside className="space-y-4 rounded-3xl border border-white/60 bg-white/85 p-6 shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
+          <Card>
             <div>
               <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Upcoming decisions
@@ -346,7 +347,7 @@ export default function EmployeeLeavePage() {
                 </li>
               )}
             </ul>
-          </aside>
+          </Card>
         </div>
       </div>
     </div>

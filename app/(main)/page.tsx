@@ -6,7 +6,7 @@ import type { EmployeeDashboardResponse } from "@/types/employee-dashboard";
 import { getNotificationTypeLabel } from "@/lib/notification";
 import Button from "../components/atoms/buttons/Button";
 import { CardWithHeader } from "../components/atoms/frame/CardWithHeader";
-import DashboardLoadingIndicator from "../components/dashboard/DashboardLoadingIndicator";
+import LoadingSpinner from "../components/LoadingSpinner";
 import Text from "../components/atoms/Text/Text";
 
 const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -243,7 +243,7 @@ function HomePage() {
 
   if (isLoading) {
     return (
-      <DashboardLoadingIndicator
+      <LoadingSpinner
         fullscreen
         label="Loading your dashboard..."
         helper="We are fetching your attendance, leave, and notifications."

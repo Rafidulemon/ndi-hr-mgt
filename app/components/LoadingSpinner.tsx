@@ -1,30 +1,26 @@
 'use client';
 
-type DashboardLoadingIndicatorProps = {
+type LoadingSpinnerProps = {
   label?: string;
   helper?: string;
   fullscreen?: boolean;
-  subtle?: boolean;
 };
 
 const pulseRing =
   "absolute inset-0 rounded-full border-2 border-indigo-400/60 animate-[ping_2s_linear_infinite]";
 
-export const DashboardLoadingIndicator = ({
+export const LoadingSpinner = ({
   label = "Loading your dashboard...",
   helper = "Crunching attendance, leave, and notifications in one place.",
   fullscreen = false,
-  subtle = false,
-}: DashboardLoadingIndicatorProps) => {
+}: LoadingSpinnerProps) => {
   const containerClass = fullscreen
     ? "min-h-screen"
-    : "min-h-[160px] rounded-3xl border border-white/70 bg-white/80 shadow-xl dark:border-slate-700/70 dark:bg-slate-900/70";
+    : "min-h-[160px]";
 
   return (
     <div
-      className={`flex items-center justify-center px-6 py-8 text-center ${
-        subtle ? "bg-transparent" : "bg-slate-50/80 dark:bg-slate-950/80"
-      } ${containerClass}`}
+      className={`flex items-center justify-center px-6 py-8 text-center ${containerClass}`}
     >
       <div className="flex flex-col items-center gap-4">
         <div className="relative h-24 w-24">
@@ -48,4 +44,4 @@ export const DashboardLoadingIndicator = ({
   );
 };
 
-export default DashboardLoadingIndicator;
+export default LoadingSpinner;

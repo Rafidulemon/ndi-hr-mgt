@@ -6,7 +6,7 @@ import { FiAlertCircle, FiCheckCircle, FiUsers, FiUserPlus } from "react-icons/f
 import Button from "@/app/components/atoms/buttons/Button";
 import TextInput from "@/app/components/atoms/inputs/TextInput";
 import TextArea from "@/app/components/atoms/inputs/TextArea";
-import DashboardLoadingIndicator from "@/app/components/dashboard/DashboardLoadingIndicator";
+import LoadingSpinner from "@/app/components/LoadingSpinner";
 import type { HrTeamPerson } from "@/types/hr-team";
 import { TEAM_MANAGEMENT_ROLES } from "@/types/hr-team";
 import { trpc } from "@/trpc/client";
@@ -200,7 +200,7 @@ export default function TeamManagementClient() {
   if (overviewQuery.isLoading) {
     return (
       <div className="rounded-3xl border border-slate-100 bg-white/80 p-6 shadow-md dark:border-slate-700/70 dark:bg-slate-900/70">
-        <DashboardLoadingIndicator
+        <LoadingSpinner
           label="Loading team management"
           helper="Fetching teams, departments, and eligible teammates."
         />

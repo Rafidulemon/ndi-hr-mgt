@@ -7,6 +7,8 @@ import Table from "../../../components/atoms/tables/Table";
 import Pagination from "../../../components/pagination/Pagination";
 import { months } from "../../../utils/dateAndMonth";
 import { trpc } from "@/trpc/client";
+import { EmployeeHeader } from "@/app/components/layouts/EmployeeHeader";
+import { Card } from "@/app/components/atoms/frame/Card";
 
 const backendStatuses = [
   "PRESENT",
@@ -20,9 +22,19 @@ const backendStatuses = [
 type BackendAttendanceStatus = (typeof backendStatuses)[number];
 type StatusFilter = "All" | BackendAttendanceStatus;
 
-const headers = ["Date", "Day", "Check-in", "Check-out", "Working Hours", "Status"];
+const headers = [
+  "Date",
+  "Day",
+  "Check-in",
+  "Check-out",
+  "Working Hours",
+  "Status",
+];
 
-const statusMeta: Record<BackendAttendanceStatus, { label: string; chipClass: string }> = {
+const statusMeta: Record<
+  BackendAttendanceStatus,
+  { label: string; chipClass: string }
+> = {
   PRESENT: {
     label: "Present",
     chipClass:
@@ -30,7 +42,8 @@ const statusMeta: Record<BackendAttendanceStatus, { label: string; chipClass: st
   },
   LATE: {
     label: "Late",
-    chipClass: "bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200",
+    chipClass:
+      "bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200",
   },
   HALF_DAY: {
     label: "Half Day",
@@ -38,15 +51,18 @@ const statusMeta: Record<BackendAttendanceStatus, { label: string; chipClass: st
   },
   ABSENT: {
     label: "Absent",
-    chipClass: "bg-rose-50 text-rose-600 dark:bg-rose-500/20 dark:text-rose-200",
+    chipClass:
+      "bg-rose-50 text-rose-600 dark:bg-rose-500/20 dark:text-rose-200",
   },
   REMOTE: {
     label: "Remote",
-    chipClass: "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200",
+    chipClass:
+      "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200",
   },
   HOLIDAY: {
     label: "Holiday",
-    chipClass: "bg-violet-50 text-violet-600 dark:bg-violet-500/20 dark:text-violet-200",
+    chipClass:
+      "bg-violet-50 text-violet-600 dark:bg-violet-500/20 dark:text-violet-200",
   },
 };
 
@@ -176,16 +192,25 @@ export default function AttendanceHistory() {
           </span>
         ),
       })),
-    [filteredRecords],
+    [filteredRecords]
   );
 
   const presentDays = displayRecords.filter(
-    (record) => record.status === "PRESENT" || record.status === "REMOTE",
+    (record) => record.status === "PRESENT" || record.status === "REMOTE"
   ).length;
-  const lateDays = displayRecords.filter((record) => record.status === "LATE").length;
-  const halfDays = displayRecords.filter((record) => record.status === "HALF_DAY").length;
-  const absentDays = displayRecords.filter((record) => record.status === "ABSENT").length;
-  const totalHours = displayRecords.reduce((sum, record) => sum + record.hoursValue, 0);
+  const lateDays = displayRecords.filter(
+    (record) => record.status === "LATE"
+  ).length;
+  const halfDays = displayRecords.filter(
+    (record) => record.status === "HALF_DAY"
+  ).length;
+  const absentDays = displayRecords.filter(
+    (record) => record.status === "ABSENT"
+  ).length;
+  const totalHours = displayRecords.reduce(
+    (sum, record) => sum + record.hoursValue,
+    0
+  );
 
   const summaryCards = [
     {
@@ -233,7 +258,8 @@ export default function AttendanceHistory() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
+      <EmployeeHeader />
+      <Card>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
@@ -348,9 +374,9 @@ export default function AttendanceHistory() {
             </div>
           )}
         </div>
-      </section>
+      </Card>
 
-      <section className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
+      <Card>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
@@ -381,7 +407,9 @@ export default function AttendanceHistory() {
                   <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                     {entry.dateLabel}
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{entry.dayLabel}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {entry.dayLabel}
+                  </p>
                 </div>
                 <div className="flex flex-col text-sm text-slate-600 dark:text-slate-300">
                   <span>
@@ -403,7 +431,7 @@ export default function AttendanceHistory() {
             ))
           )}
         </div>
-      </section>
+      </Card>
     </div>
   );
 }

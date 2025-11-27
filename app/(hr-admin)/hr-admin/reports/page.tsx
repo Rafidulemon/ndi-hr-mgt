@@ -10,7 +10,7 @@ import TextFeild from "@/app/components/atoms/TextFeild/TextFeild";
 import SelectBox from "@/app/components/atoms/selectBox/SelectBox";
 import { Table } from "@/app/components/atoms/tables/Table";
 import Pagination from "@/app/components/pagination/Pagination";
-import DashboardLoadingIndicator from "@/app/components/dashboard/DashboardLoadingIndicator";
+import LoadingSpinner from "@/app/components/LoadingSpinner";
 import { exportToExcel } from "@/lib/export-to-excel";
 import { trpc } from "@/trpc/client";
 
@@ -298,7 +298,7 @@ export default function HrAdminReportsPage() {
       </header>
 
       {isLoading || !data ? (
-        <DashboardLoadingIndicator label="Loading reports overview..." helper="Aggregating daily and monthly submissions." />
+        <LoadingSpinner label="Loading reports overview..." helper="Aggregating daily and monthly submissions." />
       ) : (
         <>
           <section className="space-y-6">

@@ -7,8 +7,9 @@ import Text from "../../components/atoms/Text/Text";
 import Button from "../../components/atoms/buttons/Button";
 import { Modal } from "../../components/atoms/frame/Modal";
 import { EmployeeHeader } from "../../components/layouts/EmployeeHeader";
-import DashboardLoadingIndicator from "../../components/dashboard/DashboardLoadingIndicator";
+import LoadingSpinner from "../../components/LoadingSpinner";
 import { trpc } from "@/trpc/client";
+import { Card } from "@/app/components/atoms/frame/Card";
 
 const STORAGE_KEY = "ndi.attendance.timer.v1";
 
@@ -620,7 +621,7 @@ function AttendancePage() {
 
   if (isInitialLoading) {
     return (
-      <DashboardLoadingIndicator
+      <LoadingSpinner
         fullscreen
         label="Loading attendance"
         helper="Fetching today’s log and timer state."
@@ -665,7 +666,7 @@ function AttendancePage() {
           onButtonClick={handleButtonClick}
         />
 
-        <section className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
+        <Card>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="space-y-1">
@@ -698,9 +699,9 @@ function AttendancePage() {
               </div>
             )}
           </div>
-        </section>
+        </Card>
 
-        <section className="rounded-3xl border border-slate-100 bg-white/90 p-6 text-center shadow-sm transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
+        <Card>
           <div className="flex flex-col items-center gap-6">
             <div className="flex flex-col items-center text-center gap-1">
               <Text text={formattedTodayDate} className="text-lg font-semibold" />
@@ -850,7 +851,7 @@ function AttendancePage() {
               </p>
             )}
           </div>
-        </section>
+        </Card>
       </div>
 
       <Modal

@@ -12,7 +12,7 @@ import {
 import Button from "@/app/components/atoms/buttons/Button";
 import TextInput from "@/app/components/atoms/inputs/TextInput";
 import TextArea from "@/app/components/atoms/inputs/TextArea";
-import DashboardLoadingIndicator from "@/app/components/dashboard/DashboardLoadingIndicator";
+import LoadingSpinner from "@/app/components/LoadingSpinner";
 import type { HrWorkPolicy, WeekdayOption } from "@/types/hr-work";
 import { WEEKDAY_OPTIONS } from "@/types/hr-work";
 import { trpc } from "@/trpc/client";
@@ -214,7 +214,7 @@ export default function WorkManagementClient() {
   if (overviewQuery.isLoading) {
     return (
       <div className="rounded-3xl border border-slate-100 bg-white/80 p-6 shadow-md dark:border-slate-700/70 dark:bg-slate-900/70">
-        <DashboardLoadingIndicator
+        <LoadingSpinner
           label="Loading operating rhythm"
           helper="Pulling your working hours, holidays, and weekly cadence."
         />

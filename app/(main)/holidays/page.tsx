@@ -2,7 +2,7 @@
 
 import Button from "../../components/atoms/buttons/Button";
 import Text from "../../components/atoms/Text/Text";
-import DashboardLoadingIndicator from "../../components/dashboard/DashboardLoadingIndicator";
+import LoadingSpinner from "../../components/LoadingSpinner";
 import { trpc } from "@/trpc/client";
 
 const fullDateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -99,7 +99,7 @@ const HolidaysPage = () => {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <DashboardLoadingIndicator label="Loading holidays..." />
+        <LoadingSpinner label="Loading holidays..." />
       </div>
     );
   }

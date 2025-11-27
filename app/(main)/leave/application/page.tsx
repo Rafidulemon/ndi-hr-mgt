@@ -21,6 +21,7 @@ import {
   type LeaveTypeValue,
 } from "@/lib/leave-types";
 import { trpc } from "@/trpc/client";
+import { Card } from "@/app/components/atoms/frame/Card";
 
 const leaveApplicationSchema = z
   .object({
@@ -473,7 +474,7 @@ export default function LeaveApplicationPage() {
           </div>
         )}
 
-        <section className="rounded-3xl border border-white/60 bg-white/85 p-6 shadow-sm transition-colors duration-200 sm:p-8 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
+        <Card>
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
               Leave application
@@ -835,7 +836,7 @@ export default function LeaveApplicationPage() {
               )}
             </aside>
           </div>
-        </section>
+        </Card>
       </div>
     </div>
   );

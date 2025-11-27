@@ -15,7 +15,7 @@ import {
 
 import Text from "@/app/components/atoms/Text/Text";
 import Button from "@/app/components/atoms/buttons/Button";
-import DashboardLoadingIndicator from "@/app/components/dashboard/DashboardLoadingIndicator";
+import LoadingSpinner from "@/app/components/LoadingSpinner";
 import type {
   MyTeamOverviewResponse,
   TeamMemberSummary,
@@ -213,7 +213,7 @@ function MyTeamPage() {
 
   if (overviewQuery.isLoading || overviewQuery.isPending) {
     return (
-      <DashboardLoadingIndicator
+      <LoadingSpinner
         fullscreen
         label="Loading your team"
         helper="Collecting member profiles, work styles, and schedules."
