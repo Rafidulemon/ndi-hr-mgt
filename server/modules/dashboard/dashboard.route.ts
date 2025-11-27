@@ -22,4 +22,7 @@ export const dashboardRouter = router({
   notifications: protectedProcedure.query(({ ctx }) =>
     DashboardController.getNotifications(ctx),
   ),
+  holidays: protectedProcedure.query(({ ctx }) =>
+    DashboardController.getHolidays(ctx),
+  ),
 });

@@ -77,6 +77,12 @@ const getNotifications = (ctx: TRPCContext) =>
     "Failed to load notifications.",
   );
 
+const getHolidays = (ctx: TRPCContext) =>
+  handleRequest(
+    () => DashboardService.getHolidaysSection(buildDashboardInput(ctx)),
+    "Failed to load holidays.",
+  );
+
 export const DashboardController = {
   getOverview,
   getProfile,
@@ -84,4 +90,5 @@ export const DashboardController = {
   getAttendance,
   getTimeOff,
   getNotifications,
+  getHolidays,
 };

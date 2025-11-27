@@ -204,8 +204,9 @@ export const userService = {
     const userId = ctx.session.user.id;
     const organizationId = ctx.session.user.organizationId;
 
-    await ctx.prisma.$transaction(async (tx) => {
-      await tx.employeeProfile.upsert({
+    const prismaClient = ctx.prisma;
+
+    await prismaClient.employeeProfile.upsert({
         where: { userId },
         update: {
           firstName: parsed.profile.firstName,
@@ -242,9 +243,9 @@ export const userService = {
         },
       });
 
-      let departmentId: string | null | undefined;
-      if (parsed.employment.departmentName) {
-        const department = await tx.department.upsert({
+    let departmentId: string | null | undefined;
+    if (parsed.employment.departmentName) {
+      const department = await prismaClient.department.upsert({
           where: {
             organizationId_name: {
               organizationId,
@@ -257,10 +258,10 @@ export const userService = {
             name: parsed.employment.departmentName,
           },
         });
-        departmentId = department.id;
-      }
+      departmentId = department.id;
+    }
 
-      await tx.employmentDetail.upsert({
+    await prismaClient.employmentDetail.upsert({
         where: { userId },
         update: {
           employeeCode: parsed.employment.employeeCode,
@@ -283,20 +284,20 @@ export const userService = {
         },
       });
 
-      await tx.user.update({
+    await prismaClient.user.update({
         where: { id: userId },
         data: {
           phone: parsed.profile.workPhone ?? parsed.profile.personalPhone ?? null,
         },
       });
 
-      const existingEmergency = await tx.emergencyContact.findFirst({
+    const existingEmergency = await prismaClient.emergencyContact.findFirst({
         where: { userId },
         orderBy: { createdAt: "asc" },
       });
 
-      if (existingEmergency) {
-        await tx.emergencyContact.update({
+    if (existingEmergency) {
+      await prismaClient.emergencyContact.update({
           where: { id: existingEmergency.id },
           data: {
             name: parsed.emergencyContact.name,
@@ -305,8 +306,8 @@ export const userService = {
             alternatePhone: parsed.emergencyContact.alternatePhone ?? null,
           },
         });
-      } else {
-        await tx.emergencyContact.create({
+    } else {
+      await prismaClient.emergencyContact.create({
           data: {
             userId,
             name: parsed.emergencyContact.name,
@@ -315,15 +316,15 @@ export const userService = {
             alternatePhone: parsed.emergencyContact.alternatePhone ?? null,
           },
         });
-      }
+    }
 
-      const existingBank = await tx.employeeBankAccount.findFirst({
+    const existingBank = await prismaClient.employeeBankAccount.findFirst({
         where: { userId },
         orderBy: { createdAt: "asc" },
       });
 
-      if (existingBank) {
-        await tx.employeeBankAccount.update({
+    if (existingBank) {
+      await prismaClient.employeeBankAccount.update({
           where: { id: existingBank.id },
           data: {
             bankName: parsed.bankAccount.bankName,
@@ -334,8 +335,8 @@ export const userService = {
             taxId: parsed.bankAccount.taxId ?? null,
           },
         });
-      } else {
-        await tx.employeeBankAccount.create({
+    } else {
+      await prismaClient.employeeBankAccount.create({
           data: {
             userId,
             bankName: parsed.bankAccount.bankName,
@@ -346,8 +347,7 @@ export const userService = {
             taxId: parsed.bankAccount.taxId ?? null,
           },
         });
-      }
-    });
+    }
 
     return this.getProfile(ctx);
   },

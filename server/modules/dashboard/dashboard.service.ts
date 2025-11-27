@@ -20,6 +20,7 @@ import {
 import type {
   DashboardAttendanceSection,
   DashboardAttendanceTrendPoint,
+  DashboardHolidaysSection,
   DashboardNotificationsSection,
   DashboardProfileSection,
   DashboardSummarySection,
@@ -204,6 +205,20 @@ const notificationSelect = {
   createdAt: true,
 } as const satisfies Prisma.NotificationSelect;
 
+const holidaySelect = {
+  id: true,
+  title: true,
+  description: true,
+  date: true,
+} as const satisfies Prisma.HolidaySelect;
+
+const workPolicySelect = {
+  onsiteStartTime: true,
+  onsiteEndTime: true,
+  remoteStartTime: true,
+  remoteEndTime: true,
+} as const satisfies Prisma.WorkPolicySelect;
+
 const notificationStatusesForDashboard: NotificationStatus[] = [
   NotificationStatus.SENT,
   NotificationStatus.SCHEDULED,
@@ -235,6 +250,14 @@ type LeaveRequestForDashboard = Prisma.LeaveRequestGetPayload<{
 
 type NotificationForDashboard = Prisma.NotificationGetPayload<{
   select: typeof notificationSelect;
+}>;
+
+type HolidayForDashboard = Prisma.HolidayGetPayload<{
+  select: typeof holidaySelect;
+}>;
+
+type WorkPolicyForDashboard = Prisma.WorkPolicyGetPayload<{
+  select: typeof workPolicySelect;
 }>;
 
 type MonthlyAttendanceSummary = {
@@ -314,6 +337,8 @@ type DashboardDataset = {
   monthlyLeaveRequests: LeaveRequestForDashboard[];
   upcomingLeaves: LeaveRequestForDashboard[];
   notifications: NotificationForDashboard[];
+  upcomingHolidays: HolidayForDashboard[];
+  workPolicy: WorkPolicyForDashboard | null;
   pendingCount: number;
   dates: DashboardDates;
   organizationName: string;
@@ -326,6 +351,23 @@ type DashboardSections = {
   timeOff: DashboardTimeOffSection;
   notifications: DashboardNotificationsSection;
   overview: EmployeeDashboardResponse;
+};
+
+const formatWorkPolicyHours = (
+  policy: WorkPolicyForDashboard | null,
+): string | null => {
+  if (!policy) {
+    return null;
+  }
+  const onsite =
+    policy.onsiteStartTime && policy.onsiteEndTime
+      ? `On-site ${policy.onsiteStartTime}-${policy.onsiteEndTime}`
+      : null;
+  const remote =
+    policy.remoteStartTime && policy.remoteEndTime
+      ? `Remote ${policy.remoteStartTime}-${policy.remoteEndTime}`
+      : null;
+  return [onsite, remote].filter(Boolean).join(" • ") || null;
 };
 
 const loadDashboardDataset = async (
@@ -347,6 +389,8 @@ const loadDashboardDataset = async (
     monthlyLeaveRequests,
     upcomingLeaves,
     notifications,
+    upcomingHolidays,
+    workPolicy,
     pendingCount,
   ] = await prisma.$transaction([
     prisma.user.findUnique({
@@ -409,6 +453,23 @@ const loadDashboardDataset = async (
       ],
       take: 5,
     }),
+    prisma.holiday.findMany({
+      where: {
+        organizationId,
+        date: {
+          gte: todayStart,
+        },
+      },
+      select: holidaySelect,
+      orderBy: { date: "asc" },
+      take: 5,
+    }),
+    prisma.workPolicy.findUnique({
+      where: {
+        organizationId,
+      },
+      select: workPolicySelect,
+    }),
     prisma.leaveRequest.count({
       where: {
         employeeId: userId,
@@ -447,6 +508,8 @@ const loadDashboardDataset = async (
     monthlyLeaveRequests,
     upcomingLeaves,
     notifications,
+    upcomingHolidays,
+    workPolicy,
     pendingCount,
     dates,
     organizationName,
@@ -461,6 +524,8 @@ const buildDashboardSections = (dataset: DashboardDataset): DashboardSections =>
     upcomingLeaves,
     notifications,
     pendingCount,
+    upcomingHolidays,
+    workPolicy,
     dates,
     organizationName,
   } = dataset;
@@ -568,6 +633,7 @@ const buildDashboardSections = (dataset: DashboardDataset): DashboardSections =>
 
   const profile = user.profile;
   const employment = user.employment;
+  const workHoursLabel = formatWorkPolicyHours(workPolicy);
   const baseName = [profile?.firstName, profile?.lastName]
     .filter(Boolean)
     .join(" ")
@@ -655,7 +721,7 @@ const buildDashboardSections = (dataset: DashboardDataset): DashboardSections =>
     },
     {
       label: "Work Hours",
-      value: employment?.workHours ?? null,
+      value: workHoursLabel,
     },
     {
       label: "Location",
@@ -730,7 +796,7 @@ const buildDashboardSections = (dataset: DashboardDataset): DashboardSections =>
       employmentType: employment?.employmentType ?? null,
       employmentStatus: employment?.status ?? null,
       workModel: profile?.workModel ?? null,
-      workHours: employment?.workHours ?? null,
+      workHours: workHoursLabel,
       currentProject: employment?.currentProject?.name ?? null,
       currentProjectNote: employment?.currentProjectNote ?? null,
       primaryLocation: employment?.primaryLocation ?? null,
@@ -765,9 +831,17 @@ const buildDashboardSections = (dataset: DashboardDataset): DashboardSections =>
     nextLeaveDate,
   };
 
+  const upcomingHolidayHighlights = upcomingHolidays.map((holiday) => ({
+    id: holiday.id,
+    title: holiday.title,
+    description: holiday.description ?? null,
+    date: holiday.date.toISOString(),
+  }));
+
   const timeOffSection: DashboardTimeOffSection = {
     leaveBalances,
     leaveHighlights,
+    upcomingHolidays: upcomingHolidayHighlights,
   };
 
   const notificationsSection: DashboardNotificationsSection = {
@@ -784,6 +858,7 @@ const buildDashboardSections = (dataset: DashboardDataset): DashboardSections =>
     attendanceTrend: attendanceSection.attendanceTrend,
     leaveBalances: timeOffSection.leaveBalances,
     leaveHighlights: timeOffSection.leaveHighlights,
+    upcomingHolidays: timeOffSection.upcomingHolidays,
     notifications: notificationsSection.notifications,
   };
 
@@ -794,6 +869,36 @@ const buildDashboardSections = (dataset: DashboardDataset): DashboardSections =>
     timeOff: timeOffSection,
     notifications: notificationsSection,
     overview,
+  };
+};
+
+const getHolidaysSection = async (
+  input: DashboardServiceInput,
+): Promise<DashboardHolidaysSection> => {
+  const { organizationId, organizationNameHint } = input;
+  const holidayRecords = await prisma.holiday.findMany({
+    where: { organizationId },
+    select: holidaySelect,
+    orderBy: { date: "asc" },
+  });
+
+  let workspaceName = organizationNameHint;
+  if (!workspaceName) {
+    const organization = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { name: true },
+    });
+    workspaceName = organization?.name ?? null;
+  }
+
+  return {
+    workspaceName: workspaceName ?? "Workspace",
+    holidays: holidayRecords.map((record) => ({
+      id: record.id,
+      title: record.title,
+      description: record.description ?? null,
+      date: record.date.toISOString(),
+    })),
   };
 };
 
@@ -839,4 +944,5 @@ export const DashboardService = {
   getAttendanceSection,
   getTimeOffSection,
   getNotificationsSection,
+  getHolidaysSection,
 };

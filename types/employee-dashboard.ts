@@ -72,6 +72,13 @@ export type DashboardLeaveHighlight = {
   totalDays: number;
 };
 
+export type DashboardHolidayHighlight = {
+  id: string;
+  title: string;
+  description: string | null;
+  date: string;
+};
+
 export type DashboardNotificationItem = {
   id: string;
   title: string;
@@ -96,6 +103,7 @@ export type EmployeeDashboardResponse = {
     upcoming: DashboardLeaveHighlight[];
     nextLeaveDate: string | null;
   };
+  upcomingHolidays: DashboardHolidayHighlight[];
   notifications: DashboardNotificationItem[];
 };
 
@@ -119,8 +127,14 @@ export type DashboardAttendanceSection = {
 export type DashboardTimeOffSection = {
   leaveBalances: LeaveBalanceResponse[];
   leaveHighlights: EmployeeDashboardResponse["leaveHighlights"];
+  upcomingHolidays: DashboardHolidayHighlight[];
 };
 
 export type DashboardNotificationsSection = {
   notifications: DashboardNotificationItem[];
+};
+
+export type DashboardHolidaysSection = {
+  workspaceName: string;
+  holidays: DashboardHolidayHighlight[];
 };

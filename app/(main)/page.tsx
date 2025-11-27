@@ -27,6 +27,8 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
   minute: "numeric",
 });
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const leaveColorMap: Record<string, string> = {
   CASUAL: "#0ea5e9",
   SICK: "#14b8a6",
@@ -95,18 +97,6 @@ const formatDateValue = (
   return formatter.format(parsed);
 };
 
-const formatDateRange = (start?: string | null, end?: string | null) => {
-  if (!start && !end) return "—";
-  if (!start) return formatDateValue(end, shortDateFormatter);
-  if (!end || start === end) {
-    return formatDateValue(start, shortDateFormatter);
-  }
-  return `${formatDateValue(start, shortDateFormatter)} → ${formatDateValue(
-    end,
-    shortDateFormatter,
-  )}`;
-};
-
 const formatDuration = (seconds: number) => {
   if (!seconds) return "—";
   const hours = Math.floor(seconds / 3600);
@@ -127,6 +117,28 @@ const formatHoursValue = (value: number) => {
 
 const formatTextValue = (value?: string | null) =>
   value && value.trim().length > 0 ? value : "—";
+
+const formatDaysUntil = (value?: string | null) => {
+  if (!value) return null;
+  const target = new Date(value);
+  if (Number.isNaN(target.getTime())) {
+    return null;
+  }
+  const normalizedTarget = new Date(target);
+  normalizedTarget.setHours(0, 0, 0, 0);
+  const normalizedToday = new Date();
+  normalizedToday.setHours(0, 0, 0, 0);
+  const diffDays = Math.ceil(
+    (normalizedTarget.getTime() - normalizedToday.getTime()) / DAY_MS,
+  );
+  if (diffDays <= 0) {
+    return "Today";
+  }
+  if (diffDays === 1) {
+    return "Tomorrow";
+  }
+  return `In ${diffDays} days`;
+};
 
 const humanizeStatus = (status: string) =>
   status
@@ -275,6 +287,7 @@ function HomePage() {
     attendanceTrend: attendanceSection.attendanceTrend,
     leaveBalances: timeOffSection.leaveBalances,
     leaveHighlights: timeOffSection.leaveHighlights,
+    upcomingHolidays: timeOffSection.upcomingHolidays,
     notifications: notificationsSection.notifications,
   };
   const profile = data.profile;
@@ -307,13 +320,11 @@ function HomePage() {
       label: statusLabelMap[status] ?? humanizeStatus(status),
     }));
 
-  const nextLeaveDate = data.leaveHighlights.nextLeaveDate
-    ? formatDateValue(data.leaveHighlights.nextLeaveDate, longDateFormatter)
-    : null;
-  const availabilityTip =
-    data.attendanceSummary.averageCheckIn && data.attendanceSummary.averageCheckIn !== "—"
-      ? `Average check-in around ${data.attendanceSummary.averageCheckIn}.`
-      : "Keep logging your day so we can surface accurate habits.";
+  const upcomingHolidays = data.upcomingHolidays.map((holiday) => ({
+    ...holiday,
+    formattedDate: formatDateValue(holiday.date, longDateFormatter),
+    countdown: formatDaysUntil(holiday.date),
+  }));
 
   return (
     <div className="relative space-y-8">
@@ -425,108 +436,113 @@ function HomePage() {
             ))}
           </div>
         </CardWithHeader>
-
-        <CardWithHeader title="Availability & Notices" titleColor="bg-emerald-500" className="h-full">
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-5 py-6 text-emerald-900 shadow-inner dark:border-emerald-900/60 dark:bg-emerald-500/10 dark:text-emerald-200">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em]">Schedule</p>
-            <p className="mt-2 text-lg font-semibold">{formatTextValue(profile.workHours)}</p>
-            <p className="text-sm text-emerald-700 dark:text-emerald-200/80">
-              {formatTextValue(profile.primaryLocation)} • {formatTextValue(profile.workModel)}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-100 bg-white/80 px-5 py-4 text-sm text-slate-600 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300">
-            <p className="font-semibold text-slate-700 dark:text-slate-100">
-              {nextLeaveDate ? `Next leave on ${nextLeaveDate}` : "No time off scheduled"}
-            </p>
-            <p className="text-slate-500 dark:text-slate-400">
-              {data.leaveHighlights.pendingCount > 0
-                ? `${data.leaveHighlights.pendingCount} request${
-                    data.leaveHighlights.pendingCount === 1 ? "" : "s"
-                  } awaiting approval.`
-                : "All requests are clear."}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-5 py-4 text-sm text-indigo-700 shadow-sm transition-colors duration-200 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200">
-            <p className="font-semibold">Routine insight</p>
-            <p>{availabilityTip}</p>
-          </div>
-        </CardWithHeader>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <CardWithHeader title="Upcoming Time Off" titleColor="bg-purple-500">
-          {data.leaveHighlights.upcoming.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              You have no upcoming leave scheduled.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {data.leaveHighlights.upcoming.map((leave) => (
-                <div
-                  key={leave.id}
-                  className="flex flex-col gap-2 rounded-2xl border border-white/60 bg-white/80 px-5 py-4 text-sm text-slate-600 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                      {leave.leaveTypeLabel}
-                    </p>
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
-                      {formatDateRange(leave.startDate, leave.endDate)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold">
-                      {leave.totalDays} day{leave.totalDays === 1 ? "" : "s"}
-                    </span>
-                    <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-300">
-                      {humanizeStatus(leave.status)}
-                    </span>
-                  </div>
-                </div>
-              ))}
+        <CardWithHeader title="Upcoming Holidays" titleColor="bg-purple-500">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Stay ahead of organization-wide breaks.
+              </p>
+              <Button
+                href="/holidays"
+                theme="secondary"
+                className="text-xs font-semibold uppercase tracking-wide"
+              >
+                See more
+              </Button>
             </div>
-          )}
+            {upcomingHolidays.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                No upcoming holidays have been scheduled yet.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {upcomingHolidays.map((holiday) => (
+                  <div
+                    key={holiday.id}
+                    className="rounded-2xl border border-white/60 bg-white/80 px-5 py-4 text-slate-600 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300"
+                  >
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                          {holiday.title}
+                        </p>
+                        <p className="text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
+                          {holiday.formattedDate}
+                        </p>
+                      </div>
+                      {holiday.countdown ? (
+                        <span className="rounded-full border border-purple-200 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-purple-600 dark:border-purple-500/40 dark:text-purple-200">
+                          {holiday.countdown}
+                        </span>
+                      ) : null}
+                    </div>
+                    {holiday.description ? (
+                      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                        {holiday.description}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </CardWithHeader>
 
         <CardWithHeader title="Notifications" titleColor="bg-amber-500">
-          {data.notifications.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              No notifications from your workspace just yet.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {data.notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className="rounded-2xl border border-white/60 bg-white/80 px-5 py-4 text-sm shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">
-                      {notification.title}
-                    </p>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                      {getNotificationTypeLabel(notification.type)}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-slate-500 dark:text-slate-400">{notification.body}</p>
-                  <p className="mt-2 text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
-                    {formatDateValue(notification.timestamp, dateTimeFormatter)}
-                  </p>
-                </div>
-              ))}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-slate-500 dark:text-slate-400">Your latest workspace updates.</p>
+              <Button
+                href="/notification"
+                theme="secondary"
+                className="text-xs font-semibold uppercase tracking-wide"
+              >
+                See all
+              </Button>
             </div>
-          )}
+            {data.notifications.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                No notifications from your workspace just yet.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {data.notifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className="rounded-2xl border border-white/60 bg-white/80 px-5 py-4 text-sm shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">
+                        {notification.title}
+                      </p>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                        {getNotificationTypeLabel(notification.type)}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-slate-500 dark:text-slate-400">{notification.body}</p>
+                    <p className="mt-2 text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
+                      {formatDateValue(notification.timestamp, dateTimeFormatter)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </CardWithHeader>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
         <CardWithHeader title="Attendance Trend" titleColor="bg-cyan-500">
-          <div className="rounded-3xl border border-white/60 bg-gradient-to-b from-white to-white/40 p-6 shadow-inner transition dark:border-slate-700/60 dark:from-slate-900 dark:to-slate-900/40">
-            {attendanceChart.markers.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                No attendance records for this period.
-              </p>
-            ) : (
+          <div className="flex flex-col gap-4">
+            <div className="rounded-3xl border border-white/60 bg-gradient-to-b from-white to-white/40 p-6 shadow-inner transition dark:border-slate-700/60 dark:from-slate-900 dark:to-slate-900/40">
+              {attendanceChart.markers.length === 0 ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  No attendance records for this period.
+                </p>
+              ) : (
               <div className="space-y-4">
                 <div className="relative h-48 w-full">
                   <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
@@ -599,41 +615,63 @@ function HomePage() {
                   })}
                 </div>
               </div>
-            )}
+              )}
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center">
+              <Button
+                href="/attendance/history"
+                theme="secondary"
+                className="text-xs font-semibold uppercase tracking-wide"
+              >
+                Attendance history
+              </Button>
+            </div>
           </div>
         </CardWithHeader>
 
         <CardWithHeader title="Leave Balance" titleColor="bg-rose-500">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
-            <div className="flex flex-1 flex-col items-center gap-3">
-              <div
-                className="h-40 w-40 rounded-full border-8 border-white/70 bg-white/70 shadow-inner dark:border-slate-800/70 dark:bg-slate-900/60"
-                style={{ backgroundImage: leaveChart.background }}
-              />
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Total balance: {data.quickStats.find((stat) => stat.id === "leave-balance")?.value ?? "0d"}
-              </p>
-            </div>
-            <div className="flex-1 space-y-3">
-              {leaveChart.legend.map((entry) => (
+          <div className="flex flex-col gap-4">
+            
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
+              <div className="flex flex-1 flex-col items-center gap-3">
                 <div
-                  key={entry.type}
-                  className="flex items-center justify-between rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-sm text-slate-600 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300"
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="h-3 w-3 rounded-full"
-                      style={{ backgroundColor: entry.color }}
-                    />
+                  className="h-40 w-40 rounded-full border-8 border-white/70 bg-white/70 shadow-inner dark:border-slate-800/70 dark:bg-slate-900/60"
+                  style={{ backgroundImage: leaveChart.background }}
+                />
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Total balance: {data.quickStats.find((stat) => stat.id === "leave-balance")?.value ?? "0d"}
+                </p>
+              </div>
+              <div className="flex-1 space-y-3">
+                {leaveChart.legend.map((entry) => (
+                  <div
+                    key={entry.type}
+                    className="flex items-center justify-between rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-sm text-slate-600 shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="h-3 w-3 rounded-full"
+                        style={{ backgroundColor: entry.color }}
+                      />
+                      <span className="font-semibold text-slate-900 dark:text-slate-100">
+                        {entry.label}
+                      </span>
+                    </div>
                     <span className="font-semibold text-slate-900 dark:text-slate-100">
-                      {entry.label}
+                      {entry.remaining} day{entry.remaining === 1 ? "" : "s"}
                     </span>
                   </div>
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">
-                    {entry.remaining} day{entry.remaining === 1 ? "" : "s"}
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center">
+              <Button
+                href="/leave"
+                theme="secondary"
+                className="text-xs font-semibold uppercase tracking-wide"
+              >
+                Leave history
+              </Button>
             </div>
           </div>
         </CardWithHeader>
