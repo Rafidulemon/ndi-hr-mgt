@@ -109,7 +109,9 @@ const LeftMenu = ({
   const pathname = usePathname();
   const currentPath = pathname ?? "/";
   const unseenNotificationQuery = trpc.notification.unseenCount.useQuery(undefined, {
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: true,
   });
   const unseenNotifications = unseenNotificationQuery.data?.unseen ?? 0;
 

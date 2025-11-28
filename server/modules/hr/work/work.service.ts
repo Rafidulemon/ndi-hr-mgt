@@ -1,3 +1,8 @@
+import {
+  NotificationAudience,
+  NotificationStatus,
+  NotificationType,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import type { TRPCContext } from "@/server/api/trpc";
@@ -27,6 +32,18 @@ const timeFormatter = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
   year: "numeric",
 });
+
+const formatDayLabel = (day: WeekdayOption) =>
+  day
+    .split("_")
+    .map((piece) => piece.charAt(0) + piece.slice(1).toLowerCase())
+    .join(" ");
+
+const sortWeekdays = (values: WeekdayOption[]) =>
+  [...values].sort((a, b) => WEEKDAY_OPTIONS.indexOf(a) - WEEKDAY_OPTIONS.indexOf(b));
+
+const formatDayList = (values: WeekdayOption[]) =>
+  values.length ? sortWeekdays(values).map((day) => formatDayLabel(day)).join(", ") : "Not set";
 
 const normalizeDate = (input: string) => {
   const date = new Date(input);
@@ -146,15 +163,43 @@ export const hrWorkService = {
     }
 
     const normalizedDate = normalizeDate(input.date);
+    const title = input.title.trim();
+    const description = input.description?.trim() ? input.description.trim() : null;
+    const readableDate = timeFormatter.format(normalizedDate);
 
     try {
-      await ctx.prisma.holiday.create({
-        data: {
-          organizationId,
-          title: input.title.trim(),
-          date: normalizedDate,
-          description: input.description?.trim() ? input.description.trim() : null,
-        },
+      await ctx.prisma.$transaction(async (tx) => {
+        const holidayRecord = await tx.holiday.create({
+          data: {
+            organizationId,
+            title,
+            date: normalizedDate,
+            description,
+          },
+        });
+
+        const sentAt = new Date();
+        const descriptionSuffix = description ? ` ${description}` : "";
+
+        await tx.notification.create({
+          data: {
+            organizationId,
+            senderId: user.id,
+            title: `New holiday scheduled: ${title}`,
+            body: `${title} will be observed on ${readableDate}.${descriptionSuffix}`,
+            type: NotificationType.ANNOUNCEMENT,
+            status: NotificationStatus.SENT,
+            audience: NotificationAudience.ORGANIZATION,
+            actionUrl: "/holidays",
+            metadata: {
+              holidayId: holidayRecord.id,
+              holidayDate: normalizedDate.toISOString(),
+              appliesTo: "All employees",
+              ...(description ? { reason: description } : {}),
+            },
+            sentAt,
+          },
+        });
       });
     } catch (error) {
       void error;
@@ -201,6 +246,32 @@ export const hrWorkService = {
         onsiteEndTime: onsEnd,
         remoteStartTime: remoteStart,
         remoteEndTime: remoteEnd,
+      },
+    });
+
+    const sentAt = new Date();
+    const onsiteWindow = `${onsStart} - ${onsEnd}`;
+    const remoteWindow = `${remoteStart} - ${remoteEnd}`;
+
+    await ctx.prisma.notification.create({
+      data: {
+        organizationId,
+        senderId: user.id,
+        title: "Working hours updated",
+        body: `On-site ${onsiteWindow} | Remote ${remoteWindow}`,
+        type: NotificationType.ANNOUNCEMENT,
+        status: NotificationStatus.SENT,
+        audience: NotificationAudience.ORGANIZATION,
+        actionUrl: "/attendance",
+        metadata: {
+          effectiveDate: sentAt.toISOString(),
+          appliesTo: "All employees",
+          onsiteStartTime: onsStart,
+          onsiteEndTime: onsEnd,
+          remoteStartTime: remoteStart,
+          remoteEndTime: remoteEnd,
+        },
+        sentAt,
       },
     });
   },
@@ -253,6 +324,30 @@ export const hrWorkService = {
       update: {
         workingDays,
         weekendDays,
+      },
+    });
+
+    const sentAt = new Date();
+    const workingLabel = formatDayList(workingDays);
+    const weekendLabel = formatDayList(weekendDays);
+
+    await ctx.prisma.notification.create({
+      data: {
+        organizationId,
+        senderId: user.id,
+        title: "Workweek cadence updated",
+        body: `Working days: ${workingLabel} | Weekend: ${weekendLabel}`,
+        type: NotificationType.ANNOUNCEMENT,
+        status: NotificationStatus.SENT,
+        audience: NotificationAudience.ORGANIZATION,
+        actionUrl: "/attendance",
+        metadata: {
+          effectiveDate: sentAt.toISOString(),
+          appliesTo: "All employees",
+          workingDays: sortWeekdays(workingDays),
+          weekendDays: sortWeekdays(weekendDays),
+        },
+        sentAt,
       },
     });
   },

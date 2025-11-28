@@ -268,7 +268,12 @@ export const leaveService = {
           status: NotificationStatus.SENT,
           actionUrl: "/hr-admin/leave-approvals",
           audience: NotificationAudience.ROLE,
-          targetRoles: [UserRole.HR_ADMIN],
+          targetRoles: [
+            UserRole.HR_ADMIN,
+            UserRole.MANAGER,
+            UserRole.ORG_ADMIN,
+            UserRole.SUPER_ADMIN,
+          ],
           metadata: {
             leaveRequestId: createdRequest.id,
             employeeId: session.user.id,

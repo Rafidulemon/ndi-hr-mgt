@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { LeaveStatus, LeaveType } from "@prisma/client";
 
-const manageableStatuses = ["PROCESSING", "APPROVED", "DENIED"] as const;
+const manageableStatuses = ["PROCESSING", "APPROVED", "DENIED", "CANCELLED"] as const;
 const sortFields = ["submittedAt", "startDate", "leaveType", "status"] as const;
 const sortOrders = ["asc", "desc"] as const;
 

@@ -29,10 +29,16 @@ const employmentSummarySelect = {
   employeeCode: true,
   designation: true,
   department: {
-    select: { name: true },
+    select: {
+      name: true,
+      headId: true,
+    },
   },
   team: {
-    select: { name: true },
+    select: {
+      name: true,
+      leadId: true,
+    },
   },
   ...employmentBalanceSelect,
 } as const;
@@ -107,6 +113,7 @@ const formatDateRangeLabel = (start: Date, end: Date) => {
 const EMPLOYEE_NOTIFICATION_STATUSES: LeaveStatus[] = [
   LeaveStatus.APPROVED,
   LeaveStatus.DENIED,
+  LeaveStatus.CANCELLED,
 ];
 
 const formatEmployeeName = (record: {
@@ -339,36 +346,99 @@ export const hrLeaveService = {
 
     const nextStatus = input.status as LeaveStatus;
     const notifyEmployee = EMPLOYEE_NOTIFICATION_STATUSES.includes(nextStatus);
+    const organizationId = refreshed.employee.organizationId ?? sessionUser.organizationId;
+    const leaveTypeLabel = leaveTypeLabelMap[toLeaveTypeValue(refreshed.leaveType)];
+    const rangeLabel = formatDateRangeLabel(refreshed.startDate, refreshed.endDate);
+    const totalLeaveDays = decimalToNumber(refreshed.totalDays as Prisma.Decimal);
+    const dayLabel = totalLeaveDays === 1 ? "day" : "days";
+    const employeeDisplayName = formatEmployeeName({
+      preferredName: refreshed.employee.profile?.preferredName ?? null,
+      firstName: refreshed.employee.profile?.firstName ?? null,
+      lastName: refreshed.employee.profile?.lastName ?? null,
+      fallback: refreshed.employee.email,
+    });
 
-    if (notifyEmployee) {
-      const organizationId = refreshed.employee.organizationId ?? sessionUser.organizationId;
-      if (organizationId) {
-        const leaveTypeLabel = leaveTypeLabelMap[toLeaveTypeValue(refreshed.leaveType)];
-        const rangeLabel = formatDateRangeLabel(refreshed.startDate, refreshed.endDate);
-        const actionVerb = nextStatus === LeaveStatus.APPROVED ? "approved" : "denied";
+    if (organizationId && notifyEmployee) {
+      const { title, messageSuffix } = (() => {
+        switch (nextStatus) {
+          case LeaveStatus.APPROVED:
+            return { title: "Leave request approved", messageSuffix: "was approved." };
+          case LeaveStatus.CANCELLED:
+            return { title: "Leave request cancelled", messageSuffix: "was cancelled by HR." };
+          default:
+            return { title: "Leave request denied", messageSuffix: "was denied." };
+        }
+      })();
 
-        await ctx.prisma.notification.create({
-          data: {
-            organizationId,
-            senderId: sessionUser.id,
-            title: `Leave request ${actionVerb}`,
-            body: `Your ${leaveTypeLabel} (${rangeLabel}) was ${actionVerb}.`,
-            type: NotificationType.LEAVE,
-            status: NotificationStatus.SENT,
-            audience: NotificationAudience.INDIVIDUAL,
-            targetUserId: refreshed.employee.id,
-            actionUrl: "/leave",
-            metadata: {
-              leaveRequestId: refreshed.id,
-              status: nextStatus,
-              reviewerId: sessionUser.id,
-              startDate: refreshed.startDate.toISOString(),
-              endDate: refreshed.endDate.toISOString(),
-              note: input.note ?? null,
-            },
-            sentAt: new Date(),
+      await ctx.prisma.notification.create({
+        data: {
+          organizationId,
+          senderId: sessionUser.id,
+          title,
+          body: `Your ${leaveTypeLabel} (${rangeLabel}) ${messageSuffix}`,
+          type: NotificationType.LEAVE,
+          status: NotificationStatus.SENT,
+          audience: NotificationAudience.INDIVIDUAL,
+          targetUserId: refreshed.employee.id,
+          actionUrl: "/leave",
+          metadata: {
+            leaveRequestId: refreshed.id,
+            status: nextStatus,
+            reviewerId: sessionUser.id,
+            startDate: refreshed.startDate.toISOString(),
+            endDate: refreshed.endDate.toISOString(),
+            note: input.note ?? null,
           },
-        });
+          sentAt: new Date(),
+        },
+      });
+    }
+
+    if (organizationId && nextStatus === LeaveStatus.APPROVED) {
+      const employmentDetails = refreshed.employee.employment;
+      const potentialRecipients = [
+        employmentDetails?.team?.leadId ?? null,
+        employmentDetails?.department?.headId ?? null,
+      ];
+      const managerRecipients = Array.from(
+        new Set(
+          potentialRecipients.filter(
+            (value): value is string =>
+              Boolean(value && value !== refreshed.employee.id && value !== sessionUser.id),
+          ),
+        ),
+      );
+
+      if (managerRecipients.length > 0) {
+        const sentAt = new Date();
+        const managerBody = `${employeeDisplayName}'s ${leaveTypeLabel} (${rangeLabel}) was approved (${totalLeaveDays} ${dayLabel}).`;
+        await Promise.all(
+          managerRecipients.map((targetUserId) =>
+            ctx.prisma.notification.create({
+              data: {
+                organizationId,
+                senderId: sessionUser.id,
+                title: `${employeeDisplayName}'s leave approved`,
+                body: managerBody,
+                type: NotificationType.LEAVE,
+                status: NotificationStatus.SENT,
+                audience: NotificationAudience.INDIVIDUAL,
+                targetUserId,
+                metadata: {
+                  leaveRequestId: refreshed.id,
+                  status: nextStatus,
+                  reviewerId: sessionUser.id,
+                  employeeId: refreshed.employee.id,
+                  startDate: refreshed.startDate.toISOString(),
+                  endDate: refreshed.endDate.toISOString(),
+                  totalDays: totalLeaveDays,
+                  note: input.note ?? null,
+                },
+                sentAt,
+              },
+            }),
+          ),
+        );
       }
     }
 

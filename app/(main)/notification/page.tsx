@@ -94,6 +94,11 @@ function NotificationPage() {
     if (typeof id !== "string") {
       return;
     }
+    const target = notifications.find((notification) => notification.id === id);
+    if (target?.actionUrl) {
+      router.push(target.actionUrl);
+      return;
+    }
     router.push(`/notification/${id}`);
   };
 
