@@ -259,7 +259,7 @@ export default function WorkManagementClient() {
         <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
           <p className="text-base font-semibold">Read-only view</p>
           <p className="text-sm">
-            Only org admins, managers, or super admins can update the operating rhythm.
+            Only org owners, org admins, or super admins can update the operating rhythm.
           </p>
         </div>
       ) : null}

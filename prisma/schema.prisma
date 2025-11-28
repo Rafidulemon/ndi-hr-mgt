@@ -9,6 +9,7 @@ datasource db {
 
 enum UserRole {
   SUPER_ADMIN
+  ORG_OWNER
   ORG_ADMIN
   HR_ADMIN
   MANAGER
@@ -102,6 +103,7 @@ model Organization {
   domain    String?  @unique
   timezone  String?  @default("Asia/Dhaka")
   locale    String?  @default("en-US")
+  ownerId   String?
   orgAdminId String?
   managerId  String?
   createdAt DateTime @default(now())
@@ -117,10 +119,12 @@ model Organization {
   dailyReports      DailyReport[]
   monthlyReports    MonthlyReport[]
   workPolicy        WorkPolicy?
+  owner             User?          @relation("OrganizationOwner", fields: [ownerId], references: [id])
   orgAdmin          User?          @relation("OrganizationAdmin", fields: [orgAdminId], references: [id])
   manager           User?          @relation("OrganizationManager", fields: [managerId], references: [id])
 
   @@index([name])
+  @@index([ownerId])
   @@index([orgAdminId])
   @@index([managerId])
 }
@@ -153,11 +157,12 @@ model User {
   notificationsSent     Notification[]        @relation("NotificationSender")
   notificationsReceived Notification[]        @relation("NotificationTargetUser")
   headedDepartments     Department[]          @relation("DepartmentHead")
-  ledTeams              Team[]                @relation("TeamLead")
+  teamLeadAssignments   TeamLead[]
   directReports         EmploymentDetail[]    @relation("ManagerReports")
   teamMemberships       TeamManager[]
   administeredOrganizations Organization[]    @relation("OrganizationAdmin")
   managedOrganizations      Organization[]    @relation("OrganizationManager")
+  ownedOrganizations        Organization[]    @relation("OrganizationOwner")
   sessions              Session[]
   passwordResetTokens   PasswordResetToken[]
 
@@ -269,6 +274,7 @@ model EmploymentDetail {
   primaryLocation    String?
   workHours          String?
   currentProjectNote String?
+  isTeamLead         Boolean         @default(false)
   casualLeaveBalance   Decimal   @default(0) @db.Decimal(5, 2)
   sickLeaveBalance     Decimal   @default(0) @db.Decimal(5, 2)
   annualLeaveBalance   Decimal   @default(0) @db.Decimal(5, 2)
@@ -316,14 +322,13 @@ model Team {
   departmentId   String
   name           String
   description    String?
-  leadId         String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization   Organization       @relation(fields: [organizationId], references: [id])
   department     Department         @relation(fields: [departmentId], references: [id])
-  lead           User?              @relation("TeamLead", fields: [leadId], references: [id])
   primaryMembers EmploymentDetail[] @relation("PrimaryTeam")
+  leads          TeamLead[]
   teamManagers   TeamManager[]
 
   @@unique([organizationId, name])
@@ -342,6 +347,19 @@ model TeamManager {
 
   @@unique([teamId, managerId])
   @@index([managerId])
+}
+
+model TeamLead {
+  id        String   @id @default(uuid())
+  teamId    String
+  leadId    String
+  createdAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  lead User @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, leadId])
+  @@index([leadId])
 }
 
 model AttendanceRecord {

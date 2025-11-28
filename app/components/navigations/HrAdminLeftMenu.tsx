@@ -24,6 +24,7 @@ import { TbReportAnalytics } from "react-icons/tb";
 
 import { Modal } from "../atoms/frame/Modal";
 import { canManageTeams } from "@/types/hr-team";
+import { canManageWork } from "@/types/hr-work";
 
 type MenuItem = {
   id:
@@ -55,8 +56,6 @@ type Props = {
   pendingLeaveCount?: number;
   viewerRole?: UserRole;
 };
-
-const RESTRICTED_MENU_IDS: ReadonlyArray<MenuItem["id"]> = ["teams", "work"];
 
 const hrMenuItems: MenuItem[] = [
   {
@@ -187,8 +186,11 @@ const HrAdminLeftMenu = ({
 
   const allowedMenuItems = useMemo(() => {
     return hrMenuItems.filter((item) => {
-      if (RESTRICTED_MENU_IDS.includes(item.id)) {
+      if (item.id === "teams") {
         return canManageTeams(viewerRole);
+      }
+      if (item.id === "work") {
+        return canManageWork(viewerRole);
       }
       return true;
     });

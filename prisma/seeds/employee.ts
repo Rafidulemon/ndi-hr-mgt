@@ -104,10 +104,20 @@ export const seedEmployees = async (prisma: PrismaClient) => {
   }
 
   for (const assignment of teamLeadAssignments) {
-    await prisma.team.update({
-      where: { id: assignment.teamId },
-      data: { leadId: assignment.leadId },
-    });
+    const uniqueLeadIds = Array.from(new Set(assignment.leadUserIds));
+    for (const leadId of uniqueLeadIds) {
+      await prisma.teamLead.create({
+        data: {
+          teamId: assignment.teamId,
+          leadId,
+        },
+      });
+
+      await prisma.employmentDetail.updateMany({
+        where: { userId: leadId },
+        data: { teamId: assignment.teamId, isTeamLead: true },
+      });
+    }
   }
 
   for (const assignment of teamManagerAssignments) {

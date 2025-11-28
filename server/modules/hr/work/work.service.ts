@@ -12,9 +12,8 @@ import type {
   HrWorkPolicy,
   WeekdayOption,
 } from "@/types/hr-work";
-import { WEEKDAY_OPTIONS } from "@/types/hr-work";
-import { canManageTeams } from "@/types/hr-team";
-import { requireTeamManager } from "@/server/modules/hr/utils";
+import { WEEKDAY_OPTIONS, canManageWork } from "@/types/hr-work";
+import { requireWorkManager } from "@/server/modules/hr/utils";
 
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -126,7 +125,7 @@ const assertWeekday = (value: string): WeekdayOption => {
 
 export const hrWorkService = {
   async overview(ctx: TRPCContext): Promise<HrWorkOverviewResponse> {
-    const user = requireTeamManager(ctx);
+    const user = requireWorkManager(ctx);
     const organizationId = user.organizationId;
 
     if (!organizationId) {
@@ -146,7 +145,7 @@ export const hrWorkService = {
 
     return {
       viewerRole: user.role,
-      canManage: canManageTeams(user.role),
+      canManage: canManageWork(user.role),
       policy: toPolicy(policyRecord),
       holidays: holidayRecords.map(toHolidaySummary),
     };
@@ -156,7 +155,7 @@ export const hrWorkService = {
     ctx: TRPCContext,
     input: { title: string; date: string; description?: string | null },
   ) {
-    const user = requireTeamManager(ctx);
+    const user = requireWorkManager(ctx);
     const organizationId = user.organizationId;
     if (!organizationId) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Organization context missing." });
@@ -219,7 +218,7 @@ export const hrWorkService = {
       remoteEndTime: string;
     },
   ) {
-    const user = requireTeamManager(ctx);
+    const user = requireWorkManager(ctx);
     const organizationId = user.organizationId;
     if (!organizationId) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Organization context missing." });
@@ -280,7 +279,7 @@ export const hrWorkService = {
     ctx: TRPCContext,
     input: { workingDays: WeekdayOption[]; weekendDays: WeekdayOption[] },
   ) {
-    const user = requireTeamManager(ctx);
+    const user = requireWorkManager(ctx);
     const organizationId = user.organizationId;
     if (!organizationId) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Organization context missing." });

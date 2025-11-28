@@ -130,6 +130,7 @@ const buildPersonSummary = (input: {
   } | null;
   employment?: {
     designation: string;
+    isTeamLead?: boolean | null;
   } | null;
 } | null): TeamPersonSummary | null => {
   if (!input) {
@@ -143,6 +144,7 @@ const buildPersonSummary = (input: {
     designation: input.employment?.designation ?? null,
     email: input.profile?.workEmail ?? input.email ?? null,
     workModel: input.profile?.workModel ?? null,
+    isTeamLead: Boolean(input.employment?.isTeamLead),
   };
 };
 
@@ -176,6 +178,7 @@ const toMemberSummary = (
     startDateLabel: record.startDate ? dateFormatter.format(record.startDate) : null,
     tenureMonths,
     tenureLabel: formatTenureLabel(tenureMonths),
+    isTeamLead: record.isTeamLead ?? false,
   };
 };
 
@@ -214,6 +217,7 @@ const memberSelect = {
   status: true,
   startDate: true,
   primaryLocation: true,
+  isTeamLead: true,
   user: {
     select: {
       id: true,
@@ -274,29 +278,35 @@ export const teamService = {
                     employment: {
                       select: {
                         designation: true,
+                        isTeamLead: true,
                       },
                     },
                   },
                 },
               },
             },
-            lead: {
+            leads: {
               select: {
-                id: true,
-                email: true,
-                profile: {
+                lead: {
                   select: {
-                    firstName: true,
-                    lastName: true,
-                    preferredName: true,
-                    profilePhotoUrl: true,
-                    workEmail: true,
-                    workModel: true,
-                  },
-                },
-                employment: {
-                  select: {
-                    designation: true,
+                    id: true,
+                    email: true,
+                    profile: {
+                      select: {
+                        firstName: true,
+                        lastName: true,
+                        preferredName: true,
+                        profilePhotoUrl: true,
+                        workEmail: true,
+                        workModel: true,
+                      },
+                    },
+                    employment: {
+                      select: {
+                        designation: true,
+                        isTeamLead: true,
+                      },
+                    },
                   },
                 },
               },
@@ -320,6 +330,7 @@ export const teamService = {
             employment: {
               select: {
                 designation: true,
+                isTeamLead: true,
               },
             },
           },
@@ -535,6 +546,9 @@ export const teamService = {
       })
       .filter((value): value is NonNullable<typeof value> => Boolean(value));
 
+    const leadPeople = employment.team.leads
+      .map((entry) => buildPersonSummary(entry.lead ?? null))
+      .filter((lead): lead is NonNullable<typeof lead> => Boolean(lead));
     const departmentManager = buildPersonSummary(
       employment.team.department?.head ?? null,
     );
@@ -548,7 +562,7 @@ export const teamService = {
         name: employment.team.name,
         description: employment.team.description ?? null,
         departmentName: employment.team.department?.name ?? null,
-        lead: buildPersonSummary(employment.team.lead),
+        leads: leadPeople,
         manager: departmentManager ?? reportingManager,
         locationHint: topLocation ?? employment.primaryLocation ?? null,
       },

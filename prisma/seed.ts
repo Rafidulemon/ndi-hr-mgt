@@ -14,6 +14,7 @@ const prisma = new PrismaClient();
 const seedOrganizations = async () => {
   for (const organization of organizations) {
     const {
+      ownerUserId: _ownerUserId,
       orgAdminUserId: _orgAdminUserId,
       managerUserId: _managerUserId,
       ...orgData
@@ -76,6 +77,7 @@ const assignOrganizationLeadership = async () => {
     await prisma.organization.update({
       where: { id: organization.id },
       data: {
+        ownerId: organization.ownerUserId,
         orgAdminId: organization.orgAdminUserId,
         managerId: organization.managerUserId,
       },

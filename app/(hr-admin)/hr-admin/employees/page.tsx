@@ -133,7 +133,9 @@ export default function EmployeeManagementPage() {
     type: "approve" | "reject" | "delete";
   } | null>(null);
 
-  const canDeleteEmployees = ["SUPER_ADMIN", "ORG_ADMIN", "MANAGER"].includes(viewerRole);
+  const canDeleteEmployees = ["SUPER_ADMIN", "ORG_OWNER", "ORG_ADMIN", "MANAGER"].includes(
+    viewerRole,
+  );
 
   useEffect(() => {
     if (!actionAlert) {

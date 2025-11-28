@@ -37,7 +37,11 @@ const employmentSummarySelect = {
   team: {
     select: {
       name: true,
-      leadId: true,
+      leads: {
+        select: {
+          leadId: true,
+        },
+      },
     },
   },
   ...employmentBalanceSelect,
@@ -396,8 +400,10 @@ export const hrLeaveService = {
 
     if (organizationId && nextStatus === LeaveStatus.APPROVED) {
       const employmentDetails = refreshed.employee.employment;
+      const teamLeadIds =
+        employmentDetails?.team?.leads?.map((lead) => lead.leadId ?? null) ?? [];
       const potentialRecipients = [
-        employmentDetails?.team?.leadId ?? null,
+        ...teamLeadIds,
         employmentDetails?.department?.headId ?? null,
       ];
       const managerRecipients = Array.from(

@@ -14,6 +14,7 @@ import { requireHrAdmin, requireTeamManager } from "@/server/modules/hr/utils";
 const personSelect = {
   userId: true,
   designation: true,
+  isTeamLead: true,
   teamId: true,
   team: {
     select: {
@@ -44,6 +45,7 @@ const leadSelect = {
     select: {
       designation: true,
       teamId: true,
+      isTeamLead: true,
       team: {
         select: {
           id: true,
@@ -87,6 +89,7 @@ const buildPersonFromEmployment = (
   record: {
     userId: string;
     designation: string | null;
+    isTeamLead: boolean;
     teamId: string | null;
     team: { id: string; name: string } | null;
     user: {
@@ -113,6 +116,7 @@ const buildPersonFromEmployment = (
     avatarUrl: profile?.profilePhotoUrl ?? null,
     teamId: record.team?.id ?? record.teamId ?? null,
     teamName: record.team?.name ?? null,
+    isTeamLead: record.isTeamLead ?? false,
   };
 };
 
@@ -130,6 +134,7 @@ const buildPersonFromUser = (
     employment: {
       designation: string | null;
       teamId: string | null;
+      isTeamLead: boolean | null;
       team: { id: string; name: string } | null;
     } | null;
   } | null,
@@ -146,6 +151,7 @@ const buildPersonFromUser = (
     avatarUrl: profile?.profilePhotoUrl ?? null,
     teamId: user.employment?.team?.id ?? user.employment?.teamId ?? null,
     teamName: user.employment?.team?.name ?? null,
+    isTeamLead: Boolean(user.employment?.isTeamLead),
   };
 };
 
@@ -186,8 +192,12 @@ export const hrTeamService = {
               name: true,
             },
           },
-          lead: {
-            select: leadSelect,
+          leads: {
+            select: {
+              lead: {
+                select: leadSelect,
+              },
+            },
           },
           primaryMembers: {
             select: personSelect,
@@ -205,6 +215,9 @@ export const hrTeamService = {
     const personByUserId = new Map(employees.map((person) => [person.userId, person]));
 
     const teams = teamRecords.map((team) => {
+      const leadPeople = team.leads
+        .map((entry) => buildPersonFromUser(entry.lead))
+        .filter((lead): lead is HrTeamPerson => Boolean(lead));
       const members = team.primaryMembers
         .map((member) => personByUserId.get(member.userId) ?? buildPersonFromEmployment(member))
         .filter((member): member is HrTeamPerson => Boolean(member));
@@ -214,7 +227,8 @@ export const hrTeamService = {
         description: team.description ?? null,
         departmentId: team.departmentId,
         departmentName: team.department?.name ?? "—",
-        lead: buildPersonFromUser(team.lead),
+        leads: leadPeople,
+        leadUserIds: leadPeople.map((lead) => lead.userId),
         memberUserIds: members.map((member) => member.userId),
         memberCount: members.length,
         memberPreview: members.slice(0, 4),
@@ -281,45 +295,85 @@ export const hrTeamService = {
 
     const team = await ctx.prisma.team.findFirst({
       where: { id: input.teamId, organizationId },
-      select: { id: true },
+      select: { id: true, leads: { select: { leadId: true } } },
     });
 
     if (!team) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
     }
 
-    const leadUserId = input.leadUserId;
+    const uniqueLeadIds = Array.from(
+      new Set(input.leadUserIds.filter((value): value is string => Boolean(value))),
+    );
 
-    if (!leadUserId) {
-      await ctx.prisma.team.update({
-        where: { id: team.id },
-        data: { leadId: null },
+    if (uniqueLeadIds.length) {
+      const validLeads = await ctx.prisma.employmentDetail.findMany({
+        where: {
+          organizationId,
+          userId: { in: uniqueLeadIds },
+        },
+        select: { userId: true },
       });
-      return;
+
+      if (validLeads.length !== uniqueLeadIds.length) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Select valid teammates from this organization.",
+        });
+      }
     }
 
-    const employment = await ctx.prisma.employmentDetail.findUnique({
-      where: { userId: leadUserId },
-      select: { organizationId: true, userId: true },
-    });
-
-    if (!employment || employment.organizationId !== organizationId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Select a valid teammate from this organization.",
-      });
-    }
+    const existingLeadIds = team.leads.map((lead) => lead.leadId);
+    const desiredSet = new Set(uniqueLeadIds);
+    const toRemove = existingLeadIds.filter((leadId) => !desiredSet.has(leadId));
+    const toAdd = uniqueLeadIds.filter((leadId) => !existingLeadIds.includes(leadId));
 
     await ctx.prisma.$transaction(async (tx) => {
-      await tx.team.update({
-        where: { id: team.id },
-        data: { leadId: leadUserId },
-      });
+      if (toRemove.length) {
+        await tx.teamLead.deleteMany({
+          where: {
+            teamId: team.id,
+            leadId: { in: toRemove },
+          },
+        });
+      }
 
-      await tx.employmentDetail.update({
-        where: { userId: leadUserId },
-        data: { teamId: team.id },
-      });
+      for (const leadId of toAdd) {
+        await tx.teamLead.create({
+          data: {
+            teamId: team.id,
+            leadId,
+          },
+        });
+      }
+
+      if (uniqueLeadIds.length) {
+        await tx.employmentDetail.updateMany({
+          where: {
+            organizationId,
+            userId: { in: uniqueLeadIds },
+          },
+          data: { teamId: team.id, isTeamLead: true },
+        });
+      }
+
+      if (toRemove.length) {
+        const stillLeads = await tx.teamLead.findMany({
+          where: { leadId: { in: toRemove } },
+          select: { leadId: true },
+        });
+        const stillLeadIds = new Set(stillLeads.map((entry) => entry.leadId));
+        const toUnset = toRemove.filter((leadId) => !stillLeadIds.has(leadId));
+        if (toUnset.length) {
+          await tx.employmentDetail.updateMany({
+            where: {
+              organizationId,
+              userId: { in: toUnset },
+            },
+            data: { isTeamLead: false },
+          });
+        }
+      }
     });
   },
 
@@ -336,7 +390,7 @@ export const hrTeamService = {
 
     const team = await ctx.prisma.team.findFirst({
       where: { id: input.teamId, organizationId },
-      select: { id: true, leadId: true },
+      select: { id: true, leads: { select: { leadId: true } } },
     });
 
     if (!team) {
@@ -344,8 +398,11 @@ export const hrTeamService = {
     }
 
     const uniqueMemberIds = Array.from(new Set(input.memberUserIds.filter(Boolean)));
-    if (team.leadId && !uniqueMemberIds.includes(team.leadId)) {
-      uniqueMemberIds.push(team.leadId);
+    const enforcedLeadIds = team.leads.map((lead) => lead.leadId);
+    for (const leadId of enforcedLeadIds) {
+      if (!uniqueMemberIds.includes(leadId)) {
+        uniqueMemberIds.push(leadId);
+      }
     }
 
     if (uniqueMemberIds.length) {

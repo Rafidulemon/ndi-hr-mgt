@@ -1,5 +1,17 @@
 import type { UserRole } from "@prisma/client";
 
+export const WORK_MANAGEMENT_ROLES = ["ORG_OWNER", "ORG_ADMIN", "SUPER_ADMIN"] as const;
+export type WorkManagementRole = (typeof WORK_MANAGEMENT_ROLES)[number];
+
+export const canManageWork = (
+  role?: UserRole | null,
+): role is WorkManagementRole => {
+  if (!role) {
+    return false;
+  }
+  return (WORK_MANAGEMENT_ROLES as readonly UserRole[]).includes(role);
+};
+
 export const WEEKDAY_OPTIONS = [
   "MONDAY",
   "TUESDAY",

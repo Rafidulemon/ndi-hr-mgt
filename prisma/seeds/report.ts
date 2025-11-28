@@ -27,7 +27,7 @@ type MonthlySeed = {
 
 const dailyReports: DailySeed[] = [
   {
-    employeeId: "frontend-dev-nadia",
+    employeeId: "emp-zahidul",
     reportDate: "2024-11-18",
     note: "Focused on UI polish and QA fixes.",
     entries: [
@@ -47,7 +47,7 @@ const dailyReports: DailySeed[] = [
     ],
   },
   {
-    employeeId: "backend-dev-emon",
+    employeeId: "emp-mustahid",
     reportDate: "2024-11-18",
     note: "Morning spent on reporting APIs, afternoon on code review.",
     entries: [
@@ -69,7 +69,7 @@ const dailyReports: DailySeed[] = [
 
 const monthlyReports: MonthlySeed[] = [
   {
-    employeeId: "frontend-dev-nadia",
+    employeeId: "emp-zahidul",
     reportMonth: "2024-10-01",
     entries: [
       { taskName: "App shell redesign", storyPoint: 21, workingHours: 72 },
@@ -78,7 +78,7 @@ const monthlyReports: MonthlySeed[] = [
     ],
   },
   {
-    employeeId: "backend-dev-emon",
+    employeeId: "emp-mustahid",
     reportMonth: "2024-10-01",
     entries: [
       { taskName: "Reporting API foundation", storyPoint: 13, workingHours: 64 },

@@ -15,7 +15,7 @@ const createTeamInput = z.object({
 
 const assignLeadInput = z.object({
   teamId: z.string().min(1, "Team ID is required."),
-  leadUserId: z.string().min(1).optional().nullable(),
+  leadUserIds: z.array(z.string().min(1)).default([]),
 });
 
 const assignMembersInput = z.object({
@@ -33,7 +33,7 @@ export const hrTeamRouter = createTRPCRouter({
     .mutation(({ ctx, input }) =>
       hrTeamController.assignLead({
         ctx,
-        input: { teamId: input.teamId, leadUserId: input.leadUserId ?? null },
+        input: { teamId: input.teamId, leadUserIds: input.leadUserIds },
       }),
     ),
   assignMembers: protectedProcedure

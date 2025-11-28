@@ -6,7 +6,7 @@ const notifications = [
   {
     id: "notif-announcement-remote",
     organizationId: NDI_ORG_ID,
-    senderId: "org-manager-tabuchi",
+    senderId: "org-admin-tabuchi",
     title: "December 4: remote work for on-site teams",
     body: "All on-site squads will work remotely on Thursday, December 4 due to the building maintenance drill.",
     type: "ANNOUNCEMENT" as const,
@@ -24,7 +24,7 @@ const notifications = [
   {
     id: "notif-announcement-holiday",
     organizationId: NDI_ORG_ID,
-    senderId: "org-admin-kohei",
+    senderId: "org-owner-kohei",
     title: "Victory Day office closure",
     body: "The Dhaka HQ will be closed on December 16 for Victory Day. Enjoy the long weekend!",
     type: "ANNOUNCEMENT" as const,
@@ -45,7 +45,7 @@ const notifications = [
     body: "Saiful requested casual leave for January 15. Please review before EOD.",
     type: "LEAVE" as const,
     audience: "ROLE" as const,
-    targetRoles: ["HR_ADMIN"] as UserRole[],
+    targetRoles: ["HR_ADMIN", "ORG_OWNER"] as UserRole[],
     status: "SENT" as const,
     actionUrl: "/hr-admin/leave/leave-2",
     metadata: {
@@ -113,12 +113,12 @@ const notifications = [
   {
     id: "notif-report-daily-gap",
     organizationId: NDI_ORG_ID,
-    senderId: "org-manager-tabuchi",
+    senderId: "org-admin-tabuchi",
     title: "Daily report missing (Frontend)",
     body: "Two frontend engineers did not submit their daily report and were not on leave.",
     type: "REPORT" as const,
     audience: "ROLE" as const,
-    targetRoles: ["HR_ADMIN", "ORG_ADMIN"] as UserRole[],
+    targetRoles: ["HR_ADMIN", "ORG_ADMIN", "ORG_OWNER"] as UserRole[],
     status: "SENT" as const,
     actionUrl: "/hr-admin/reports/daily",
     metadata: {
@@ -135,7 +135,7 @@ const notifications = [
     body: "The December monthly report has been compiled. Please review before sharing with leadership.",
     type: "REPORT" as const,
     audience: "ROLE" as const,
-    targetRoles: ["HR_ADMIN", "ORG_ADMIN"] as UserRole[],
+    targetRoles: ["HR_ADMIN", "ORG_ADMIN", "ORG_OWNER"] as UserRole[],
     status: "SENT" as const,
     actionUrl: "/hr-admin/reports/monthly",
     metadata: {

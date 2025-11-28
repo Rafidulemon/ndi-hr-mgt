@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 
 import { requireUser } from "@/server/auth/guards";
-import { canManageTeams } from "@/types/hr-team";
+import { canManageWork } from "@/types/hr-work";
 
 import WorkManagementClient from "./WorkManagementClient";
 
 export default async function WorkManagementPage() {
   const user = await requireUser();
 
-  if (!canManageTeams(user.role)) {
+  if (!canManageWork(user.role)) {
     redirect("/hr-admin");
   }
 

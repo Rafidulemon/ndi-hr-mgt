@@ -23,7 +23,7 @@ const leaveRequests = [
     status: "PENDING" as const,
     reason: "Family engagement.",
     note: "Needs manager review.",
-    reviewerId: "org-admin-kohei",
+    reviewerId: "org-owner-kohei",
   },
   {
     id: "leave-3",

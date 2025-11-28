@@ -19,7 +19,7 @@ import { requireHrAdmin } from "@/server/modules/hr/utils";
 
 type PrismaTransaction = Prisma.TransactionClient;
 
-const privilegedDeletionRoles: UserRole[] = ["SUPER_ADMIN", "ORG_ADMIN", "MANAGER"];
+const privilegedDeletionRoles: UserRole[] = ["SUPER_ADMIN", "ORG_OWNER", "ORG_ADMIN", "MANAGER"];
 
 const employmentStatusToDirectoryStatus: Record<
   EmploymentStatus,
@@ -493,9 +493,9 @@ const deleteUserCascade = async (tx: PrismaTransaction, userId: string) => {
     data: { headId: null },
   });
 
-  await tx.team.updateMany({
-    where: { leadId: userId },
-    data: { leadId: null },
+  await tx.organization.updateMany({
+    where: { ownerId: userId },
+    data: { ownerId: null },
   });
 
   await tx.organization.updateMany({

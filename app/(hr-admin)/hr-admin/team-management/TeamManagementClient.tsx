@@ -30,7 +30,14 @@ const AlertBanner = ({ alert }: { alert: AlertState }) => {
 
 const MemberPill = ({ person }: { person: HrTeamPerson }) => (
   <div className="rounded-2xl border border-slate-200/80 bg-white/70 px-3 py-2 text-left shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70">
-    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{person.fullName}</p>
+    <div className="flex flex-wrap items-center gap-2">
+      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{person.fullName}</p>
+      {person.isTeamLead ? (
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-400/20 dark:text-amber-200">
+          Team Lead
+        </span>
+      ) : null}
+    </div>
     <p className="text-xs text-slate-500 dark:text-slate-400">
       {person.designation ?? person.teamName ?? "Role coming soon"}
     </p>
@@ -63,7 +70,7 @@ export default function TeamManagementClient() {
   const [alert, setAlert] = useState<AlertState>(null);
   const [pendingLeadTeam, setPendingLeadTeam] = useState<string | null>(null);
   const [pendingMemberTeam, setPendingMemberTeam] = useState<string | null>(null);
-  const [leadEdits, setLeadEdits] = useState<Record<string, string>>({});
+  const [leadEdits, setLeadEdits] = useState<Record<string, string[]>>({});
   const [memberEdits, setMemberEdits] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
@@ -72,9 +79,9 @@ export default function TeamManagementClient() {
     return () => window.clearTimeout(timer);
   }, [alert]);
 
-  const baseLeadSelection: Record<string, string> = data?.teams
-    ? data.teams.reduce<Record<string, string>>((acc, team) => {
-        acc[team.id] = team.lead?.userId ?? "";
+  const baseLeadSelection: Record<string, string[]> = data?.teams
+    ? data.teams.reduce<Record<string, string[]>>((acc, team) => {
+        acc[team.id] = team.leadUserIds;
         return acc;
       }, {})
     : {};
@@ -90,13 +97,17 @@ export default function TeamManagementClient() {
     const total = data?.employees.length ?? 4;
     return Math.min(10, Math.max(4, total));
   }, [data?.employees.length]);
+  const leadSelectSize = useMemo(() => {
+    const total = data?.employees.length ?? 6;
+    return Math.min(6, Math.max(3, Math.ceil(total / 6)));
+  }, [data?.employees.length]);
 
   const handleCreateSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canManage) {
       setAlert({
         type: "error",
-        message: "Only managers, org admins, or super admins can change teams.",
+        message: "Only managers, org admins, org owners, or super admins can change teams.",
       });
       return;
     }
@@ -125,8 +136,9 @@ export default function TeamManagementClient() {
     );
   };
 
-  const handleLeadChange = (teamId: string, value: string) => {
-    setLeadEdits((prev) => ({ ...prev, [teamId]: value }));
+  const handleLeadChange = (teamId: string, options: HTMLCollectionOf<HTMLOptionElement>) => {
+    const selectedValues = Array.from(options).map((option) => option.value);
+    setLeadEdits((prev) => ({ ...prev, [teamId]: selectedValues }));
   };
 
   const handleMembersChange = (teamId: string, options: HTMLCollectionOf<HTMLOptionElement>) => {
@@ -138,17 +150,16 @@ export default function TeamManagementClient() {
     if (!canManage) {
       setAlert({
         type: "error",
-        message: "Only manager, org admin, or super admin roles can change leads.",
+        message: "Only manager, org admin, org owner, or super admin roles can change leads.",
       });
       return;
     }
-    const selectedLead =
-      leadEdits[teamId] ?? baseLeadSelection[teamId] ?? "";
+    const selectedLeads = leadEdits[teamId] ?? baseLeadSelection[teamId] ?? [];
     setPendingLeadTeam(teamId);
     assignLeadMutation.mutate(
       {
         teamId,
-        leadUserId: selectedLead.length ? selectedLead : null,
+        leadUserIds: selectedLeads,
       },
       {
         onSuccess: () => {
@@ -170,7 +181,7 @@ export default function TeamManagementClient() {
     if (!canManage) {
       setAlert({
         type: "error",
-        message: "You need manager, org admin, or super admin rights to change members.",
+        message: "You need manager, org admin, org owner, or super admin rights to change members.",
       });
       return;
     }
@@ -250,8 +261,8 @@ export default function TeamManagementClient() {
         <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
           <p className="text-base font-semibold">Read-only access</p>
           <p className="text-sm">
-            Managers, org admins, or super admins can make changes. Contact your workspace
-            admin to request access.
+            Managers, org admins, org owners, or super admins can make changes. Contact your
+            workspace admin to request access.
           </p>
         </div>
       ) : null}
@@ -349,8 +360,8 @@ export default function TeamManagementClient() {
             {data.teams.map((team) => {
               const memberValues =
                 memberEdits[team.id] ?? baseMemberSelection[team.id] ?? team.memberUserIds;
-              const selectedLeadValue =
-                leadEdits[team.id] ?? baseLeadSelection[team.id] ?? team.lead?.userId ?? "";
+              const selectedLeadValues =
+                leadEdits[team.id] ?? baseLeadSelection[team.id] ?? [];
               const pendingLead = pendingLeadTeam === team.id && assignLeadMutation.isPending;
               const pendingMembers =
                 pendingMemberTeam === team.id && assignMembersMutation.isPending;
@@ -381,35 +392,58 @@ export default function TeamManagementClient() {
                   <div className="grid gap-6 md:grid-cols-2">
                     <div className="space-y-3">
                       <div className="space-y-1">
-                        <p className="text-sm font-semibold text-slate-600">Team lead</p>
+                        <p className="text-sm font-semibold text-slate-600">Team leads</p>
                         <p className="text-xs text-slate-500">
-                          Pick who owns rituals, sprint plans, and approvals.
+                          Pick who owns rituals, sprint plans, and approvals. Multiple leads are
+                          supported.
                         </p>
                       </div>
                       <select
-                        value={selectedLeadValue}
-                        onChange={(event) => handleLeadChange(team.id, event.target.value)}
+                        multiple
+                        size={leadSelectSize}
+                        value={selectedLeadValues}
+                        onChange={(event) => handleLeadChange(team.id, event.target.selectedOptions)}
                         disabled={!canManage}
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-60 dark:border-slate-700/70 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700/30"
                       >
-                        <option value="">No lead selected</option>
-                        {data.employees.map((employee) => (
-                          <option key={employee.userId} value={employee.userId}>
-                            {employee.fullName}
-                            {employee.designation ? ` • ${employee.designation}` : ""}
-                            {employee.teamName && employee.teamId !== team.id
-                              ? ` (Currently ${employee.teamName})`
-                              : ""}
-                          </option>
-                        ))}
+                        {data.employees.map((employee) => {
+                          const statusHints = [
+                            employee.designation ? `• ${employee.designation}` : null,
+                            employee.teamName && employee.teamId !== team.id
+                              ? `(Currently ${employee.teamName})`
+                              : null,
+                            employee.isTeamLead ? "(Team Lead)" : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" ");
+                          return (
+                            <option key={employee.userId} value={employee.userId}>
+                              {employee.fullName} {statusHints}
+                            </option>
+                          );
+                        })}
                       </select>
                       <Button
                         theme="secondary"
                         onClick={() => handleSaveLead(team.id)}
                         disabled={!canManage || pendingLead}
                       >
-                        {pendingLead ? "Saving..." : "Save lead"}
+                        {pendingLead ? "Saving..." : "Save leads"}
                       </Button>
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Assigned leads
+                        </p>
+                        {team.leads.length ? (
+                          <div className="flex flex-wrap gap-2">
+                            {team.leads.map((lead) => (
+                              <MemberPill key={lead.userId} person={lead} />
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-500">No leads set for this team.</p>
+                        )}
+                      </div>
                     </div>
                     <div className="space-y-3">
                       <div className="space-y-1">
@@ -426,17 +460,27 @@ export default function TeamManagementClient() {
                         disabled={!canManage}
                         className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-inner shadow-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-60 dark:border-slate-700/70 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-700/30"
                       >
-                        {data.employees.map((employee) => (
-                          <option key={employee.userId} value={employee.userId}>
-                            {employee.fullName}
-                            {employee.designation ? ` • ${employee.designation}` : ""}
-                            {employee.teamName && employee.teamId !== team.id
-                              ? ` (Currently ${employee.teamName})`
+                        {data.employees.map((employee) => {
+                          const placementHint =
+                            employee.teamName && employee.teamId !== team.id
+                              ? `Currently ${employee.teamName}`
                               : employee.teamName
-                                ? " (Already here)"
-                                : " (Unassigned)"}
-                          </option>
-                        ))}
+                                ? "Already here"
+                                : "Unassigned";
+                          const extraHints = [
+                            employee.designation ? employee.designation : null,
+                            placementHint,
+                            employee.isTeamLead ? "Team Lead" : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" • ");
+                          return (
+                            <option key={employee.userId} value={employee.userId}>
+                              {employee.fullName}
+                              {extraHints ? ` (${extraHints})` : ""}
+                            </option>
+                          );
+                        })}
                       </select>
                       <Button
                         onClick={() => handleSaveMembers(team.id)}

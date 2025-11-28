@@ -14,6 +14,7 @@ export type TeamPersonSummary = {
   designation: string | null;
   email: string | null;
   workModel: WorkModel | null;
+  isTeamLead: boolean;
 };
 
 export type TeamMemberSummary = {
@@ -36,6 +37,7 @@ export type TeamMemberSummary = {
   startDateLabel: string | null;
   tenureMonths: number;
   tenureLabel: string;
+  isTeamLead: boolean;
 };
 
 export type TeamHighlight = {
@@ -83,7 +85,7 @@ export type TeamSummary = {
   name: string;
   description: string | null;
   departmentName: string | null;
-  lead: TeamPersonSummary | null;
+  leads: TeamPersonSummary[];
   manager: TeamPersonSummary | null;
   locationHint: string | null;
 };

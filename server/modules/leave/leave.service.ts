@@ -271,6 +271,7 @@ export const leaveService = {
           targetRoles: [
             UserRole.HR_ADMIN,
             UserRole.MANAGER,
+            UserRole.ORG_OWNER,
             UserRole.ORG_ADMIN,
             UserRole.SUPER_ADMIN,
           ],

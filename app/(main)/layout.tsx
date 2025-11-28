@@ -12,6 +12,7 @@ export default async function MainLayout({
   const elevatedRoles: ReadonlyArray<UserRole> = [
     "MANAGER",
     "HR_ADMIN",
+    "ORG_OWNER",
     "ORG_ADMIN",
     "SUPER_ADMIN",
   ];

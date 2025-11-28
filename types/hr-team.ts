@@ -1,6 +1,6 @@
 import type { UserRole } from "@prisma/client";
 
-export const TEAM_MANAGEMENT_ROLES = ["MANAGER", "ORG_ADMIN", "SUPER_ADMIN"] as const;
+export const TEAM_MANAGEMENT_ROLES = ["MANAGER", "ORG_ADMIN", "ORG_OWNER", "SUPER_ADMIN"] as const;
 export type TeamManagementRole = (typeof TEAM_MANAGEMENT_ROLES)[number];
 
 export const canManageTeams = (
@@ -20,6 +20,7 @@ export type HrTeamPerson = {
   avatarUrl: string | null;
   teamId: string | null;
   teamName: string | null;
+  isTeamLead: boolean;
 };
 
 export type HrTeamSummary = {
@@ -28,7 +29,8 @@ export type HrTeamSummary = {
   description: string | null;
   departmentId: string;
   departmentName: string;
-  lead: HrTeamPerson | null;
+  leads: HrTeamPerson[];
+  leadUserIds: string[];
   memberUserIds: string[];
   memberCount: number;
   memberPreview: HrTeamPerson[];
@@ -50,7 +52,7 @@ export type HrCreateTeamInput = {
 
 export type HrAssignTeamLeadInput = {
   teamId: string;
-  leadUserId: string | null;
+  leadUserIds: string[];
 };
 
 export type HrAssignTeamMembersInput = {
