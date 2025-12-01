@@ -1,5 +1,8 @@
 import type { TRPCContext } from "@/server/api/trpc";
-import type { HrEmployeeUpdateInput } from "@/types/hr-admin";
+import type {
+  HrEmployeeLeaveQuotaUpdateInput,
+  HrEmployeeUpdateInput,
+} from "@/types/hr-admin";
 import { hrEmployeesService } from "./employees.service";
 
 export const hrEmployeesController = {
@@ -10,6 +13,13 @@ export const hrEmployeesController = {
     hrEmployeesService.getEmployeeForm(ctx, employeeId),
   update: ({ ctx, input }: { ctx: TRPCContext; input: HrEmployeeUpdateInput }) =>
     hrEmployeesService.updateEmployee(ctx, input),
+  updateLeaveQuota: ({
+    ctx,
+    input,
+  }: {
+    ctx: TRPCContext;
+    input: HrEmployeeLeaveQuotaUpdateInput;
+  }) => hrEmployeesService.updateLeaveBalances(ctx, input),
   approveSignup: ({ ctx, employeeId }: { ctx: TRPCContext; employeeId: string }) =>
     hrEmployeesService.approvePendingEmployee(ctx, employeeId),
   rejectSignup: ({ ctx, employeeId }: { ctx: TRPCContext; employeeId: string }) =>

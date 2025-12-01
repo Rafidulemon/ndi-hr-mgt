@@ -10,4 +10,5 @@ export const hrLeaveController = {
     hrLeaveService.listRequests(ctx, input),
   updateStatus: ({ ctx, input }: { ctx: TRPCContext; input: HrLeaveUpdateStatusInput }) =>
     hrLeaveService.updateStatus(ctx, input),
+  pendingCount: ({ ctx }: { ctx: TRPCContext }) => hrLeaveService.pendingCount(ctx),
 };

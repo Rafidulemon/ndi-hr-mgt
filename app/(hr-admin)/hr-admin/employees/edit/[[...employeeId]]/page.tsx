@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useForm } from "react-hook-form";
 
@@ -137,12 +137,23 @@ export default function EditEmployeePage() {
   const [photoUrl, setPhotoUrl] = useState("/dp.png");
   const [isPhotoUploading, setIsPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [leaveFormValues, setLeaveFormValues] = useState({
+    annual: "",
+    sick: "",
+    casual: "",
+    parental: "",
+  });
+  const [leaveAlert, setLeaveAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const employeeFormQuery = trpc.hrEmployees.form.useQuery(
     { employeeId: employeeId ?? "" },
     { enabled: Boolean(employeeId) },
   );
   const updateMutation = trpc.hrEmployees.update.useMutation();
+  const updateLeaveQuotaMutation = trpc.hrEmployees.updateLeaveQuota.useMutation();
 
   useEffect(() => {
     if (employeeFormQuery.data?.form) {
@@ -150,6 +161,26 @@ export default function EditEmployeePage() {
       setPhotoUrl(employeeFormQuery.data.form.profilePhotoUrl ?? "/dp.png");
     }
   }, [employeeFormQuery.data?.form, form]);
+
+  useEffect(() => {
+    const balances = employeeFormQuery.data?.form.leaveBalances;
+    if (balances) {
+      setLeaveFormValues({
+        annual: balances.annual.toString(),
+        sick: balances.sick.toString(),
+        casual: balances.casual.toString(),
+        parental: balances.parental.toString(),
+      });
+    }
+  }, [employeeFormQuery.data?.form.leaveBalances]);
+
+  useEffect(() => {
+    if (!leaveAlert) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setLeaveAlert(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [leaveAlert]);
 
   const handlePhotoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!employeeId) {
@@ -200,6 +231,71 @@ export default function EditEmployeePage() {
       {
         onSuccess: (data) => {
           form.reset(toFormValues(data.form));
+        },
+      },
+    );
+  };
+
+  const handleLeaveValueChange =
+    (field: keyof typeof leaveFormValues) => (event: ChangeEvent<HTMLInputElement>) => {
+      setLeaveFormValues((prev) => ({
+        ...prev,
+        [field]: event.target.value,
+      }));
+      setLeaveAlert(null);
+    };
+
+  const parseLeaveValue = (value: string) => {
+    if (!value) {
+      return 0;
+    }
+    const parsed = Number(value);
+    if (Number.isNaN(parsed) || parsed < 0) {
+      return 0;
+    }
+    return parsed;
+  };
+
+  const handleLeaveQuotaSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!employeeId) {
+      setLeaveAlert({
+        type: "error",
+        message: "Employee not found.",
+      });
+      return;
+    }
+
+    updateLeaveQuotaMutation.mutate(
+      {
+        employeeId,
+        annual: parseLeaveValue(leaveFormValues.annual),
+        sick: parseLeaveValue(leaveFormValues.sick),
+        casual: parseLeaveValue(leaveFormValues.casual),
+        parental: parseLeaveValue(leaveFormValues.parental),
+      },
+      {
+        onSuccess: (data) => {
+          setLeaveAlert({
+            type: "success",
+            message: "Leave quotas updated.",
+          });
+          setLeaveFormValues({
+            annual: data.leaveBalances.annual.toString(),
+            sick: data.leaveBalances.sick.toString(),
+            casual: data.leaveBalances.casual.toString(),
+            parental: data.leaveBalances.parental.toString(),
+          });
+          void Promise.all([
+            utils.hrEmployees.profile.invalidate({ employeeId }),
+            utils.hrEmployees.form.invalidate({ employeeId }),
+          ]);
+        },
+        onError: (error) => {
+          setLeaveAlert({
+            type: "error",
+            message: error.message,
+          });
         },
       },
     );
@@ -471,6 +567,73 @@ export default function EditEmployeePage() {
           </Button>
         </div>
       </form>
+
+      <section className="rounded-[32px] border border-white/60 bg-white/95 p-8 shadow-xl shadow-indigo-100 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+              Leave quotas
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Adjust the available leave balance for this employee. Changes apply immediately.
+            </p>
+          </div>
+          <form className="space-y-6" onSubmit={handleLeaveQuotaSubmit}>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <TextInput
+                label="Annual leave (days)"
+                className="w-full"
+                type="number"
+                name="leaveAnnual"
+                value={leaveFormValues.annual}
+                onChange={handleLeaveValueChange("annual")}
+                placeholder="0"
+              />
+              <TextInput
+                label="Sick leave (days)"
+                className="w-full"
+                type="number"
+                name="leaveSick"
+                value={leaveFormValues.sick}
+                onChange={handleLeaveValueChange("sick")}
+                placeholder="0"
+              />
+              <TextInput
+                label="Casual leave (days)"
+                className="w-full"
+                type="number"
+                name="leaveCasual"
+                value={leaveFormValues.casual}
+                onChange={handleLeaveValueChange("casual")}
+                placeholder="0"
+              />
+              <TextInput
+                label="Parental leave (days)"
+                className="w-full"
+                type="number"
+                name="leaveParental"
+                value={leaveFormValues.parental}
+                onChange={handleLeaveValueChange("parental")}
+                placeholder="0"
+              />
+            </div>
+            {leaveAlert ? (
+              <p
+                className={`text-sm ${
+                  leaveAlert.type === "success" ? "text-emerald-600" : "text-rose-500"
+                }`}
+              >
+                {leaveAlert.message}
+              </p>
+            ) : null}
+            <div className="flex justify-end">
+              <Button type="submit" disabled={updateLeaveQuotaMutation.isPending}>
+                {updateLeaveQuotaMutation.isPending ? "Updating..." : "Update leave quotas"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </section>
     </div>
   );
 }

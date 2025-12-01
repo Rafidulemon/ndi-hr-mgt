@@ -60,6 +60,7 @@ export type HrEmployeeLeaveBalances = {
   annual: number;
   sick: number;
   casual: number;
+  parental: number;
 };
 
 export type HrEmployeeProfile = {
@@ -113,6 +114,7 @@ export type HrEmployeeForm = {
   status: EmployeeStatus;
   emergencyContact: HrEmployeeEmergencyContact | null;
   profilePhotoUrl: string | null;
+  leaveBalances: HrEmployeeLeaveBalances;
 };
 
 export type HrEmployeeFormResponse = {
@@ -136,4 +138,16 @@ export type HrEmployeeUpdateInput = {
   emergencyName?: string | null;
   emergencyPhone?: string | null;
   emergencyRelation?: string | null;
+};
+
+export type HrEmployeeLeaveQuotaUpdateInput = {
+  employeeId: string;
+  annual: number;
+  sick: number;
+  casual: number;
+  parental: number;
+};
+
+export type HrEmployeeLeaveQuotaResponse = {
+  leaveBalances: HrEmployeeLeaveBalances;
 };

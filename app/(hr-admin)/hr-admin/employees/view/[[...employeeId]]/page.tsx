@@ -177,9 +177,9 @@ const EmployeeProfileContent = ({
     { label: "Annual leave", value: `${employee.leaveBalances.annual} days` },
     { label: "Sick leave", value: `${employee.leaveBalances.sick} days` },
     { label: "Casual leave", value: `${employee.leaveBalances.casual} days` },
+    { label: "Parental leave", value: `${employee.leaveBalances.parental} days` },
   ];
 
-  const joiningDate = formatDate(employee.startDate);
   const statusStyle =
     employeeStatusStyles[employee.status] ?? employeeStatusStyles.Active;
 

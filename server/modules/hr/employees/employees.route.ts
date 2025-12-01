@@ -26,6 +26,19 @@ const updateEmployeeInput = z.object({
   emergencyRelation: z.string().optional().nullable(),
 });
 
+const leaveQuotaValue = z.coerce
+  .number()
+  .min(0, "Leave quota cannot be negative.")
+  .max(365, "Leave quota cannot exceed 365 days.");
+
+const updateLeaveQuotaInput = z.object({
+  employeeId: z.string().min(1, "Employee ID is required."),
+  annual: leaveQuotaValue,
+  sick: leaveQuotaValue,
+  casual: leaveQuotaValue,
+  parental: leaveQuotaValue,
+});
+
 export const hrEmployeesRouter = createTRPCRouter({
   dashboard: protectedProcedure.query(({ ctx }) =>
     hrEmployeesController.dashboard({ ctx }),
@@ -43,6 +56,11 @@ export const hrEmployeesRouter = createTRPCRouter({
   update: protectedProcedure
     .input(updateEmployeeInput)
     .mutation(({ ctx, input }) => hrEmployeesController.update({ ctx, input })),
+  updateLeaveQuota: protectedProcedure
+    .input(updateLeaveQuotaInput)
+    .mutation(({ ctx, input }) =>
+      hrEmployeesController.updateLeaveQuota({ ctx, input }),
+    ),
   approveSignup: protectedProcedure
     .input(employeeIdParam)
     .mutation(({ ctx, input }) =>

@@ -25,6 +25,7 @@ import { TbReportAnalytics } from "react-icons/tb";
 import { Modal } from "../atoms/frame/Modal";
 import { canManageTeams } from "@/types/hr-team";
 import { canManageWork } from "@/types/hr-work";
+import { trpc } from "@/trpc/client";
 
 type MenuItem = {
   id:
@@ -134,6 +135,17 @@ const HrAdminLeftMenu = ({
   const [isOpenModal, setIsOpenModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
+  const pendingCountQuery = trpc.hrLeave.pendingCount.useQuery(undefined, {
+    initialData: pendingLeaveCount,
+    refetchInterval: 15000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    staleTime: 5000,
+  });
+  const livePendingLeaveCount =
+    typeof pendingCountQuery.data === "number"
+      ? pendingCountQuery.data
+      : pendingLeaveCount;
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -222,7 +234,8 @@ const HrAdminLeftMenu = ({
       <nav className="flex flex-1 flex-col">
         <ul className="space-y-1">
           {allowedMenuItems.map((item) => {
-            const showPendingBadge = item.id === "leave" && pendingLeaveCount > 0;
+            const showPendingBadge =
+              item.id === "leave" && livePendingLeaveCount > 0;
             return (
               <li key={item.id}>
                 <Link
@@ -233,7 +246,7 @@ const HrAdminLeftMenu = ({
                   <span className="text-[16px] font-semibold">{item.label}</span>
                   {showPendingBadge ? (
                     <span className="ml-auto rounded-full bg-rose-500/10 px-3 py-0.5 text-xs font-bold text-rose-600 dark:bg-rose-400/20 dark:text-rose-100">
-                      {pendingLeaveCount}
+                      {livePendingLeaveCount}
                     </span>
                   ) : null}
                 </Link>

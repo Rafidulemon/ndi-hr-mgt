@@ -450,4 +450,23 @@ export const hrLeaveService = {
 
     return mapLeaveRequest(refreshed);
   },
+
+  async pendingCount(ctx: TRPCContext): Promise<number> {
+    const sessionUser = requireHrAdmin(ctx);
+
+    if (!sessionUser.organizationId) {
+      return 0;
+    }
+
+    return ctx.prisma.leaveRequest.count({
+      where: {
+        employee: {
+          organizationId: sessionUser.organizationId,
+        },
+        status: {
+          in: [LeaveStatus.PENDING, LeaveStatus.PROCESSING],
+        },
+      },
+    });
+  },
 };

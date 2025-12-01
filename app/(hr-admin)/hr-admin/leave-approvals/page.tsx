@@ -203,6 +203,7 @@ export default function HrAdminLeaveManagementPage() {
     [statusFilter, leaveTypeFilter, searchValue, month, year, sortField, sortOrder],
   );
 
+  const utils = trpc.useUtils();
   const listQuery = trpc.hrLeave.list.useQuery(listInput);
   const requests = listQuery.data?.requests ?? [];
 
@@ -230,6 +231,7 @@ export default function HrAdminLeaveManagementPage() {
         )}.`,
       });
       await listQuery.refetch();
+      await utils.hrLeave.pendingCount.invalidate();
     },
     onError: (error) => {
       setActionMessage({

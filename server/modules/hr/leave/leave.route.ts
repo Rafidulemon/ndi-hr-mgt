@@ -9,4 +9,9 @@ export const hrLeaveRouter = createTRPCRouter({
   updateStatus: protectedProcedure
     .input(hrLeaveUpdateStatusInput)
     .mutation(({ ctx, input }) => hrLeaveController.updateStatus({ ctx, input })),
+  pendingCount: protectedProcedure.query(({ ctx }) =>
+    hrLeaveController.pendingCount({
+      ctx,
+    }),
+  ),
 });

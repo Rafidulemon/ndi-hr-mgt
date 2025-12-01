@@ -8,6 +8,8 @@ import type {
   HrEmployeeDashboardResponse,
   HrEmployeeForm,
   HrEmployeeFormResponse,
+  HrEmployeeLeaveQuotaResponse,
+  HrEmployeeLeaveQuotaUpdateInput,
   HrEmployeeProfile,
   HrEmployeeProfileResponse,
   HrEmployeeUpdateInput,
@@ -177,6 +179,7 @@ const employeeDetailSelect = {
       casualLeaveBalance: true,
       sickLeaveBalance: true,
       annualLeaveBalance: true,
+      parentalLeaveBalance: true,
     },
   },
   emergencyContacts: {
@@ -438,6 +441,7 @@ const mapEmployeeProfileDetail = (record: EmployeeDetailRecord): HrEmployeeProfi
       annual: decimalToNumber(employment?.annualLeaveBalance),
       sick: decimalToNumber(employment?.sickLeaveBalance),
       casual: decimalToNumber(employment?.casualLeaveBalance),
+      parental: decimalToNumber(employment?.parentalLeaveBalance),
     },
     tags: [],
     skills: [],
@@ -484,6 +488,12 @@ const mapEmployeeForm = (record: EmployeeDetailRecord): HrEmployeeForm => {
         }
       : null,
     profilePhotoUrl: profile?.profilePhotoUrl ?? null,
+    leaveBalances: {
+      annual: decimalToNumber(employment?.annualLeaveBalance),
+      sick: decimalToNumber(employment?.sickLeaveBalance),
+      casual: decimalToNumber(employment?.casualLeaveBalance),
+      parental: decimalToNumber(employment?.parentalLeaveBalance),
+    },
   };
 };
 
@@ -719,6 +729,56 @@ export const hrEmployeesService = {
     });
 
     return this.getEmployeeForm(ctx, input.employeeId);
+  },
+
+  async updateLeaveBalances(
+    ctx: TRPCContext,
+    input: HrEmployeeLeaveQuotaUpdateInput,
+  ): Promise<HrEmployeeLeaveQuotaResponse> {
+    const sessionUser = requireHrAdmin(ctx);
+    const employment = await ctx.prisma.employmentDetail.findFirst({
+      where: {
+        userId: input.employeeId,
+        user: {
+          organizationId: sessionUser.organizationId,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!employment) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
+    }
+
+    const clampBalance = (value: number) =>
+      Number(Math.max(0, Math.min(value, 365)).toFixed(2));
+
+    const updated = await ctx.prisma.employmentDetail.update({
+      where: { id: employment.id },
+      data: {
+        annualLeaveBalance: clampBalance(input.annual),
+        sickLeaveBalance: clampBalance(input.sick),
+        casualLeaveBalance: clampBalance(input.casual),
+        parentalLeaveBalance: clampBalance(input.parental),
+      },
+      select: {
+        annualLeaveBalance: true,
+        sickLeaveBalance: true,
+        casualLeaveBalance: true,
+        parentalLeaveBalance: true,
+      },
+    });
+
+    return {
+      leaveBalances: {
+        annual: decimalToNumber(updated.annualLeaveBalance),
+        sick: decimalToNumber(updated.sickLeaveBalance),
+        casual: decimalToNumber(updated.casualLeaveBalance),
+        parental: decimalToNumber(updated.parentalLeaveBalance),
+      },
+    };
   },
 
   async approvePendingEmployee(ctx: TRPCContext, employeeId: string) {
