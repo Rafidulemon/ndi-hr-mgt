@@ -154,6 +154,10 @@ export default function EditEmployeePage() {
   );
   const updateMutation = trpc.hrEmployees.update.useMutation();
   const updateLeaveQuotaMutation = trpc.hrEmployees.updateLeaveQuota.useMutation();
+  const permissions = employeeFormQuery.data?.permissions;
+  const editingDisabled = permissions ? !permissions.canEdit : false;
+  const permissionMessage =
+    permissions?.reason ?? "You don’t have permission to edit this employee.";
 
   useEffect(() => {
     if (employeeFormQuery.data?.form) {
@@ -184,6 +188,11 @@ export default function EditEmployeePage() {
 
   const handlePhotoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!employeeId) {
+      return;
+    }
+    if (permissions && !permissions.canEdit) {
+      setPhotoError("You don’t have permission to update the profile photo.");
+      event.target.value = "";
       return;
     }
     const file = event.target.files?.[0];
@@ -220,7 +229,7 @@ export default function EditEmployeePage() {
   };
 
   const onSubmit = (values: EmployeeFormValues) => {
-    if (!employeeId) {
+    if (!employeeId || (permissions && !permissions.canEdit)) {
       return;
     }
     updateMutation.mutate(
@@ -258,6 +267,13 @@ export default function EditEmployeePage() {
 
   const handleLeaveQuotaSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (permissions && !permissions.canEdit) {
+      setLeaveAlert({
+        type: "error",
+        message: permissionMessage,
+      });
+      return;
+    }
     if (!employeeId) {
       setLeaveAlert({
         type: "error",
@@ -341,9 +357,18 @@ export default function EditEmployeePage() {
             {updateMutation.error.message ?? "Failed to update employee."}
           </p>
         ) : null}
+        {permissions && !permissions.canEdit ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-400/40 dark:bg-amber-950/30 dark:text-amber-100">
+            {permissionMessage}
+          </div>
+        ) : null}
       </div>
 
-      <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <fieldset
+          disabled={editingDisabled}
+          className="space-y-6 disabled:cursor-not-allowed disabled:opacity-60"
+        >
         <div className="rounded-[32px] border border-white/60 bg-white/95 p-8 shadow-xl shadow-indigo-100 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
           <div className="space-y-6">
             <div>
@@ -561,11 +586,12 @@ export default function EditEmployeePage() {
           </Link>
           <Button
             type="submit"
-            disabled={updateMutation.isPending}
+            disabled={editingDisabled || updateMutation.isPending}
           >
             {updateMutation.isPending ? "Saving..." : "Save changes"}
           </Button>
         </div>
+        </fieldset>
       </form>
 
       <section className="rounded-[32px] border border-white/60 bg-white/95 p-8 shadow-xl shadow-indigo-100 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
@@ -578,59 +604,64 @@ export default function EditEmployeePage() {
               Adjust the available leave balance for this employee. Changes apply immediately.
             </p>
           </div>
-          <form className="space-y-6" onSubmit={handleLeaveQuotaSubmit}>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <TextInput
-                label="Annual leave (days)"
-                className="w-full"
-                type="number"
-                name="leaveAnnual"
-                value={leaveFormValues.annual}
-                onChange={handleLeaveValueChange("annual")}
-                placeholder="0"
-              />
-              <TextInput
-                label="Sick leave (days)"
-                className="w-full"
-                type="number"
-                name="leaveSick"
-                value={leaveFormValues.sick}
-                onChange={handleLeaveValueChange("sick")}
-                placeholder="0"
-              />
-              <TextInput
-                label="Casual leave (days)"
-                className="w-full"
-                type="number"
-                name="leaveCasual"
-                value={leaveFormValues.casual}
-                onChange={handleLeaveValueChange("casual")}
-                placeholder="0"
-              />
-              <TextInput
-                label="Parental leave (days)"
-                className="w-full"
-                type="number"
-                name="leaveParental"
-                value={leaveFormValues.parental}
-                onChange={handleLeaveValueChange("parental")}
-                placeholder="0"
-              />
-            </div>
-            {leaveAlert ? (
-              <p
-                className={`text-sm ${
-                  leaveAlert.type === "success" ? "text-emerald-600" : "text-rose-500"
-                }`}
-              >
-                {leaveAlert.message}
-              </p>
-            ) : null}
-            <div className="flex justify-end">
-              <Button type="submit" disabled={updateLeaveQuotaMutation.isPending}>
-                {updateLeaveQuotaMutation.isPending ? "Updating..." : "Update leave quotas"}
-              </Button>
-            </div>
+          <form onSubmit={handleLeaveQuotaSubmit}>
+            <fieldset
+              disabled={editingDisabled}
+              className="space-y-6 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <TextInput
+                  label="Annual leave (days)"
+                  className="w-full"
+                  type="number"
+                  name="leaveAnnual"
+                  value={leaveFormValues.annual}
+                  onChange={handleLeaveValueChange("annual")}
+                  placeholder="0"
+                />
+                <TextInput
+                  label="Sick leave (days)"
+                  className="w-full"
+                  type="number"
+                  name="leaveSick"
+                  value={leaveFormValues.sick}
+                  onChange={handleLeaveValueChange("sick")}
+                  placeholder="0"
+                />
+                <TextInput
+                  label="Casual leave (days)"
+                  className="w-full"
+                  type="number"
+                  name="leaveCasual"
+                  value={leaveFormValues.casual}
+                  onChange={handleLeaveValueChange("casual")}
+                  placeholder="0"
+                />
+                <TextInput
+                  label="Parental leave (days)"
+                  className="w-full"
+                  type="number"
+                  name="leaveParental"
+                  value={leaveFormValues.parental}
+                  onChange={handleLeaveValueChange("parental")}
+                  placeholder="0"
+                />
+              </div>
+              {leaveAlert ? (
+                <p
+                  className={`text-sm ${
+                    leaveAlert.type === "success" ? "text-emerald-600" : "text-rose-500"
+                  }`}
+                >
+                  {leaveAlert.message}
+                </p>
+              ) : null}
+              <div className="flex justify-end">
+                <Button type="submit" disabled={editingDisabled || updateLeaveQuotaMutation.isPending}>
+                  {updateLeaveQuotaMutation.isPending ? "Updating..." : "Update leave quotas"}
+                </Button>
+              </div>
+            </fieldset>
           </form>
         </div>
       </section>

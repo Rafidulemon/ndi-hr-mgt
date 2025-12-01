@@ -54,3 +54,85 @@ export const requireWorkManager = (ctx: TRPCContext) => {
   }
   return user;
 };
+
+const ROLE_ORDER: UserRole[] = [
+  "EMPLOYEE",
+  "HR_ADMIN",
+  "MANAGER",
+  "ORG_ADMIN",
+  "ORG_OWNER",
+  "SUPER_ADMIN",
+];
+
+const ROLE_RANK = ROLE_ORDER.reduce<Record<UserRole, number>>((acc, role, index) => {
+  acc[role] = index;
+  return acc;
+}, {} as Record<UserRole, number>);
+
+type PermissionResult = {
+  allowed: boolean;
+  reason: string | null;
+};
+
+export type RolePermissionResult = PermissionResult;
+
+const buildPermissionResult = (allowed: boolean, reason?: string | null): PermissionResult => ({
+  allowed,
+  reason: reason ?? null,
+});
+
+export const isRoleSenior = (targetRole: UserRole, viewerRole: UserRole) =>
+  (ROLE_RANK[targetRole] ?? 0) > (ROLE_RANK[viewerRole] ?? 0);
+
+export const getEditPermission = (
+  viewerRole: UserRole,
+  targetRole: UserRole,
+): PermissionResult => {
+  if (viewerRole === "EMPLOYEE") {
+    return buildPermissionResult(false, "Employees can’t edit other team members.");
+  }
+
+  if (targetRole === "SUPER_ADMIN") {
+    return buildPermissionResult(false, "Super Admin profiles can’t be edited.");
+  }
+
+  if (targetRole === "ORG_OWNER" && viewerRole !== "SUPER_ADMIN") {
+    return buildPermissionResult(false, "Only Super Admins can edit Org Owners.");
+  }
+
+  if (
+    (viewerRole === "HR_ADMIN" || viewerRole === "MANAGER") &&
+    (targetRole === "MANAGER" || targetRole === "ORG_ADMIN")
+  ) {
+    return buildPermissionResult(
+      false,
+      "Managers and HR admins can’t edit Manager or Org Admin accounts.",
+    );
+  }
+
+  return buildPermissionResult(true);
+};
+
+export const getTerminationPermission = (
+  viewerRole: UserRole,
+  targetRole: UserRole,
+  options?: { isSelf?: boolean },
+): PermissionResult => {
+  if (options?.isSelf) {
+    return buildPermissionResult(false, "You can’t terminate your own account.");
+  }
+
+  if (viewerRole === "EMPLOYEE") {
+    return buildPermissionResult(false, "Only admins can terminate employees.");
+  }
+
+  if (targetRole === "SUPER_ADMIN") {
+    return buildPermissionResult(false, "Super Admin accounts can’t be terminated.");
+  }
+
+  if (isRoleSenior(targetRole, viewerRole)) {
+    return buildPermissionResult(false, "You can’t terminate a senior position holder.");
+  }
+
+  return buildPermissionResult(true);
+};

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { IconType } from "react-icons";
 import { FiEdit2, FiEye, FiTrash2 } from "react-icons/fi";
@@ -13,10 +13,7 @@ import type { EmploymentType, UserRole } from "@prisma/client";
 import Button from "../../../components/atoms/buttons/Button";
 import TextArea from "../../../components/atoms/inputs/TextArea";
 import TextInput from "../../../components/atoms/inputs/TextInput";
-import {
-  employeeStatusStyles,
-  pendingApprovalStatusStyles,
-} from "./statusStyles";
+import { employeeStatusStyles } from "./statusStyles";
 import { trpc } from "@/trpc/client";
 import type { EmployeeDirectoryEntry, EmployeeStatus } from "@/types/hr-admin";
 
@@ -74,19 +71,6 @@ const formatDate = (value?: string | null) => {
   }).format(date);
 };
 
-const formatRelativeTime = (value?: string | null) => {
-  if (!value) return "moments ago";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "moments ago";
-  const diffMs = Date.now() - date.getTime();
-  const diffMinutes = Math.round(diffMs / (1000 * 60));
-  if (diffMinutes < 60) return `${Math.max(diffMinutes, 1)}m ago`;
-  const diffHours = Math.round(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.round(diffHours / 24);
-  return `${diffDays}d ago`;
-};
-
 const countNewHiresInDays = (
   employees: EmployeeDirectoryEntry[],
   days: number
@@ -109,12 +93,19 @@ const statusFilterOptions: EmployeeStatus[] = [
   "Pending",
 ];
 
+const phoneRegex = /^\+?[0-9()\s-]{7,20}$/;
+
 const manualInviteSchema = z.object({
   fullName: z.string().min(3, "Full name is required"),
   workEmail: z.string().email("Provide a valid work email"),
-  inviteRole: z.string().min(1, "Select an access level"),
-  designation: z.string().min(2, "Role/title is required"),
+  inviteRole: z.string().min(1, "Select a role"),
+  designation: z.string().min(2, "Designation is required"),
+  phoneNumber: z
+    .string()
+    .min(7, "Phone number is required")
+    .regex(phoneRegex, "Enter a valid phone number"),
   departmentId: z.string().optional(),
+  teamId: z.string().optional(),
   managerId: z.string().optional(),
   startDate: z.string().optional(),
   workLocation: z.string().optional(),
@@ -144,11 +135,9 @@ export default function EmployeeManagementPage() {
   const utils = trpc.useUtils();
   const dashboardQuery = trpc.hrEmployees.dashboard.useQuery();
   const employeeDirectory = dashboardQuery.data?.directory ?? [];
-  const pendingApprovals = dashboardQuery.data?.pendingApprovals ?? [];
-  const viewerRole = dashboardQuery.data?.viewerRole ?? "EMPLOYEE";
   const manualInviteOptions = dashboardQuery.data?.manualInvite;
   const departmentOptions = manualInviteOptions?.departments ?? [];
-  const managerOptions = manualInviteOptions?.managers ?? [];
+  const teamOptions = manualInviteOptions?.teams ?? [];
   const locationOptions = manualInviteOptions?.locations ?? [];
   const employmentTypeOptions = manualInviteOptions?.employmentTypes ?? [];
   const inviteRoleOptions = manualInviteOptions?.allowedRoles ?? [];
@@ -160,23 +149,22 @@ export default function EmployeeManagementPage() {
     type: "success" | "error";
     message: string;
   } | null>(null);
-  const [pendingAction, setPendingAction] = useState<{
-    id: string;
-    type: "approve" | "reject" | "delete";
-  } | null>(null);
+  const [terminatingEmployeeId, setTerminatingEmployeeId] = useState<string | null>(null);
   const manualInviteForm = useForm<ManualInviteFormValues>({
     resolver: zodResolver(manualInviteSchema),
-    defaultValues: {
-      fullName: "",
-      workEmail: "",
-      inviteRole: "",
-      designation: "",
-      departmentId: "",
-      managerId: "",
-      startDate: "",
-      workLocation: "",
-      employmentType: "",
-      notes: "",
+  defaultValues: {
+    fullName: "",
+    workEmail: "",
+    inviteRole: "",
+    designation: "",
+    phoneNumber: "",
+    departmentId: "",
+    teamId: "",
+    managerId: "",
+    startDate: "",
+    workLocation: "",
+    employmentType: "",
+    notes: "",
       sendInvite: true,
     },
   });
@@ -184,6 +172,8 @@ export default function EmployeeManagementPage() {
     register: inviteRegister,
     handleSubmit: handleInviteSubmit,
     reset: resetInviteForm,
+    watch: watchInviteForm,
+    setValue: setInviteValue,
     formState: { errors: inviteErrors },
   } = manualInviteForm;
   const defaultManualInviteValues = useMemo<ManualInviteFormValues>(
@@ -192,7 +182,9 @@ export default function EmployeeManagementPage() {
       workEmail: "",
       inviteRole: manualInviteOptions?.allowedRoles[0]?.value ?? "",
       designation: "",
+      phoneNumber: "",
       departmentId: "",
+      teamId: "",
       managerId: "",
       startDate: "",
       workLocation: "",
@@ -207,10 +199,46 @@ export default function EmployeeManagementPage() {
     () => buildSuggestedEmail(fullNameForPlaceholder ?? "", manualInviteOptions?.organizationDomain),
     [fullNameForPlaceholder, manualInviteOptions?.organizationDomain],
   );
-
-  const canDeleteEmployees = ["SUPER_ADMIN", "ORG_OWNER", "ORG_ADMIN", "MANAGER"].includes(
-    viewerRole,
+  const [managerSummary, setManagerSummary] = useState(
+    "Select a department to auto-assign a manager.",
   );
+  const selectedDepartmentId = watchInviteForm("departmentId");
+  const selectedTeamId = watchInviteForm("teamId");
+  const availableTeams = useMemo(
+    () =>
+      selectedDepartmentId
+        ? teamOptions.filter((team) => team.departmentId === selectedDepartmentId)
+        : [],
+    [selectedDepartmentId, teamOptions],
+  );
+  const previousDepartmentRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const previous = previousDepartmentRef.current;
+    if (previous && selectedDepartmentId && previous !== selectedDepartmentId) {
+      setInviteValue("teamId", "");
+    }
+    previousDepartmentRef.current = selectedDepartmentId ?? null;
+  }, [selectedDepartmentId, setInviteValue]);
+
+  useEffect(() => {
+    if (!manualInviteOptions) {
+      return;
+    }
+    const department = manualInviteOptions.departments.find(
+      (dept) => dept.id === selectedDepartmentId,
+    );
+    const team = manualInviteOptions.teams.find((teamOption) => teamOption.id === selectedTeamId);
+
+    const nextManagerId = team?.leadId ?? department?.headId ?? "";
+    const nextManagerName =
+      team?.leadName ??
+      department?.headName ??
+      (selectedDepartmentId ? "No manager assigned for this department yet." : "Select a department to auto-assign a manager.");
+
+    setInviteValue("managerId", nextManagerId ?? "");
+    setManagerSummary(nextManagerName);
+  }, [manualInviteOptions, selectedDepartmentId, selectedTeamId, setInviteValue]);
 
   useEffect(() => {
     if (!actionAlert) {
@@ -227,14 +255,8 @@ export default function EmployeeManagementPage() {
     resetInviteForm(defaultManualInviteValues);
   }, [defaultManualInviteValues, manualInviteOptions, resetInviteForm]);
 
-  const approveMutation = trpc.hrEmployees.approveSignup.useMutation({
-    onSettled: () => setPendingAction(null),
-  });
-  const rejectMutation = trpc.hrEmployees.rejectSignup.useMutation({
-    onSettled: () => setPendingAction(null),
-  });
-  const deleteMutation = trpc.hrEmployees.deleteEmployee.useMutation({
-    onSettled: () => setPendingAction(null),
+  const terminateMutation = trpc.hrEmployees.deleteEmployee.useMutation({
+    onSettled: () => setTerminatingEmployeeId(null),
   });
   const inviteMutation = trpc.hrEmployees.invite.useMutation({
     onSuccess: (data) => {
@@ -242,7 +264,7 @@ export default function EmployeeManagementPage() {
         type: "success",
         message: data.invitationSent
           ? `Invitation email sent to ${data.email}.`
-          : `Pending profile created for ${data.email}.`,
+          : `Invite link generated for ${data.email}.`,
       });
       resetInviteForm(defaultManualInviteValues);
       setFullNameForPlaceholder("");
@@ -261,7 +283,9 @@ export default function EmployeeManagementPage() {
       inviteRole: values.inviteRole as UserRole,
       employmentType: values.employmentType as EmploymentType,
       departmentId: values.departmentId || undefined,
+      teamId: values.teamId || undefined,
       managerId: values.managerId || undefined,
+      phoneNumber: values.phoneNumber.trim(),
       startDate: values.startDate || undefined,
       workLocation: values.workLocation || undefined,
       notes: values.notes?.trim() || undefined,
@@ -269,65 +293,33 @@ export default function EmployeeManagementPage() {
     });
   });
 
-  const isProcessingAction = (type: "approve" | "reject" | "delete", id: string) =>
-    pendingAction?.type === type && pendingAction?.id === id;
-
-  const handleApprove = (employeeId: string, name: string) => {
-    setPendingAction({ id: employeeId, type: "approve" });
-    approveMutation.mutate(
-      { employeeId },
-      {
-        onSuccess: () => {
-          void utils.hrEmployees.dashboard.invalidate();
-          setActionAlert({ type: "success", message: `${name} has been approved.` });
-        },
-        onError: (error) => {
-          setActionAlert({ type: "error", message: error.message });
-        },
-      },
-    );
-  };
-
-  const handleReject = (employeeId: string, name: string) => {
-    setPendingAction({ id: employeeId, type: "reject" });
-    rejectMutation.mutate(
-      { employeeId },
-      {
-        onSuccess: () => {
-          void utils.hrEmployees.dashboard.invalidate();
-          setActionAlert({ type: "success", message: `${name} has been rejected.` });
-        },
-        onError: (error) => {
-          setActionAlert({ type: "error", message: error.message });
-        },
-      },
-    );
-  };
-
-  const handleDeleteEmployee = (employeeId: string, name: string) => {
-    if (!canDeleteEmployees) {
+  const handleTerminateEmployee = (employee: EmployeeDirectoryEntry) => {
+    if (!employee.canTerminate) {
       setActionAlert({
         type: "error",
-        message: "You do not have permission to delete employee records.",
+        message: "You do not have permission to terminate this employee.",
       });
       return;
     }
 
     if (
       !window.confirm(
-        `Are you sure you want to delete ${name}? This action cannot be undone.`,
+        `Terminate ${employee.name}? This action immediately revokes access and cannot be undone.`,
       )
     ) {
       return;
     }
 
-    setPendingAction({ id: employeeId, type: "delete" });
-    deleteMutation.mutate(
-      { employeeId },
+    setTerminatingEmployeeId(employee.id);
+    terminateMutation.mutate(
+      { employeeId: employee.id },
       {
         onSuccess: () => {
           void utils.hrEmployees.dashboard.invalidate();
-          setActionAlert({ type: "success", message: `${name} has been deleted.` });
+          setActionAlert({
+            type: "success",
+            message: `${employee.name} has been terminated.`,
+          });
         },
         onError: (error) => {
           setActionAlert({ type: "error", message: error.message });
@@ -366,17 +358,11 @@ export default function EmployeeManagementPage() {
   const activeEmployees = employeeDirectory.filter(
     (employee) => employee.status === "Active"
   ).length;
-  const pendingEmployees = employeeDirectory.filter(
-    (employee) => employee.status === "Pending"
-  ).length;
   const remoteHybridEmployees = employeeDirectory.filter((employee) => {
     const arrangement = employee.workArrangement?.toLowerCase();
     return arrangement === "remote" || arrangement === "hybrid";
   }).length;
   const newHires = countNewHiresInDays(employeeDirectory, 60);
-  const readyApprovals = pendingApprovals.filter(
-    (request) => request.status === "Ready"
-  ).length;
 
   const overviewCards = useMemo(
     () => [
@@ -396,11 +382,6 @@ export default function EmployeeManagementPage() {
             : "No records yet",
       },
       {
-        label: "Signup approvals",
-        value: pendingApprovals.length.toString(),
-        helper: `${readyApprovals} ready to approve`,
-      },
-      {
         label: "Remote + hybrid",
         value: remoteHybridEmployees.toString(),
         helper:
@@ -415,8 +396,6 @@ export default function EmployeeManagementPage() {
       totalEmployees,
       newHires,
       activeEmployees,
-      pendingApprovals.length,
-      readyApprovals,
       remoteHybridEmployees,
     ]
   );
@@ -476,11 +455,11 @@ export default function EmployeeManagementPage() {
             </p>
             <div>
               <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">
-                Bring sign-ups, approvals, and people data into one desk.
+                Bring onboarding and people data into one desk.
               </h1>
               <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                Manually create employee accounts, hold them in approval, then
-                jump into detailed profiles without switching apps.
+                Manually create employee accounts, send invites, then jump into detailed
+                profiles without switching apps.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -666,12 +645,12 @@ export default function EmployeeManagementPage() {
                               employee.id,
                             )}`}
                           />
-                          {canDeleteEmployees ? (
+                          {employee.canTerminate ? (
                             <IconActionButton
-                              label={`Delete ${employee.name}`}
+                              label={`Terminate ${employee.name}`}
                               icon={FiTrash2}
-                              onClick={() => handleDeleteEmployee(employee.id, employee.name)}
-                              disabled={isProcessingAction("delete", employee.id)}
+                              onClick={() => handleTerminateEmployee(employee)}
+                              disabled={terminatingEmployeeId === employee.id}
                             />
                           ) : null}
                         </div>
@@ -687,7 +666,7 @@ export default function EmployeeManagementPage() {
 
       <section
         id="manual-signup"
-        className="grid gap-6 rounded-[32px] border border-white/60 bg-white/95 p-6 shadow-xl shadow-indigo-100 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none lg:grid-cols-[2fr_1fr]"
+        className="rounded-[32px] border border-white/60 bg-white/95 p-6 shadow-xl shadow-indigo-100 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none"
       >
         <div className="space-y-6">
           <div>
@@ -695,8 +674,7 @@ export default function EmployeeManagementPage() {
               Manually add an employee
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              This creates a pending account. HR approval flips the status to
-              active.
+              Send a secure invite. Once they complete signup they can sign in right away.
             </p>
           </div>
           <form className="grid gap-4 md:grid-cols-2" onSubmit={handleManualInviteSubmit}>
@@ -727,9 +705,20 @@ export default function EmployeeManagementPage() {
               isRequired
               disabled={manualInviteDisabled}
             />
+            <TextInput
+              label="Phone number"
+              type="tel"
+              placeholder="+8801xxxxxxxxx"
+              className="w-full"
+              name="phoneNumber"
+              register={inviteRegister}
+              error={inviteErrors.phoneNumber}
+              isRequired
+              disabled={manualInviteDisabled}
+            />
             <div className="flex flex-col">
               <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
-                Access level
+                Role
               </label>
               <select
                 className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
@@ -750,7 +739,7 @@ export default function EmployeeManagementPage() {
               ) : null}
             </div>
             <TextInput
-              label="Role / title"
+              label="Designation"
               placeholder="e.g. Payroll Associate"
               className="w-full"
               name="designation"
@@ -797,7 +786,7 @@ export default function EmployeeManagementPage() {
                 {...inviteRegister("departmentId")}
                 disabled={manualInviteDisabled}
               >
-                <option value="">Select team</option>
+                <option value="">Select department</option>
                 {departmentOptions.map((department) => (
                   <option key={department.id} value={department.id}>
                     {department.name}
@@ -808,26 +797,42 @@ export default function EmployeeManagementPage() {
                 <p className="mt-1 text-xs text-rose-500">{inviteErrors.departmentId.message}</p>
               ) : null}
             </div>
-            <div className="flex flex-col">
-              <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
-                Manager
-              </label>
-              <select
-                className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                {...inviteRegister("managerId")}
-                disabled={manualInviteDisabled}
-              >
-                <option value="">Select manager</option>
-                {managerOptions.map((manager) => (
-                  <option key={manager.id} value={manager.id}>
-                    {manager.name}
-                    {manager.designation ? ` · ${manager.designation}` : ""}
-                  </option>
-                ))}
-              </select>
-              {inviteErrors.managerId ? (
-                <p className="mt-1 text-xs text-rose-500">{inviteErrors.managerId.message}</p>
-              ) : null}
+            {availableTeams.length > 0 ? (
+              <div className="flex flex-col">
+                <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
+                  Team (optional)
+                </label>
+                <select
+                  className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  {...inviteRegister("teamId")}
+                  disabled={manualInviteDisabled}
+                >
+                  <option value="">No specific team</option>
+                  {availableTeams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                      {team.leadName ? ` · Lead ${team.leadName}` : ""}
+                    </option>
+                  ))}
+                </select>
+                {inviteErrors.teamId ? (
+                  <p className="mt-1 text-xs text-rose-500">{inviteErrors.teamId.message}</p>
+                ) : null}
+              </div>
+            ) : (
+              <input type="hidden" {...inviteRegister("teamId")} />
+            )}
+            <div className="md:col-span-2 rounded-2xl border border-dashed border-slate-200 bg-white/60 px-4 py-3 text-sm dark:border-slate-700/70 dark:bg-slate-900/40">
+              <input type="hidden" {...inviteRegister("managerId")} />
+              <p className="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                Manager assignment
+              </p>
+              <p className="text-base font-semibold text-slate-900 dark:text-white">
+                {managerSummary}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Managers are auto-selected from department heads or team leads. You can update them later inside the employee profile.
+              </p>
             </div>
             <div className="flex flex-col">
               <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
@@ -851,7 +856,7 @@ export default function EmployeeManagementPage() {
             <TextArea
               label="Notes for HR (optional)"
               placeholder="Share onboarding context, paperwork status, or equipment needs."
-              className="md:col-span-2 w-full"
+              className="w-full md:col-span-2"
               height="120px"
               name="notes"
               register={inviteRegister}
@@ -870,7 +875,7 @@ export default function EmployeeManagementPage() {
                 Send account invite email now
               </label>
               <p className="mt-2 text-xs text-slate-400">
-                The profile stays in <span className="font-semibold">Pending</span> until HR approves it inside this dashboard.
+                Invitees can sign in immediately after completing their profile.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 md:col-span-2">
@@ -879,7 +884,7 @@ export default function EmployeeManagementPage() {
                 className="px-6 py-3 text-sm"
                 disabled={manualInviteDisabled || inviteMutation.isPending}
               >
-                {inviteMutation.isPending ? "Sending invite..." : "Create pending profile"}
+                {inviteMutation.isPending ? "Sending invite..." : "Send invite"}
               </Button>
               <Button
                 type="button"
@@ -895,172 +900,6 @@ export default function EmployeeManagementPage() {
               </Button>
             </div>
           </form>
-        </div>
-
-        <div className="space-y-4 rounded-[28px] border border-slate-100 bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white shadow-inner shadow-slate-900/40 dark:border-slate-700/70">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-white/70">
-              Signup pipeline
-            </p>
-            <h3 className="mt-2 text-3xl font-semibold">
-              {pendingApprovals.length}
-            </h3>
-            <p className="text-sm text-white/70">Pending approvals</p>
-          </div>
-          <dl className="space-y-3 text-sm">
-            <div className="flex items-center justify-between rounded-2xl bg-white/10 px-4 py-3">
-              <dt>Ready to activate</dt>
-              <dd className="text-lg font-semibold">{readyApprovals}</dd>
-            </div>
-            <div className="flex items-center justify-between rounded-2xl bg-white/10 px-4 py-3">
-              <dt>Need documents</dt>
-              <dd className="text-lg font-semibold">
-                {
-                  pendingApprovals.filter(
-                    (request) => request.status === "Documents Pending"
-                  ).length
-                }
-              </dd>
-            </div>
-          </dl>
-          <div className="rounded-2xl bg-white/10 p-4 text-sm text-white/80">
-            <p className="font-semibold">Auto-approvals</p>
-            <p className="mt-1 text-white/70">
-              Coming soon: configure policies to auto-approve referrals or
-              pre-onboarded contractors.
-            </p>
-            <p className="mt-3 text-xs text-white/50">
-              {pendingEmployees} people in the directory are still marked as
-              Pending until paperwork is complete.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-[32px] border border-white/60 bg-white/95 p-6 shadow-xl shadow-indigo-100 transition dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">
-              Pending signup approvals
-            </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Accounts remain inaccessible until you approve them here.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button theme="white" className="px-5 py-2.5 text-sm">
-              Download spreadsheet
-            </Button>
-            <Button className="px-5 py-2.5 text-sm">Approve all ready</Button>
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-4">
-          {pendingApprovals.length === 0 ? (
-            <p className="rounded-3xl border border-dashed border-slate-200 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700/70 dark:text-slate-400">
-              No pending signup requests right now.
-            </p>
-          ) : (
-            pendingApprovals.map((request) => {
-              const approvalStatusClass =
-                pendingApprovalStatusStyles[request.status] ??
-                pendingApprovalStatusStyles["Awaiting Review"];
-              const isApproving = isProcessingAction("approve", request.id);
-              const isRejecting = isProcessingAction("reject", request.id);
-
-              return (
-                <div
-                  key={request.id}
-                  className="grid gap-4 rounded-[28px] border border-slate-100 p-5 text-sm shadow-sm shadow-white/40 transition hover:border-slate-200 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-200"
-                >
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                        {request.id}
-                      </p>
-                      <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                        {request.name}
-                      </p>
-                    </div>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${approvalStatusClass}`}
-                    >
-                      {request.status}
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800/70 dark:text-slate-300">
-                      {request.channel}
-                    </span>
-                    <p className="ml-auto text-xs text-slate-500 dark:text-slate-400">
-                      {formatRelativeTime(request.requestedAt)}
-                    </p>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-wider text-slate-400">
-                        Role
-                      </p>
-                      <p className="font-semibold text-slate-900 dark:text-white">
-                        {request.role}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-wider text-slate-400">
-                        Department
-                      </p>
-                      <p className="font-semibold text-slate-900 dark:text-white">
-                        {request.department ?? "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-wider text-slate-400">
-                        Experience
-                      </p>
-                      <p className="font-semibold text-slate-900 dark:text-white">
-                        {request.experience}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <p className="text-xs uppercase tracking-wider text-slate-400">
-                        Email
-                      </p>
-                      <p className="font-mono text-sm text-slate-700 dark:text-slate-200">
-                        {request.email}
-                      </p>
-                    </div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      {request.note}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        theme="white"
-                        className="px-4 py-2 text-xs"
-                        href={`/hr-admin/employees/view/${encodeURIComponent(request.id)}`}
-                      >
-                        View profile
-                      </Button>
-                      <Button
-                        className="px-4 py-2 text-xs"
-                        disabled={isApproving}
-                        onClick={() => handleApprove(request.id, request.name)}
-                      >
-                        {isApproving ? "Approving..." : "Approve"}
-                      </Button>
-                      <Button
-                        theme="cancel-secondary"
-                        className="px-4 py-2 text-xs"
-                        disabled={isRejecting}
-                        onClick={() => handleReject(request.id, request.name)}
-                      >
-                        {isRejecting ? "Rejecting..." : "Reject"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
         </div>
       </section>
     </div>

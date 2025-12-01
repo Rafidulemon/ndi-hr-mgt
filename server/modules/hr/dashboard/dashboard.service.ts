@@ -423,21 +423,21 @@ const buildQuickActions = ({
 ];
 
 const buildWorkforceSignals = ({
-  pendingApprovals,
   pendingLeaves,
+  missingCheckIns,
 }: {
-  pendingApprovals: number;
   pendingLeaves: number;
+  missingCheckIns: number;
 }): HrDashboardWorkforceSignal[] => [
-  {
-    label: "Backfills ready",
-    value: formatNumber(pendingApprovals),
-    detail: "Invites awaiting onboarding",
-  },
   {
     label: "Open leave requests",
     value: formatNumber(pendingLeaves),
     detail: "Need HR attention",
+  },
+  {
+    label: "Missing check-ins",
+    value: formatNumber(missingCheckIns),
+    detail: "Haven't started their day",
   },
 ];
 
@@ -466,7 +466,6 @@ const buildCoverageSummary = ({
 const buildWorkforceCapacity = (
   employees: EmployeeRecord[],
   months: number,
-  pendingApprovals: number,
   targetDate: Date,
 ): HrDashboardWorkforcePoint[] => {
   const results: HrDashboardWorkforcePoint[] = [];
@@ -484,11 +483,9 @@ const buildWorkforceCapacity = (
       return startDate <= monthEnd;
     }).length;
 
-    const plan = actual + pendingApprovals;
-
     results.push({
       label: monthFormatter.format(monthDate),
-      plan,
+      plan: actual,
       actual,
     });
   }
@@ -532,7 +529,7 @@ export const hrDashboardService = {
     const targetDate = startOfDay(parseDateInput(input?.date));
     const previousDate = addDays(targetDate, -1);
 
-    const [employees, attendanceToday, attendanceYesterday, leaveRequests, pendingLeavesCount, pendingApprovalsCount] =
+    const [employees, attendanceToday, attendanceYesterday, leaveRequests, pendingLeavesCount] =
       await Promise.all([
         ctx.prisma.user.findMany({
           where: {
@@ -593,15 +590,6 @@ export const hrDashboardService = {
             status: {
               in: [LeaveStatus.PENDING, LeaveStatus.PROCESSING],
             },
-          },
-        }),
-        ctx.prisma.user.count({
-          where: {
-            organizationId,
-            invitedAt: {
-              not: null,
-            },
-            lastLoginAt: null,
           },
         }),
       ]);
@@ -811,15 +799,10 @@ export const hrDashboardService = {
       late: currentCategories.late,
     });
 
-    const workforceCapacity = buildWorkforceCapacity(
-      activeEmployees,
-      6,
-      pendingApprovalsCount,
-      targetDate,
-    );
+    const workforceCapacity = buildWorkforceCapacity(activeEmployees, 6, targetDate);
     const workforceSignals = buildWorkforceSignals({
-      pendingApprovals: pendingApprovalsCount,
       pendingLeaves: pendingLeavesCount,
+      missingCheckIns,
     });
     const teamCapacity = buildTeamCapacity(activeEmployees);
 
@@ -845,9 +828,9 @@ export const hrDashboardService = {
         detail: "Assigned to live projects",
       },
       {
-        label: "Pending approvals",
-        value: formatNumber(pendingApprovalsCount),
-        detail: "Invites awaiting onboarding",
+        label: "Open leave requests",
+        value: formatNumber(pendingLeavesCount),
+        detail: "Need HR attention",
       },
     ];
 

@@ -19,17 +19,12 @@ import type {
   HrEmployeeProfile,
   HrEmployeeProfileResponse,
   HrEmployeeUpdateInput,
-  PendingApproval,
-  PendingApprovalStatus,
 } from "@/types/hr-admin";
 
-import { requireHrAdmin } from "@/server/modules/hr/utils";
+import { getEditPermission, getTerminationPermission, requireHrAdmin } from "@/server/modules/hr/utils";
 import { addHours, createRandomToken, hashToken } from "@/server/utils/token";
 
 type PrismaTransaction = Prisma.TransactionClient;
-
-const privilegedDeletionRoles: UserRole[] = ["SUPER_ADMIN", "ORG_OWNER", "ORG_ADMIN", "MANAGER"];
-const managerEligibleRoles: UserRole[] = ["SUPER_ADMIN", "ORG_OWNER", "ORG_ADMIN", "MANAGER", "HR_ADMIN"];
 
 const INVITE_TOKEN_TTL_HOURS =
   Number(
@@ -94,6 +89,14 @@ const sanitizeOptional = (value?: string | null) => {
   return trimmed.length ? trimmed : null;
 };
 
+const normalizePhoneNumber = (value?: string | null) => {
+  const trimmed = sanitizeOptional(value);
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed.replace(/\s+/g, " ");
+};
+
 const parseStartDateInput = (value?: string | null) => {
   if (!value) {
     return new Date();
@@ -105,16 +108,31 @@ const parseStartDateInput = (value?: string | null) => {
   return parsed;
 };
 
-const getSiteUrl = () => {
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+const normalizeBaseUrl = (value?: string | null) => {
+  if (!value) {
+    return null;
   }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed.replace(/\/$/, "");
+};
+
+const getSiteUrl = () => {
+  const envUrl =
+    normalizeBaseUrl(process.env.NEXT_PUBLIC_BASE_URL) ??
+    normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ??
+    normalizeBaseUrl(process.env.NEXTAUTH_URL);
+
+  if (envUrl) {
+    return envUrl;
+  }
+
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
   }
-  if (process.env.NEXTAUTH_URL) {
-    return process.env.NEXTAUTH_URL.replace(/\/$/, "");
-  }
+
   return `http://localhost:${process.env.PORT ?? 3000}`;
 };
 
@@ -128,6 +146,7 @@ const createPlaceholderPasswordHash = async () => {
 
 const employeeSelect = {
   id: true,
+  role: true,
   email: true,
   phone: true,
   status: true,
@@ -203,10 +222,9 @@ const pendingApprovalSelect = {
   },
 } as const satisfies Prisma.UserSelect;
 
-type PendingRecord = Prisma.UserGetPayload<{ select: typeof pendingApprovalSelect }>;
-
 const employeeDetailSelect = {
   id: true,
+  role: true,
   email: true,
   phone: true,
   status: true,
@@ -391,7 +409,7 @@ const buildManualInviteOptions = async ({
   organizationId: string;
   viewerRole: UserRole;
 }): Promise<HrManualInviteOptions> => {
-  const [organization, departments, managerRecords, locationRecords] = await Promise.all([
+  const [organization, departments, teams, locationRecords] = await Promise.all([
     prisma.organization.findUnique({
       where: { id: organizationId },
       select: {
@@ -403,32 +421,48 @@ const buildManualInviteOptions = async ({
     prisma.department.findMany({
       where: { organizationId },
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
-    prisma.user.findMany({
-      where: {
-        organizationId,
-        role: {
-          in: managerEligibleRoles,
-        },
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
       select: {
         id: true,
-        email: true,
-        role: true,
-        profile: {
+        name: true,
+        headId: true,
+        head: {
           select: {
-            firstName: true,
-            lastName: true,
-            preferredName: true,
+            email: true,
+            profile: {
+              select: {
+                firstName: true,
+                lastName: true,
+                preferredName: true,
+              },
+            },
           },
         },
-        employment: {
+      },
+    }),
+    prisma.team.findMany({
+      where: { organizationId },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        departmentId: true,
+        leads: {
+          orderBy: { createdAt: "asc" },
+          take: 1,
           select: {
-            designation: true,
+            lead: {
+              select: {
+                id: true,
+                email: true,
+                profile: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    preferredName: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -457,13 +491,6 @@ const buildManualInviteOptions = async ({
     .filter((value): value is string => Boolean(value))
     .sort((a, b) => a.localeCompare(b));
 
-  const managers = managerRecords.map((record) => ({
-    id: record.id,
-    name: buildFullName(record.profile, record.email),
-    role: record.role,
-    designation: record.employment?.designation ?? null,
-  }));
-
   const allowedRoles: HrInviteRoleOption[] = getAllowedInviteRoles(viewerRole).map((role) => ({
     value: role,
     label: formatRoleLabel(role),
@@ -472,18 +499,31 @@ const buildManualInviteOptions = async ({
   return {
     organizationDomain: organization?.domain ?? null,
     organizationName: organization?.name ?? "Your organization",
-    departments,
-    managers,
+    departments: departments.map((department) => ({
+      id: department.id,
+      name: department.name,
+      headId: department.headId,
+      headName: department.head
+        ? buildFullName(department.head.profile, department.head.email)
+        : null,
+    })),
+    teams: teams.map((team) => {
+      const leadUser = team.leads[0]?.lead ?? null;
+      return {
+        id: team.id,
+        name: team.name,
+        departmentId: team.departmentId,
+        leadId: leadUser?.id ?? null,
+        leadName: leadUser ? buildFullName(leadUser.profile, leadUser.email) : null,
+      };
+    }),
     locations,
     employmentTypes,
     allowedRoles,
   };
 };
 
-const buildInitials = (
-  profile?: EmployeeRecord["profile"] | PendingRecord["profile"] | null,
-  fallback?: string,
-) => {
+const buildInitials = (profile?: EmployeeRecord["profile"] | null, fallback?: string) => {
   const createFromString = (value: string) =>
     value
       .split(" ")
@@ -558,14 +598,21 @@ const formatManagerName = (
 
 const formatDateToIso = (date?: Date | null) => (date ? date.toISOString() : null);
 
-const mapEmployeeRecord = (record: EmployeeRecord): EmployeeDirectoryEntry => {
+const mapEmployeeRecord = (
+  record: EmployeeRecord,
+  viewer: { id: string; role: UserRole },
+): EmployeeDirectoryEntry => {
   const profile = record.profile;
   const employment = record.employment;
 
   const statusSource = employment?.status ?? record.status;
+  const terminationPermission = getTerminationPermission(viewer.role, record.role as UserRole, {
+    isSelf: viewer.id === record.id,
+  });
 
   return {
     id: record.id,
+    userRole: record.role as UserRole,
     employeeCode: employment?.employeeCode ?? null,
     name: buildFullName(profile, record.email),
     role: employment?.designation ?? "Team member",
@@ -584,34 +631,7 @@ const mapEmployeeRecord = (record: EmployeeRecord): EmployeeDirectoryEntry => {
     avatarInitials: buildInitials(profile, record.email),
     profilePhotoUrl: profile?.profilePhotoUrl ?? null,
     experience: formatExperience(employment?.startDate),
-  };
-};
-
-const mapPendingStatus = (status: EmploymentStatus): PendingApprovalStatus => {
-  if (status === EmploymentStatus.ACTIVE) {
-    return "Ready";
-  }
-  if (status === EmploymentStatus.PROBATION) {
-    return "Awaiting Review";
-  }
-  return "Documents Pending";
-};
-
-const mapPendingRecord = (record: PendingRecord): PendingApproval => {
-  const requestedAt = record.invitedAt ?? record.createdAt;
-  const role = record.employment?.designation ?? "Pending assignment";
-
-  return {
-    id: record.id,
-    name: buildFullName(record.profile, record.email),
-    role,
-    department: record.employment?.department?.name ?? null,
-    requestedAt: formatDateToIso(requestedAt) ?? new Date().toISOString(),
-    experience: formatExperience(record.employment?.startDate),
-    email: record.email,
-    channel: "Manual signup",
-    note: `${role} is awaiting HR approval.`,
-    status: mapPendingStatus(record.status),
+    canTerminate: terminationPermission.allowed,
   };
 };
 
@@ -724,6 +744,7 @@ const mapEmployeeForm = (record: EmployeeDetailRecord): HrEmployeeForm => {
 
   return {
     id: record.id,
+    userRole: record.role as UserRole,
     employeeCode: employment?.employeeCode ?? null,
     fullName,
     preferredName: profile?.preferredName ?? null,
@@ -785,8 +806,9 @@ const deleteUserCascade = async (tx: PrismaTransaction, userId: string) => {
 export const hrEmployeesService = {
   async getDashboard(ctx: TRPCContext): Promise<HrEmployeeDashboardResponse> {
     const user = requireHrAdmin(ctx);
+    const viewerRole = user.role as UserRole;
 
-    const [employees, pendingApprovals, manualInvite] = await Promise.all([
+    const [employees, manualInvite] = await Promise.all([
       ctx.prisma.user.findMany({
         where: {
           organizationId: user.organizationId,
@@ -796,20 +818,6 @@ export const hrEmployeesService = {
         },
         select: employeeSelect,
       }),
-      ctx.prisma.user.findMany({
-        where: {
-          organizationId: user.organizationId,
-          status: EmploymentStatus.INACTIVE,
-          invitedAt: {
-            not: null,
-          },
-          lastLoginAt: null,
-        },
-        orderBy: {
-          invitedAt: "desc",
-        },
-        select: pendingApprovalSelect,
-      }),
       buildManualInviteOptions({
         prisma: ctx.prisma,
         organizationId: user.organizationId,
@@ -818,9 +826,11 @@ export const hrEmployeesService = {
     ]);
 
     return {
-      viewerRole: user.role as UserRole,
-      directory: employees.map(mapEmployeeRecord),
-      pendingApprovals: pendingApprovals.map(mapPendingRecord),
+      viewerRole,
+      viewerId: user.id,
+      directory: employees.map((employee) =>
+        mapEmployeeRecord(employee, { id: user.id, role: viewerRole }),
+      ),
       manualInvite,
     };
   },
@@ -851,6 +861,7 @@ export const hrEmployeesService = {
     employeeId: string,
   ): Promise<HrEmployeeFormResponse> {
     const sessionUser = requireHrAdmin(ctx);
+    const viewerRole = sessionUser.role as UserRole;
 
     const record = await ctx.prisma.user.findFirst({
       where: {
@@ -864,7 +875,18 @@ export const hrEmployeesService = {
       throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
     }
 
-    return { form: mapEmployeeForm(record) };
+    const targetRole = record.role as UserRole;
+    const permission = getEditPermission(viewerRole, targetRole);
+
+    return {
+      form: mapEmployeeForm(record),
+      permissions: {
+        canEdit: permission.allowed,
+        viewerRole,
+        targetRole,
+        reason: permission.reason,
+      },
+    };
   },
 
   async updateEmployee(
@@ -872,6 +894,7 @@ export const hrEmployeesService = {
     input: HrEmployeeUpdateInput,
   ): Promise<HrEmployeeFormResponse> {
     const sessionUser = requireHrAdmin(ctx);
+    const viewerRole = sessionUser.role as UserRole;
     const existing = await ctx.prisma.user.findFirst({
       where: {
         id: input.employeeId,
@@ -879,11 +902,21 @@ export const hrEmployeesService = {
       },
       select: {
         id: true,
+        role: true,
       },
     });
 
     if (!existing) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
+    }
+
+    const targetRole = existing.role as UserRole;
+    const permission = getEditPermission(viewerRole, targetRole);
+    if (!permission.allowed) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: permission.reason ?? "You are not allowed to edit this employee.",
+      });
     }
 
     const { firstName, lastName } = splitFullName(input.fullName);
@@ -1078,18 +1111,31 @@ export const hrEmployeesService = {
     }
 
     const normalizedEmail = normalizeEmail(input.workEmail);
-    const departmentId = sanitizeOptional(input.departmentId);
-    const managerId = sanitizeOptional(input.managerId);
+    let departmentId = sanitizeOptional(input.departmentId);
+    const requestedManagerId = sanitizeOptional(input.managerId);
+    const teamId = sanitizeOptional(input.teamId);
+    const normalizedPhone = normalizePhoneNumber(input.phoneNumber);
 
+    if (!normalizedPhone) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Phone number is required.",
+      });
+    }
+
+    let resolvedDepartment: { id: string; headId: string | null } | null = null;
     if (departmentId) {
-      const departmentExists = await ctx.prisma.department.findFirst({
+      resolvedDepartment = await ctx.prisma.department.findFirst({
         where: {
           id: departmentId,
           organizationId: organization.id,
         },
-        select: { id: true },
+        select: {
+          id: true,
+          headId: true,
+        },
       });
-      if (!departmentExists) {
+      if (!resolvedDepartment) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Selected department does not exist.",
@@ -1097,14 +1143,82 @@ export const hrEmployeesService = {
       }
     }
 
-    if (managerId) {
+    let resolvedTeam:
+      | {
+          id: string;
+          departmentId: string;
+          leadId: string | null;
+        }
+      | null = null;
+
+    if (teamId) {
+      const teamRecord = await ctx.prisma.team.findFirst({
+        where: {
+          id: teamId,
+          organizationId: organization.id,
+        },
+        select: {
+          id: true,
+          departmentId: true,
+          leads: {
+            orderBy: { createdAt: "asc" },
+            take: 1,
+            select: {
+              leadId: true,
+            },
+          },
+        },
+      });
+
+      if (!teamRecord) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Selected team does not exist.",
+        });
+      }
+
+      if (departmentId && teamRecord.departmentId !== departmentId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Selected team does not belong to that department.",
+        });
+      }
+
+      if (!departmentId) {
+        departmentId = teamRecord.departmentId;
+        resolvedDepartment = await ctx.prisma.department.findFirst({
+          where: {
+            id: departmentId,
+            organizationId: organization.id,
+          },
+          select: {
+            id: true,
+            headId: true,
+          },
+        });
+      }
+
+      resolvedTeam = {
+        id: teamRecord.id,
+        departmentId: teamRecord.departmentId,
+        leadId: teamRecord.leads[0]?.leadId ?? null,
+      };
+    }
+
+    let resolvedManagerId = requestedManagerId;
+    if (!resolvedManagerId) {
+      resolvedManagerId = resolvedTeam?.leadId ?? resolvedDepartment?.headId ?? null;
+    }
+
+    if (resolvedManagerId) {
       const managerExists = await ctx.prisma.user.findFirst({
         where: {
-          id: managerId,
+          id: resolvedManagerId,
           organizationId: organization.id,
         },
         select: { id: true },
       });
+
       if (!managerExists) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -1142,6 +1256,7 @@ export const hrEmployeesService = {
         data: {
           organizationId: organization.id,
           email: normalizedEmail,
+          phone: normalizedPhone,
           passwordHash: placeholderPasswordHash,
           role: input.inviteRole,
           status: EmploymentStatus.INACTIVE,
@@ -1160,6 +1275,7 @@ export const hrEmployeesService = {
           lastName,
           preferredName: firstName,
           workEmail: normalizedEmail,
+          workPhone: normalizedPhone,
         },
       });
 
@@ -1172,8 +1288,9 @@ export const hrEmployeesService = {
           status: EmploymentStatus.INACTIVE,
           startDate,
           departmentId: departmentId ?? undefined,
+          teamId: resolvedTeam?.id ?? undefined,
           primaryLocation: sanitizeOptional(input.workLocation),
-          reportingManagerId: managerId ?? undefined,
+          reportingManagerId: resolvedManagerId ?? undefined,
           currentProjectNote: sanitizeOptional(input.notes),
         },
       });
@@ -1236,102 +1353,10 @@ export const hrEmployeesService = {
     };
   },
 
-  async approvePendingEmployee(ctx: TRPCContext, employeeId: string) {
-    const sessionUser = requireHrAdmin(ctx);
-    const employee = await ctx.prisma.user.findFirst({
-      where: {
-        id: employeeId,
-        ...(sessionUser.role === "SUPER_ADMIN"
-          ? {}
-          : { organizationId: sessionUser.organizationId }),
-      },
-      select: {
-        id: true,
-        status: true,
-      },
-    });
-
-    if (!employee) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
-    }
-
-    if (employee.status !== EmploymentStatus.INACTIVE) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Only pending signups can be approved.",
-      });
-    }
-
-    await ctx.prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: employeeId },
-        data: {
-          status: EmploymentStatus.ACTIVE,
-          invitedAt: null,
-        },
-      });
-
-      await tx.employmentDetail.updateMany({
-        where: { userId: employeeId },
-        data: {
-          status: EmploymentStatus.ACTIVE,
-        },
-      });
-    });
-
-    return { message: "Signup request approved." };
-  },
-
-  async rejectPendingEmployee(ctx: TRPCContext, employeeId: string) {
-    const sessionUser = requireHrAdmin(ctx);
-    const employee = await ctx.prisma.user.findFirst({
-      where: {
-        id: employeeId,
-        ...(sessionUser.role === "SUPER_ADMIN"
-          ? {}
-          : { organizationId: sessionUser.organizationId }),
-      },
-      select: {
-        id: true,
-        status: true,
-      },
-    });
-
-    if (!employee) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
-    }
-
-    if (employee.status !== EmploymentStatus.INACTIVE) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Only pending signups can be rejected.",
-      });
-    }
-
-    await ctx.prisma.$transaction(async (tx) => {
-      await deleteUserCascade(tx, employeeId);
-    });
-
-    return { message: "Signup request rejected." };
-  },
-
   async deleteEmployee(ctx: TRPCContext, employeeId: string) {
     const sessionUser = requireHrAdmin(ctx);
     const viewerRole = sessionUser.role as UserRole;
-
-    if (!privilegedDeletionRoles.includes(viewerRole)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "You are not allowed to delete employee accounts.",
-      });
-    }
-
-    if (sessionUser.id === employeeId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "You cannot delete your own account.",
-      });
-    }
+    const isSelf = sessionUser.id === employeeId;
 
     const employee = await ctx.prisma.user.findFirst({
       where: {
@@ -1342,6 +1367,7 @@ export const hrEmployeesService = {
       },
       select: {
         id: true,
+        role: true,
       },
     });
 
@@ -1349,10 +1375,21 @@ export const hrEmployeesService = {
       throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
     }
 
+    const terminationPermission = getTerminationPermission(viewerRole, employee.role as UserRole, {
+      isSelf,
+    });
+
+    if (!terminationPermission.allowed) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: terminationPermission.reason ?? "You cannot terminate this employee.",
+      });
+    }
+
     await ctx.prisma.$transaction(async (tx) => {
       await deleteUserCascade(tx, employeeId);
     });
 
-    return { message: "Employee deleted." };
+    return { message: "Employee terminated." };
   },
 };

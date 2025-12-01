@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 
+import type { UserRole } from "@prisma/client";
+
 import { prisma } from "@/server/db";
 import { getCurrentUser } from "@/server/auth/guards";
 import { buildPublicR2Url, r2BucketName, r2Client } from "@/server/storage/r2";
+import { getEditPermission } from "@/server/modules/hr/utils";
 
 export const runtime = "nodejs";
 
@@ -63,13 +66,8 @@ export async function POST(request: Request) {
 
   const isEditingOtherUser = requestedEmployeeId !== sessionUser.id;
 
-  if (isEditingOtherUser) {
-    if (sessionUser.role !== "HR_ADMIN") {
-      return disallowedResponse("Only HR admins can update other profiles", 403);
-    }
-    if (!sessionUser.organizationId) {
-      return disallowedResponse("Missing organization context", 403);
-    }
+  if (isEditingOtherUser && !sessionUser.organizationId) {
+    return disallowedResponse("Missing organization context", 403);
   }
 
   const targetUser = await prisma.user.findFirst({
@@ -81,6 +79,7 @@ export async function POST(request: Request) {
     },
     select: {
       id: true,
+      role: true,
       email: true,
       organizationId: true,
       profile: {
@@ -105,6 +104,19 @@ export async function POST(request: Request) {
     targetUser.organizationId !== sessionUser.organizationId
   ) {
     return disallowedResponse("Employee belongs to a different organization", 403);
+  }
+
+  if (isEditingOtherUser) {
+    const permission = getEditPermission(
+      sessionUser.role as UserRole,
+      targetUser.role as UserRole,
+    );
+    if (!permission.allowed) {
+      return disallowedResponse(
+        permission.reason ?? "You are not allowed to update this profile",
+        403,
+      );
+    }
   }
 
   const key = [

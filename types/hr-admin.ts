@@ -1,14 +1,15 @@
+import type { EmploymentType, UserRole } from "@prisma/client";
+
 export type EmployeeStatus = "Active" | "On Leave" | "Probation" | "Pending";
 
 export type EmployeeDocumentStatus = "Signed" | "Pending" | "Missing";
-
-export type PendingApprovalStatus = "Awaiting Review" | "Documents Pending" | "Ready";
 
 export type EmployeeDirectoryEntry = {
   id: string;
   employeeCode: string | null;
   name: string;
   role: string;
+  userRole: UserRole;
   department: string | null;
   squad: string | null;
   location: string | null;
@@ -22,22 +23,8 @@ export type EmployeeDirectoryEntry = {
   avatarInitials: string;
   experience: string;
   profilePhotoUrl: string | null;
+  canTerminate: boolean;
 };
-
-export type PendingApproval = {
-  id: string;
-  name: string;
-  role: string;
-  department: string | null;
-  requestedAt: string;
-  experience: string;
-  email: string;
-  channel: "Manual signup" | "Email invite" | "Self signup" | "Referral";
-  note: string;
-  status: PendingApprovalStatus;
-};
-
-import type { EmploymentType, UserRole } from "@prisma/client";
 
 export type HrInviteRoleOption = {
   value: UserRole;
@@ -47,17 +34,35 @@ export type HrInviteRoleOption = {
 export type HrManualInviteOptions = {
   organizationDomain: string | null;
   organizationName: string;
-  departments: Array<{ id: string; name: string }>;
-  managers: Array<{ id: string; name: string; role: UserRole; designation: string | null }>;
+  departments: Array<{
+    id: string;
+    name: string;
+    headId: string | null;
+    headName: string | null;
+  }>;
+  teams: Array<{
+    id: string;
+    name: string;
+    departmentId: string;
+    leadId: string | null;
+    leadName: string | null;
+  }>;
   locations: string[];
   employmentTypes: Array<{ value: EmploymentType; label: string }>;
   allowedRoles: HrInviteRoleOption[];
 };
 
+export type HrEmployeeFormPermissions = {
+  canEdit: boolean;
+  viewerRole: UserRole;
+  targetRole: UserRole;
+  reason: string | null;
+};
+
 export type HrEmployeeDashboardResponse = {
   directory: EmployeeDirectoryEntry[];
-  pendingApprovals: PendingApproval[];
   viewerRole: UserRole;
+  viewerId: string;
   manualInvite: HrManualInviteOptions;
 };
 
@@ -115,6 +120,7 @@ export type HrEmployeeProfileResponse = {
 
 export type HrEmployeeForm = {
   id: string;
+  userRole: UserRole;
   employeeCode: string | null;
   fullName: string;
   preferredName: string | null;
@@ -135,6 +141,7 @@ export type HrEmployeeForm = {
 
 export type HrEmployeeFormResponse = {
   form: HrEmployeeForm;
+  permissions: HrEmployeeFormPermissions;
 };
 
 export type HrEmployeeUpdateInput = {
@@ -182,7 +189,9 @@ export type HrEmployeeInviteInput = {
   inviteRole: UserRole;
   designation: string;
   departmentId?: string | null;
+  teamId?: string | null;
   managerId?: string | null;
+  phoneNumber: string;
   startDate?: string | null;
   workLocation?: string | null;
   employmentType: EmploymentType;

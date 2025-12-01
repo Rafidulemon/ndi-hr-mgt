@@ -416,6 +416,8 @@ const completeInvite = async ({
       where: { id: record.userId },
       data: {
         passwordHash: hashedPassword,
+        status: EmploymentStatus.ACTIVE,
+        invitedAt: null,
       },
     });
 
@@ -434,6 +436,13 @@ const completeInvite = async ({
         preferredName: normalizedPreferredName ?? normalizedFirstName,
         workEmail: record.user.email,
         profilePhotoUrl: normalizedPhoto,
+      },
+    });
+
+    await tx.employmentDetail.updateMany({
+      where: { userId: record.userId },
+      data: {
+        status: EmploymentStatus.ACTIVE,
       },
     });
 

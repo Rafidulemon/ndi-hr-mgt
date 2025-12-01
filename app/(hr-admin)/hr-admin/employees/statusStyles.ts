@@ -1,4 +1,4 @@
-import type { EmployeeStatus, PendingApprovalStatus } from "@/types/hr-admin";
+import type { EmployeeStatus } from "@/types/hr-admin";
 
 export const employeeStatusStyles: Record<
   EmployeeStatus,
@@ -20,16 +20,4 @@ export const employeeStatusStyles: Record<
     bg: "bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-200",
     text: "text-purple-700 dark:text-purple-200",
   },
-};
-
-export const pendingApprovalStatusStyles: Record<
-  PendingApprovalStatus,
-  string
-> = {
-  "Awaiting Review":
-    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200",
-  "Documents Pending":
-    "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200",
-  Ready:
-    "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200",
 };

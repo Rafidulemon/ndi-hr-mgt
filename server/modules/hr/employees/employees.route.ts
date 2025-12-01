@@ -48,7 +48,12 @@ const inviteEmployeeInput = z.object({
   }),
   designation: z.string().min(2, "Role/title is required."),
   departmentId: z.string().min(1).optional().nullable(),
+  teamId: z.string().min(1).optional().nullable(),
   managerId: z.string().min(1).optional().nullable(),
+  phoneNumber: z
+    .string()
+    .min(7, "Phone number is required.")
+    .regex(/^\+?[0-9()\s-]{7,20}$/, "Enter a valid phone number."),
   startDate: z.string().optional().nullable(),
   workLocation: z.string().optional().nullable(),
   employmentType: z.nativeEnum(EmploymentType, {
@@ -83,16 +88,6 @@ export const hrEmployeesRouter = createTRPCRouter({
   invite: protectedProcedure
     .input(inviteEmployeeInput)
     .mutation(({ ctx, input }) => hrEmployeesController.invite({ ctx, input })),
-  approveSignup: protectedProcedure
-    .input(employeeIdParam)
-    .mutation(({ ctx, input }) =>
-      hrEmployeesController.approveSignup({ ctx, employeeId: input.employeeId }),
-    ),
-  rejectSignup: protectedProcedure
-    .input(employeeIdParam)
-    .mutation(({ ctx, input }) =>
-      hrEmployeesController.rejectSignup({ ctx, employeeId: input.employeeId }),
-    ),
   deleteEmployee: protectedProcedure
     .input(employeeIdParam)
     .mutation(({ ctx, input }) =>
