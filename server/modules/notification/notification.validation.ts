@@ -11,7 +11,12 @@ const detail = z.object({
   id: z.string().min(1, "Notification id is required"),
 });
 
+const markAsSeen = z.object({
+  id: z.string().min(1, "Notification id is required"),
+});
+
 export const NotificationValidation = {
   list,
   detail,
+  markAsSeen,
 };

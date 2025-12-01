@@ -11,5 +11,8 @@ export const notificationRouter = router({
   detail: protectedProcedure
     .input(NotificationValidation.detail)
     .query(({ ctx, input }) => NotificationController.detail(ctx, input)),
+  markAsSeen: protectedProcedure
+    .input(NotificationValidation.markAsSeen)
+    .mutation(({ ctx, input }) => NotificationController.markAsSeen(ctx, input)),
   unseenCount: protectedProcedure.query(({ ctx }) => NotificationController.unseenCount(ctx)),
 });

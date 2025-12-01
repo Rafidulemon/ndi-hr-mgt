@@ -6,6 +6,7 @@ import {
   type NotificationDetailResponse,
   type NotificationListInput,
   type NotificationListResponse,
+  type NotificationMarkSeenResponse,
   type NotificationUnseenCountResponse,
 } from "./notification.service";
 
@@ -47,8 +48,18 @@ const unseenCount = (ctx: TRPCContext): Promise<NotificationUnseenCountResponse>
     "Failed to load notification count.",
   );
 
+const markAsSeen = (
+  ctx: TRPCContext,
+  input: { id: string },
+): Promise<NotificationMarkSeenResponse> =>
+  safeExecute(
+    () => NotificationService.markAsSeen(ctx, input),
+    "Failed to update notification.",
+  );
+
 export const NotificationController = {
   list,
   detail,
   unseenCount,
+  markAsSeen,
 };

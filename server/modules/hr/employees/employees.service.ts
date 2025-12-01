@@ -493,21 +493,6 @@ const deleteUserCascade = async (tx: PrismaTransaction, userId: string) => {
     data: { headId: null },
   });
 
-  await tx.organization.updateMany({
-    where: { ownerId: userId },
-    data: { ownerId: null },
-  });
-
-  await tx.organization.updateMany({
-    where: { orgAdminId: userId },
-    data: { orgAdminId: null },
-  });
-
-  await tx.organization.updateMany({
-    where: { managerId: userId },
-    data: { managerId: null },
-  });
-
   await tx.notification.updateMany({
     where: { senderId: userId },
     data: { senderId: null },

@@ -193,7 +193,7 @@ const leaveRequestSelect = {
   totalDays: true,
 } as const satisfies Prisma.LeaveRequestSelect;
 
-const notificationSelect = {
+const notificationBaseSelect = {
   id: true,
   title: true,
   body: true,
@@ -204,6 +204,16 @@ const notificationSelect = {
   scheduledAt: true,
   createdAt: true,
 } as const satisfies Prisma.NotificationSelect;
+
+const buildNotificationSelect = (userId: string) =>
+  ({
+    ...notificationBaseSelect,
+    receipts: {
+      where: { userId },
+      select: { isSeen: true },
+      take: 1,
+    },
+  }) as const satisfies Prisma.NotificationSelect;
 
 const holidaySelect = {
   id: true,
@@ -249,7 +259,7 @@ type LeaveRequestForDashboard = Prisma.LeaveRequestGetPayload<{
 }>;
 
 type NotificationForDashboard = Prisma.NotificationGetPayload<{
-  select: typeof notificationSelect;
+  select: ReturnType<typeof buildNotificationSelect>;
 }>;
 
 type HolidayForDashboard = Prisma.HolidayGetPayload<{
@@ -445,7 +455,7 @@ const loadDashboardDataset = async (
         },
         AND: [buildNotificationAudienceFilter(userId, userRole)],
       },
-      select: notificationSelect,
+      select: buildNotificationSelect(userId),
       orderBy: [
         { sentAt: "desc" },
         { scheduledAt: "desc" },
@@ -619,17 +629,21 @@ const buildDashboardSections = (dataset: DashboardDataset): DashboardSections =>
   const nextLeaveDate =
     upcomingLeaves.length > 0 ? upcomingLeaves[0].startDate.toISOString() : null;
 
-  const notificationsSummary = notifications.map((record) => ({
-    id: record.id,
-    title: record.title,
-    body: record.body,
-    type: record.type,
-    status: record.status,
-    actionUrl: record.actionUrl ?? null,
-    timestamp: (
-      record.sentAt ?? record.scheduledAt ?? record.createdAt
-    ).toISOString(),
-  }));
+  const notificationsSummary = notifications.map((record) => {
+    const receipt = record.receipts?.[0];
+    return {
+      id: record.id,
+      title: record.title,
+      body: record.body,
+      type: record.type,
+      status: record.status,
+      isSeen: receipt?.isSeen ?? false,
+      actionUrl: record.actionUrl ?? null,
+      timestamp: (
+        record.sentAt ?? record.scheduledAt ?? record.createdAt
+      ).toISOString(),
+    };
+  });
 
   const profile = user.profile;
   const employment = user.employment;

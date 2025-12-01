@@ -6,9 +6,6 @@ export type SeedOrganization = {
   domain: string;
   timezone: string;
   locale: string;
-  ownerUserId: string;
-  orgAdminUserId: string;
-  managerUserId: string;
 };
 
 export type SeedDepartment = {
@@ -55,9 +52,6 @@ export const organizations: SeedOrganization[] = [
     domain: "ninja-digital-innovations.com",
     timezone: "Asia/Dhaka",
     locale: "en-US",
-    ownerUserId: "org-owner-kohei",
-    orgAdminUserId: "org-admin-tabuchi",
-    managerUserId: "org-admin-tabuchi",
   },
 ];
 

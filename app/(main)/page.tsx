@@ -512,12 +512,30 @@ function HomePage() {
                 {data.notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className="rounded-2xl border border-white/60 bg-white/80 px-5 py-4 text-sm shadow-sm transition-colors duration-200 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300"
+                    className={`rounded-2xl border px-5 py-4 text-sm shadow-sm transition-colors duration-200 ${
+                      notification.isSeen
+                        ? "border-white/60 bg-white/80 text-slate-600 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-300"
+                        : "border-indigo-200 bg-white text-slate-700 shadow-indigo-100 dark:border-sky-500/50 dark:bg-slate-900/70 dark:text-slate-200"
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-4">
-                      <p className="font-semibold text-slate-900 dark:text-slate-100">
-                        {notification.title}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p
+                          className={`font-semibold ${
+                            notification.isSeen
+                              ? "text-slate-900 dark:text-slate-100"
+                              : "text-indigo-600 dark:text-indigo-200"
+                          }`}
+                        >
+                          {notification.title}
+                        </p>
+                        {!notification.isSeen && (
+                          <span
+                            className="h-2 w-2 rounded-full bg-indigo-500"
+                            aria-label="Unseen notification"
+                          />
+                        )}
+                      </div>
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                         {getNotificationTypeLabel(notification.type)}
                       </span>

@@ -103,9 +103,6 @@ model Organization {
   domain    String?  @unique
   timezone  String?  @default("Asia/Dhaka")
   locale    String?  @default("en-US")
-  ownerId   String?
-  orgAdminId String?
-  managerId  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -119,14 +116,8 @@ model Organization {
   dailyReports      DailyReport[]
   monthlyReports    MonthlyReport[]
   workPolicy        WorkPolicy?
-  owner             User?          @relation("OrganizationOwner", fields: [ownerId], references: [id])
-  orgAdmin          User?          @relation("OrganizationAdmin", fields: [orgAdminId], references: [id])
-  manager           User?          @relation("OrganizationManager", fields: [managerId], references: [id])
 
   @@index([name])
-  @@index([ownerId])
-  @@index([orgAdminId])
-  @@index([managerId])
 }
 
 /// Authenticated user record. One row per employee/admin.
@@ -160,11 +151,9 @@ model User {
   teamLeadAssignments   TeamLead[]
   directReports         EmploymentDetail[]    @relation("ManagerReports")
   teamMemberships       TeamManager[]
-  administeredOrganizations Organization[]    @relation("OrganizationAdmin")
-  managedOrganizations      Organization[]    @relation("OrganizationManager")
-  ownedOrganizations        Organization[]    @relation("OrganizationOwner")
   sessions              Session[]
   passwordResetTokens   PasswordResetToken[]
+  notificationReceipts  NotificationReceipt[]
 
   @@index([organizationId])
 }
@@ -183,12 +172,12 @@ model Session {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -258,29 +247,29 @@ model EmployeeBankAccount {
 
 /// Canonical employment data linked to an organisation.
 model EmploymentDetail {
-  id                 String           @id @default(uuid())
-  userId             String           @unique
-  organizationId     String
-  employeeCode       String?
-  designation        String
-  employmentType     EmploymentType
-  status             EmploymentStatus @default(ACTIVE)
-  startDate          DateTime
-  endDate            DateTime?
-  departmentId       String?
-  teamId             String?
-  reportingManagerId String?
-  currentProjectId   String?
-  primaryLocation    String?
-  workHours          String?
-  currentProjectNote String?
-  isTeamLead         Boolean         @default(false)
-  casualLeaveBalance   Decimal   @default(0) @db.Decimal(5, 2)
-  sickLeaveBalance     Decimal   @default(0) @db.Decimal(5, 2)
-  annualLeaveBalance   Decimal   @default(0) @db.Decimal(5, 2)
-  parentalLeaveBalance Decimal   @default(0) @db.Decimal(5, 2)
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  id                   String           @id @default(uuid())
+  userId               String           @unique
+  organizationId       String
+  employeeCode         String?
+  designation          String
+  employmentType       EmploymentType
+  status               EmploymentStatus @default(ACTIVE)
+  startDate            DateTime
+  endDate              DateTime?
+  departmentId         String?
+  teamId               String?
+  reportingManagerId   String?
+  currentProjectId     String?
+  primaryLocation      String?
+  workHours            String?
+  currentProjectNote   String?
+  isTeamLead           Boolean          @default(false)
+  casualLeaveBalance   Decimal          @default(0) @db.Decimal(5, 2)
+  sickLeaveBalance     Decimal          @default(0) @db.Decimal(5, 2)
+  annualLeaveBalance   Decimal          @default(0) @db.Decimal(5, 2)
+  parentalLeaveBalance Decimal          @default(0) @db.Decimal(5, 2)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
   user           User         @relation("EmployeeEmployment", fields: [userId], references: [id])
   organization   Organization @relation(fields: [organizationId], references: [id])
@@ -385,16 +374,16 @@ model AttendanceRecord {
 }
 
 model DailyReport {
-  id             String        @id @default(uuid())
+  id             String   @id @default(uuid())
   organizationId String
   employeeId     String
   reportDate     DateTime
   note           String?
-  submittedAt    DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  submittedAt    DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  employee     User         @relation(fields: [employeeId], references: [id])
+  organization Organization       @relation(fields: [organizationId], references: [id])
+  employee     User               @relation(fields: [employeeId], references: [id])
   entries      DailyReportEntry[]
 
   @@unique([employeeId, reportDate])
@@ -402,15 +391,15 @@ model DailyReport {
 }
 
 model DailyReportEntry {
-  id            String      @id @default(uuid())
+  id            String   @id @default(uuid())
   dailyReportId String
   workType      String
   taskName      String
   others        String?
   details       String
-  workingHours  Decimal     @db.Decimal(5, 2)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  workingHours  Decimal  @db.Decimal(5, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   report DailyReport @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
 
@@ -433,8 +422,8 @@ model LeaveRequest {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  employee    User              @relation("LeaveAuthor", fields: [employeeId], references: [id])
-  reviewer    User?             @relation("LeaveReviewer", fields: [reviewerId], references: [id])
+  employee User  @relation("LeaveAuthor", fields: [employeeId], references: [id])
+  reviewer User? @relation("LeaveReviewer", fields: [reviewerId], references: [id])
 
   @@index([employeeId, startDate])
   @@index([status])
@@ -463,29 +452,45 @@ model Project {
 }
 
 model Notification {
-  id             String             @id @default(uuid())
+  id             String               @id @default(uuid())
   organizationId String
   senderId       String?
   title          String
   body           String
-  type           NotificationType   @default(ANNOUNCEMENT)
+  type           NotificationType     @default(ANNOUNCEMENT)
   audience       NotificationAudience @default(ORGANIZATION)
-  targetRoles    UserRole[]         @default([])
+  targetRoles    UserRole[]           @default([])
   targetUserId   String?
-  status         NotificationStatus @default(DRAFT)
+  status         NotificationStatus   @default(DRAFT)
   actionUrl      String?
   metadata       Json?
   scheduledAt    DateTime?
   sentAt         DateTime?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  sender       User?        @relation("NotificationSender", fields: [senderId], references: [id])
-  targetUser   User?        @relation("NotificationTargetUser", fields: [targetUserId], references: [id])
+  organization Organization          @relation(fields: [organizationId], references: [id])
+  sender       User?                 @relation("NotificationSender", fields: [senderId], references: [id])
+  targetUser   User?                 @relation("NotificationTargetUser", fields: [targetUserId], references: [id])
+  receipts     NotificationReceipt[]
 
   @@index([organizationId])
   @@index([targetUserId])
+}
+
+model NotificationReceipt {
+  id             String    @id @default(uuid())
+  notificationId String
+  userId         String
+  isSeen         Boolean   @default(false)
+  seenAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@index([userId])
 }
 
 model Holiday {
@@ -504,30 +509,30 @@ model Holiday {
 }
 
 model WorkPolicy {
-  id               String   @id @default(uuid())
-  organizationId   String   @unique
-  onsiteStartTime  String
-  onsiteEndTime    String
-  remoteStartTime  String
-  remoteEndTime    String
-  workingDays      String[]
-  weekendDays      String[]
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(uuid())
+  organizationId  String   @unique
+  onsiteStartTime String
+  onsiteEndTime   String
+  remoteStartTime String
+  remoteEndTime   String
+  workingDays     String[]
+  weekendDays     String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
 }
 
 model MonthlyReport {
-  id             String        @id @default(uuid())
+  id             String   @id @default(uuid())
   organizationId String
   employeeId     String
   reportMonth    DateTime
-  submittedAt    DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  submittedAt    DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  organization Organization     @relation(fields: [organizationId], references: [id])
-  employee     User             @relation(fields: [employeeId], references: [id])
+  organization Organization         @relation(fields: [organizationId], references: [id])
+  employee     User                 @relation(fields: [employeeId], references: [id])
   entries      MonthlyReportEntry[]
 
   @@unique([employeeId, reportMonth])
@@ -535,13 +540,13 @@ model MonthlyReport {
 }
 
 model MonthlyReportEntry {
-  id              String         @id @default(uuid())
+  id              String   @id @default(uuid())
   monthlyReportId String
   taskName        String
-  storyPoint      Decimal        @db.Decimal(6, 2)
-  workingHours    Decimal        @db.Decimal(6, 2)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  storyPoint      Decimal  @db.Decimal(6, 2)
+  workingHours    Decimal  @db.Decimal(6, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   report MonthlyReport @relation(fields: [monthlyReportId], references: [id], onDelete: Cascade)
 

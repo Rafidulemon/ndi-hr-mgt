@@ -9,7 +9,7 @@ import {
 
 import type { TRPCContext } from "@/server/api/trpc";
 
-const notificationSelect = {
+const notificationBaseSelect = {
   id: true,
   title: true,
   body: true,
@@ -38,8 +38,18 @@ const notificationSelect = {
   },
 } as const satisfies Prisma.NotificationSelect;
 
+const buildNotificationSelect = (userId: string) =>
+  ({
+    ...notificationBaseSelect,
+    receipts: {
+      where: { userId },
+      select: { isSeen: true },
+      take: 1,
+    },
+  }) as const satisfies Prisma.NotificationSelect;
+
 type NotificationRecord = Prisma.NotificationGetPayload<{
-  select: typeof notificationSelect;
+  select: ReturnType<typeof buildNotificationSelect>;
 }>;
 
 const visibleStatuses = [
@@ -335,6 +345,7 @@ const buildSenderSummary = (record: NotificationRecord): NotificationSenderSumma
 const transformRecord = (record: NotificationRecord) => {
   const timestamp = (record.sentAt ?? record.scheduledAt ?? record.createdAt).toISOString();
   const source = notificationSourceMap[record.type];
+  const receipt = record.receipts?.[0];
 
   return {
     id: record.id,
@@ -342,6 +353,7 @@ const transformRecord = (record: NotificationRecord) => {
     body: record.body,
     type: record.type,
     status: record.status,
+    isSeen: receipt?.isSeen ?? false,
     actionUrl: record.actionUrl ?? null,
     timestamp,
     source,
@@ -355,6 +367,7 @@ export type NotificationListItem = {
   body: string;
   type: NotificationType;
   status: NotificationStatus;
+  isSeen: boolean;
   actionUrl: string | null;
   timestamp: string;
   source: NotificationSource;
@@ -384,6 +397,11 @@ export type NotificationUnseenCountResponse = {
   unseen: number;
 };
 
+export type NotificationMarkSeenResponse = {
+  id: string;
+  isSeen: boolean;
+};
+
 const getSessionContext = (ctx: TRPCContext) => {
   if (!ctx.session) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -411,11 +429,12 @@ const list = async (
 ): Promise<NotificationListResponse> => {
   const { organizationId, userId, role } = getSessionContext(ctx);
   const typeFilter = input?.type;
+  const select = buildNotificationSelect(userId);
 
   const [records, grouped] = await Promise.all([
     ctx.prisma.notification.findMany({
       where: buildNotificationWhere({ organizationId, userId, role, type: typeFilter }),
-      select: notificationSelect,
+      select,
       orderBy: notificationOrder,
     }),
     ctx.prisma.notification.groupBy({
@@ -449,7 +468,7 @@ const getById = async (
       id: input.id,
       ...buildNotificationWhere({ organizationId, userId, role }),
     },
-    select: notificationSelect,
+    select: buildNotificationSelect(userId),
   });
 
   if (!record) {
@@ -480,14 +499,78 @@ const getUnseenCount = async (ctx: TRPCContext): Promise<NotificationUnseenCount
     where: {
       ...baseWhere,
       status: NotificationStatus.SENT,
+      receipts: {
+        none: {
+          userId,
+          isSeen: true,
+        },
+      },
     },
   });
 
   return { unseen };
 };
 
+const markAsSeen = async (
+  ctx: TRPCContext,
+  input: { id: string },
+): Promise<NotificationMarkSeenResponse> => {
+  const { organizationId, userId, role } = getSessionContext(ctx);
+
+  const record = await ctx.prisma.notification.findFirst({
+    where: {
+      id: input.id,
+      ...buildNotificationWhere({ organizationId, userId, role }),
+    },
+    select: {
+      id: true,
+      receipts: {
+        where: { userId },
+        select: { id: true, isSeen: true },
+        take: 1,
+      },
+    },
+  });
+
+  if (!record) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Notification could not be found.",
+    });
+  }
+
+  const receipt = record.receipts?.[0];
+  if (!receipt?.isSeen) {
+    const now = new Date();
+    await ctx.prisma.notificationReceipt.upsert({
+      where: {
+        notificationId_userId: {
+          notificationId: record.id,
+          userId,
+        },
+      },
+      create: {
+        notificationId: record.id,
+        userId,
+        isSeen: true,
+        seenAt: now,
+      },
+      update: {
+        isSeen: true,
+        seenAt: now,
+      },
+    });
+  }
+
+  return {
+    id: record.id,
+    isSeen: true,
+  };
+};
+
 export const NotificationService = {
   list,
   getById,
   getUnseenCount,
+  markAsSeen,
 };

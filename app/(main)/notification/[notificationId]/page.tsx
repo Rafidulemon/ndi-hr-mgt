@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { trpc } from "@/trpc/client";
@@ -24,10 +25,28 @@ function NotificationDetailPage() {
         ? rawNotificationId[0]
         : "";
   const isIdReady = notificationId.length > 0;
+  const utils = trpc.useContext();
   const notificationQuery = trpc.notification.detail.useQuery(
     { id: notificationId },
     { enabled: isIdReady },
   );
+  const markAsSeenMutation = trpc.notification.markAsSeen.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.notification.list.invalidate(),
+        utils.notification.unseenCount.invalidate(),
+        utils.dashboard.notifications.invalidate(),
+      ]);
+    },
+  });
+
+  const markAsSeen = markAsSeenMutation.mutate;
+
+  useEffect(() => {
+    if (notificationQuery.data && !notificationQuery.data.isSeen) {
+      markAsSeen({ id: notificationQuery.data.id });
+    }
+  }, [markAsSeen, notificationQuery.data]);
 
   const handleBack = () => router.push("/notification");
   const handleOpenAction = () => {

@@ -85,6 +85,7 @@ export type DashboardNotificationItem = {
   body: string;
   type: NotificationType;
   status: NotificationStatus;
+  isSeen: boolean;
   timestamp: string;
   actionUrl: string | null;
 };

@@ -42,6 +42,16 @@ function NotificationPage() {
 
   const queryInput = filter === "ALL" ? undefined : { type: filter };
   const notificationsQuery = trpc.notification.list.useQuery(queryInput);
+  const utils = trpc.useContext();
+  const markAsSeenMutation = trpc.notification.markAsSeen.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.notification.list.invalidate(),
+        utils.notification.unseenCount.invalidate(),
+        utils.dashboard.notifications.invalidate(),
+      ]);
+    },
+  });
 
   const notifications = notificationsQuery.data?.notifications ?? EMPTY_NOTIFICATIONS;
   const rows = useMemo<Row[]>(
@@ -51,9 +61,23 @@ function NotificationPage() {
         Date: dateTimeFormatter.format(new Date(notification.timestamp)),
         Notification: (
           <div className="flex flex-col gap-1">
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {notification.title}
-            </p>
+            <div className="flex items-center gap-2">
+              <p
+                className={`text-sm font-semibold ${
+                  notification.isSeen
+                    ? "text-slate-900 dark:text-slate-100"
+                    : "text-indigo-600 dark:text-indigo-200"
+                }`}
+              >
+                {notification.title}
+              </p>
+              {!notification.isSeen && (
+                <span
+                  className="h-2 w-2 rounded-full bg-indigo-500"
+                  aria-label="Unseen notification"
+                />
+              )}
+            </div>
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
               <span>{getNotificationTypeLabel(notification.type) || notification.type}</span>
               <span className="text-slate-300 dark:text-slate-600">•</span>
@@ -63,7 +87,13 @@ function NotificationPage() {
           </div>
         ),
         From: notification.sourceLabel,
-        Action: <IoEye className="text-lg" />,
+        Action: (
+          <IoEye
+            className={`text-lg ${
+              notification.isSeen ? "text-slate-400" : "text-indigo-500"
+            }`}
+          />
+        ),
       })),
     [notifications],
   );
@@ -95,6 +125,9 @@ function NotificationPage() {
       return;
     }
     const target = notifications.find((notification) => notification.id === id);
+    if (target && !target.isSeen) {
+      markAsSeenMutation.mutate({ id });
+    }
     if (target?.actionUrl) {
       router.push(target.actionUrl);
       return;

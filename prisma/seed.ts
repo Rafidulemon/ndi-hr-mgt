@@ -13,13 +13,7 @@ const prisma = new PrismaClient();
 
 const seedOrganizations = async () => {
   for (const organization of organizations) {
-    const {
-      ownerUserId: _ownerUserId,
-      orgAdminUserId: _orgAdminUserId,
-      managerUserId: _managerUserId,
-      ...orgData
-    } = organization;
-    await prisma.organization.create({ data: orgData });
+    await prisma.organization.create({ data: organization });
   }
 };
 
@@ -72,19 +66,6 @@ const assignDepartmentHeads = async () => {
   }
 };
 
-const assignOrganizationLeadership = async () => {
-  for (const organization of organizations) {
-    await prisma.organization.update({
-      where: { id: organization.id },
-      data: {
-        ownerId: organization.ownerUserId,
-        orgAdminId: organization.orgAdminUserId,
-        managerId: organization.managerUserId,
-      },
-    });
-  }
-};
-
 async function main() {
   const existing = await prisma.organization.findFirst({
     where: { id: { in: organizations.map((org) => org.id) } },
@@ -97,7 +78,6 @@ async function main() {
     await seedDepartments();
     await seedTeams();
     await seedUsers(prisma);
-    await assignOrganizationLeadership();
     await assignDepartmentHeads();
     await seedEmployees(prisma);
     await seedProjects(prisma);
