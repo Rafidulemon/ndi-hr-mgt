@@ -81,6 +81,8 @@ const formatRoleLabel = (role: UserRole) => roleLabels[role] ?? role;
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
+const normalizeEmployeeCode = (value: string) => value.trim().toUpperCase();
+
 const sanitizeOptional = (value?: string | null) => {
   if (!value) {
     return null;
@@ -486,6 +488,11 @@ const buildManualInviteOptions = async ({
     label: employmentTypeLabels[type],
   }));
 
+  const workModels = (Object.keys(workModelLabels) as WorkModel[]).map((model) => ({
+    value: model,
+    label: workModelLabels[model],
+  }));
+
   const locations = locationRecords
     .map((record) => record.primaryLocation?.trim())
     .filter((value): value is string => Boolean(value))
@@ -519,6 +526,7 @@ const buildManualInviteOptions = async ({
     }),
     locations,
     employmentTypes,
+    workModels,
     allowedRoles,
   };
 };
@@ -1111,10 +1119,18 @@ export const hrEmployeesService = {
     }
 
     const normalizedEmail = normalizeEmail(input.workEmail);
+    const employeeCode = normalizeEmployeeCode(input.employeeCode);
     let departmentId = sanitizeOptional(input.departmentId);
     const requestedManagerId = sanitizeOptional(input.managerId);
     const teamId = sanitizeOptional(input.teamId);
     const normalizedPhone = normalizePhoneNumber(input.phoneNumber);
+
+    if (!employeeCode) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Employee ID is required.",
+      });
+    }
 
     if (!normalizedPhone) {
       throw new TRPCError({
@@ -1235,6 +1251,21 @@ export const hrEmployeesService = {
       });
     }
 
+    const duplicateEmployee = await ctx.prisma.employmentDetail.findFirst({
+      where: {
+        organizationId: organization.id,
+        employeeCode,
+      },
+      select: { id: true },
+    });
+
+    if (duplicateEmployee) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This employee ID is already in use.",
+      });
+    }
+
     const { firstName, lastName } = splitFullName(input.fullName);
     const startDate = parseStartDateInput(input.startDate);
     const placeholderPasswordHash = await createPlaceholderPasswordHash();
@@ -1261,6 +1292,7 @@ export const hrEmployeesService = {
           role: input.inviteRole,
           status: EmploymentStatus.INACTIVE,
           invitedAt: new Date(),
+          invitedById: sessionUser.id,
         },
         select: {
           id: true,
@@ -1276,6 +1308,7 @@ export const hrEmployeesService = {
           preferredName: firstName,
           workEmail: normalizedEmail,
           workPhone: normalizedPhone,
+          workModel: input.workModel,
         },
       });
 
@@ -1283,6 +1316,7 @@ export const hrEmployeesService = {
         data: {
           userId: user.id,
           organizationId: organization.id,
+          employeeCode,
           designation,
           employmentType: input.employmentType,
           status: EmploymentStatus.INACTIVE,

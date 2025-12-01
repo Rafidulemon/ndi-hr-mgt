@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "UserRole" AS ENUM ('SUPER_ADMIN', 'ORG_ADMIN', 'HR_ADMIN', 'MANAGER', 'EMPLOYEE');
+CREATE TYPE "UserRole" AS ENUM ('SUPER_ADMIN', 'ORG_OWNER', 'ORG_ADMIN', 'HR_ADMIN', 'MANAGER', 'EMPLOYEE');
 
 -- CreateEnum
 CREATE TYPE "Gender" AS ENUM ('MALE', 'FEMALE', 'NON_BINARY', 'UNDISCLOSED');
@@ -26,10 +26,13 @@ CREATE TYPE "LeaveType" AS ENUM ('CASUAL', 'SICK', 'ANNUAL', 'PATERNITY_MATERNIT
 CREATE TYPE "ProjectStatus" AS ENUM ('ACTIVE', 'ON_HOLD', 'COMPLETED', 'ARCHIVED');
 
 -- CreateEnum
-CREATE TYPE "NotificationType" AS ENUM ('SYSTEM', 'LEAVE', 'ATTENDANCE', 'PAYROLL', 'GENERAL');
+CREATE TYPE "NotificationType" AS ENUM ('ANNOUNCEMENT', 'LEAVE', 'ATTENDANCE', 'REPORT');
 
 -- CreateEnum
 CREATE TYPE "NotificationStatus" AS ENUM ('DRAFT', 'SCHEDULED', 'SENT', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "NotificationAudience" AS ENUM ('ORGANIZATION', 'ROLE', 'INDIVIDUAL');
 
 -- CreateTable
 CREATE TABLE "Organization" (
@@ -38,8 +41,6 @@ CREATE TABLE "Organization" (
     "domain" TEXT,
     "timezone" TEXT DEFAULT 'Asia/Dhaka',
     "locale" TEXT DEFAULT 'en-US',
-    "orgAdminId" TEXT,
-    "managerId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -57,6 +58,7 @@ CREATE TABLE "User" (
     "status" "EmploymentStatus" NOT NULL DEFAULT 'ACTIVE',
     "lastLoginAt" TIMESTAMP(3),
     "invitedAt" TIMESTAMP(3),
+    "invitedById" TEXT,
     "archivedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -85,6 +87,18 @@ CREATE TABLE "PasswordResetToken" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "PasswordResetToken_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "InvitationToken" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "usedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "InvitationToken_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -161,8 +175,8 @@ CREATE TABLE "EmploymentDetail" (
     "reportingManagerId" TEXT,
     "currentProjectId" TEXT,
     "primaryLocation" TEXT,
-    "workHours" TEXT,
     "currentProjectNote" TEXT,
+    "isTeamLead" BOOLEAN NOT NULL DEFAULT false,
     "casualLeaveBalance" DECIMAL(5,2) NOT NULL DEFAULT 0,
     "sickLeaveBalance" DECIMAL(5,2) NOT NULL DEFAULT 0,
     "annualLeaveBalance" DECIMAL(5,2) NOT NULL DEFAULT 0,
@@ -194,7 +208,6 @@ CREATE TABLE "Team" (
     "departmentId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
-    "leadId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -209,6 +222,16 @@ CREATE TABLE "TeamManager" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "TeamManager_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TeamLead" (
+    "id" TEXT NOT NULL,
+    "teamId" TEXT NOT NULL,
+    "leadId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TeamLead_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -303,7 +326,10 @@ CREATE TABLE "Notification" (
     "senderId" TEXT,
     "title" TEXT NOT NULL,
     "body" TEXT NOT NULL,
-    "type" "NotificationType" NOT NULL DEFAULT 'GENERAL',
+    "type" "NotificationType" NOT NULL DEFAULT 'ANNOUNCEMENT',
+    "audience" "NotificationAudience" NOT NULL DEFAULT 'ORGANIZATION',
+    "targetRoles" "UserRole"[] DEFAULT ARRAY[]::"UserRole"[],
+    "targetUserId" TEXT,
     "status" "NotificationStatus" NOT NULL DEFAULT 'DRAFT',
     "actionUrl" TEXT,
     "metadata" JSONB,
@@ -313,6 +339,18 @@ CREATE TABLE "Notification" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "NotificationReceipt" (
+    "id" TEXT NOT NULL,
+    "notificationId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "isSeen" BOOLEAN NOT NULL DEFAULT false,
+    "seenAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "NotificationReceipt_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -376,16 +414,13 @@ CREATE UNIQUE INDEX "Organization_domain_key" ON "Organization"("domain");
 CREATE INDEX "Organization_name_idx" ON "Organization"("name");
 
 -- CreateIndex
-CREATE INDEX "Organization_orgAdminId_idx" ON "Organization"("orgAdminId");
-
--- CreateIndex
-CREATE INDEX "Organization_managerId_idx" ON "Organization"("managerId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
 CREATE INDEX "User_organizationId_idx" ON "User"("organizationId");
+
+-- CreateIndex
+CREATE INDEX "User_invitedById_idx" ON "User"("invitedById");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Session_tokenHash_key" ON "Session"("tokenHash");
@@ -404,6 +439,15 @@ CREATE INDEX "PasswordResetToken_userId_idx" ON "PasswordResetToken"("userId");
 
 -- CreateIndex
 CREATE INDEX "PasswordResetToken_expiresAt_idx" ON "PasswordResetToken"("expiresAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "InvitationToken_tokenHash_key" ON "InvitationToken"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "InvitationToken_userId_idx" ON "InvitationToken"("userId");
+
+-- CreateIndex
+CREATE INDEX "InvitationToken_expiresAt_idx" ON "InvitationToken"("expiresAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "EmployeeProfile_userId_key" ON "EmployeeProfile"("userId");
@@ -457,6 +501,12 @@ CREATE INDEX "TeamManager_managerId_idx" ON "TeamManager"("managerId");
 CREATE UNIQUE INDEX "TeamManager_teamId_managerId_key" ON "TeamManager"("teamId", "managerId");
 
 -- CreateIndex
+CREATE INDEX "TeamLead_leadId_idx" ON "TeamLead"("leadId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TeamLead_teamId_leadId_key" ON "TeamLead"("teamId", "leadId");
+
+-- CreateIndex
 CREATE INDEX "AttendanceRecord_attendanceDate_idx" ON "AttendanceRecord"("attendanceDate");
 
 -- CreateIndex
@@ -493,6 +543,15 @@ CREATE UNIQUE INDEX "Project_organizationId_code_key" ON "Project"("organization
 CREATE INDEX "Notification_organizationId_idx" ON "Notification"("organizationId");
 
 -- CreateIndex
+CREATE INDEX "Notification_targetUserId_idx" ON "Notification"("targetUserId");
+
+-- CreateIndex
+CREATE INDEX "NotificationReceipt_userId_idx" ON "NotificationReceipt"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "NotificationReceipt_notificationId_userId_key" ON "NotificationReceipt"("notificationId", "userId");
+
+-- CreateIndex
 CREATE INDEX "Holiday_organizationId_date_idx" ON "Holiday"("organizationId", "date");
 
 -- CreateIndex
@@ -511,19 +570,19 @@ CREATE UNIQUE INDEX "MonthlyReport_employeeId_reportMonth_key" ON "MonthlyReport
 CREATE INDEX "MonthlyReportEntry_monthlyReportId_idx" ON "MonthlyReportEntry"("monthlyReportId");
 
 -- AddForeignKey
-ALTER TABLE "Organization" ADD CONSTRAINT "Organization_orgAdminId_fkey" FOREIGN KEY ("orgAdminId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Organization" ADD CONSTRAINT "Organization_managerId_fkey" FOREIGN KEY ("managerId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "User" ADD CONSTRAINT "User_invitedById_fkey" FOREIGN KEY ("invitedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PasswordResetToken" ADD CONSTRAINT "PasswordResetToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "InvitationToken" ADD CONSTRAINT "InvitationToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "EmployeeProfile" ADD CONSTRAINT "EmployeeProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -565,13 +624,16 @@ ALTER TABLE "Team" ADD CONSTRAINT "Team_organizationId_fkey" FOREIGN KEY ("organ
 ALTER TABLE "Team" ADD CONSTRAINT "Team_departmentId_fkey" FOREIGN KEY ("departmentId") REFERENCES "Department"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Team" ADD CONSTRAINT "Team_leadId_fkey" FOREIGN KEY ("leadId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "TeamManager" ADD CONSTRAINT "TeamManager_teamId_fkey" FOREIGN KEY ("teamId") REFERENCES "Team"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "TeamManager" ADD CONSTRAINT "TeamManager_managerId_fkey" FOREIGN KEY ("managerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TeamLead" ADD CONSTRAINT "TeamLead_teamId_fkey" FOREIGN KEY ("teamId") REFERENCES "Team"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TeamLead" ADD CONSTRAINT "TeamLead_leadId_fkey" FOREIGN KEY ("leadId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "AttendanceRecord" ADD CONSTRAINT "AttendanceRecord_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -601,6 +663,15 @@ ALTER TABLE "Notification" ADD CONSTRAINT "Notification_organizationId_fkey" FOR
 ALTER TABLE "Notification" ADD CONSTRAINT "Notification_senderId_fkey" FOREIGN KEY ("senderId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_targetUserId_fkey" FOREIGN KEY ("targetUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "NotificationReceipt" ADD CONSTRAINT "NotificationReceipt_notificationId_fkey" FOREIGN KEY ("notificationId") REFERENCES "Notification"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "NotificationReceipt" ADD CONSTRAINT "NotificationReceipt_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Holiday" ADD CONSTRAINT "Holiday_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -614,3 +685,4 @@ ALTER TABLE "MonthlyReport" ADD CONSTRAINT "MonthlyReport_employeeId_fkey" FOREI
 
 -- AddForeignKey
 ALTER TABLE "MonthlyReportEntry" ADD CONSTRAINT "MonthlyReportEntry_monthlyReportId_fkey" FOREIGN KEY ("monthlyReportId") REFERENCES "MonthlyReport"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

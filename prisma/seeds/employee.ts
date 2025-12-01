@@ -10,7 +10,6 @@ import {
 
 const defaultStartDate = new Date("2023-01-15");
 const defaultLocation = "Dhaka HQ";
-const defaultWorkHours = "09:00-18:00";
 
 const emergencyEmail = (firstName: string, domain: string) =>
   `${firstName.toLowerCase()}-emergency@${domain}`;
@@ -56,23 +55,22 @@ export const seedEmployees = async (prisma: PrismaClient) => {
       },
     });
 
-    await prisma.employmentDetail.create({
-      data: {
-        id: `${id}-employment`,
-        userId: id,
-        organizationId,
-        employeeCode,
-        designation,
-        employmentType: "FULL_TIME",
-        status: "ACTIVE",
-        startDate: defaultStartDate,
-        teamId,
-        departmentId: resolvedDepartmentId,
-        reportingManagerId,
-        primaryLocation: defaultLocation,
-        workHours: defaultWorkHours,
-      },
-    });
+      await prisma.employmentDetail.create({
+        data: {
+          id: `${id}-employment`,
+          userId: id,
+          organizationId,
+          employeeCode,
+          designation,
+          employmentType: "FULL_TIME",
+          status: "ACTIVE",
+          startDate: defaultStartDate,
+          teamId,
+          departmentId: resolvedDepartmentId,
+          reportingManagerId,
+          primaryLocation: defaultLocation,
+        },
+      });
 
     const accountSuffix = id.toString().padStart(4, "0");
 

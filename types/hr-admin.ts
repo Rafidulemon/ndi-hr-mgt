@@ -1,4 +1,4 @@
-import type { EmploymentType, UserRole } from "@prisma/client";
+import type { EmploymentType, UserRole, WorkModel } from "@prisma/client";
 
 export type EmployeeStatus = "Active" | "On Leave" | "Probation" | "Pending";
 
@@ -49,6 +49,7 @@ export type HrManualInviteOptions = {
   }>;
   locations: string[];
   employmentTypes: Array<{ value: EmploymentType; label: string }>;
+  workModels: Array<{ value: WorkModel; label: string }>;
   allowedRoles: HrInviteRoleOption[];
 };
 
@@ -185,6 +186,7 @@ export type HrEmployeeInviteResponse = {
 
 export type HrEmployeeInviteInput = {
   fullName: string;
+  employeeCode: string;
   workEmail: string;
   inviteRole: UserRole;
   designation: string;
@@ -195,6 +197,7 @@ export type HrEmployeeInviteInput = {
   startDate?: string | null;
   workLocation?: string | null;
   employmentType: EmploymentType;
+  workModel: WorkModel;
   notes?: string | null;
   sendInvite?: boolean;
 };

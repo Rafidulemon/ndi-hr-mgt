@@ -225,6 +225,7 @@ export default function LeaveApplicationPage() {
   const missingRequiredAttachment = requiresMedicalAttachment && attachments.length === 0;
   const submitDisabled =
     leaveMutation.isPending ||
+    isFormSubmitted ||
     quotaBlocked ||
     !requestIsValid ||
     summaryQuery.isLoading ||
@@ -727,11 +728,13 @@ export default function LeaveApplicationPage() {
                   >
                     <Text
                       text={
-                        leaveMutation.isPending
-                          ? "Submitting..."
-                          : quotaBlocked
-                            ? "Adjust request to submit"
-                            : "Submit application"
+                        isFormSubmitted
+                          ? "Redirecting..."
+                          : leaveMutation.isPending
+                            ? "Submitting..."
+                            : quotaBlocked
+                              ? "Adjust request to submit"
+                              : "Submit application"
                       }
                       className="text-[15px] font-semibold"
                     />

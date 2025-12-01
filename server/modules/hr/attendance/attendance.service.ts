@@ -223,7 +223,102 @@ const parseDateOrThrow = (value: string, message: string) => {
   return date;
 };
 
-const parseTimeToDate = (timeValue: string | null | undefined, day: Date) => {
+const TIMEZONE_TOKEN_REGEX = /([A-Za-z]+\/[A-Za-z0-9_\-+]+(?:\/[A-Za-z0-9_\-+]+)?)/;
+
+const LOCATION_TIMEZONE_HINTS: Array<{ pattern: RegExp; timeZone: string }> = [
+  { pattern: /\bdhaka\b/i, timeZone: "Asia/Dhaka" },
+  { pattern: /\bsingapore\b/i, timeZone: "Asia/Singapore" },
+  { pattern: /\btokyo\b/i, timeZone: "Asia/Tokyo" },
+  { pattern: /\bseoul\b/i, timeZone: "Asia/Seoul" },
+  { pattern: /\bkolkata\b/i, timeZone: "Asia/Kolkata" },
+  { pattern: /\bbangalore\b/i, timeZone: "Asia/Kolkata" },
+  { pattern: /\bmumbai\b/i, timeZone: "Asia/Kolkata" },
+  { pattern: /\bdelhi\b/i, timeZone: "Asia/Kolkata" },
+  { pattern: /\bdubai\b/i, timeZone: "Asia/Dubai" },
+  { pattern: /\bdoha\b/i, timeZone: "Asia/Qatar" },
+  { pattern: /\blondon\b/i, timeZone: "Europe/London" },
+  { pattern: /\bberlin\b/i, timeZone: "Europe/Berlin" },
+  { pattern: /\bparis\b/i, timeZone: "Europe/Paris" },
+  { pattern: /\btoronto\b/i, timeZone: "America/Toronto" },
+  { pattern: /\bnew york\b/i, timeZone: "America/New_York" },
+  { pattern: /\bsan francisco\b/i, timeZone: "America/Los_Angeles" },
+  { pattern: /\blos angeles\b/i, timeZone: "America/Los_Angeles" },
+  { pattern: /\baustin\b/i, timeZone: "America/Chicago" },
+  { pattern: /\bsydney\b/i, timeZone: "Australia/Sydney" },
+  { pattern: /\bmelbourne\b/i, timeZone: "Australia/Melbourne" },
+  { pattern: /\bbrisbane\b/i, timeZone: "Australia/Brisbane" },
+];
+
+const timezoneValidationCache = new Map<string, boolean>();
+const timezoneFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+const isValidTimeZone = (value: string | null | undefined): value is string => {
+  if (!value) {
+    return false;
+  }
+  if (timezoneValidationCache.has(value)) {
+    return timezoneValidationCache.get(value) ?? false;
+  }
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    timezoneValidationCache.set(value, true);
+    return true;
+  } catch {
+    timezoneValidationCache.set(value, false);
+    return false;
+  }
+};
+
+const extractTimeZoneFromText = (value: string | null | undefined): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const normalized = trimmed as string;
+  if (isValidTimeZone(normalized)) {
+    return normalized;
+  }
+  const tokenMatch = TIMEZONE_TOKEN_REGEX.exec(normalized);
+  if (tokenMatch && isValidTimeZone(tokenMatch[1])) {
+    return tokenMatch[1];
+  }
+  return null;
+};
+
+const resolveTimeZoneFromLocation = (
+  primaryLocation: string | null | undefined,
+  fallback: string | null | undefined,
+): string | null => {
+  const extracted = extractTimeZoneFromText(primaryLocation);
+  if (extracted) {
+    return extracted;
+  }
+
+  const normalized = primaryLocation?.trim().toLowerCase() ?? "";
+  if (normalized) {
+    for (const hint of LOCATION_TIMEZONE_HINTS) {
+      if (hint.pattern.test(normalized)) {
+        return hint.timeZone;
+      }
+    }
+  }
+
+  const fallbackTimezone = fallback?.trim() ?? null;
+  if (isValidTimeZone(fallbackTimezone)) {
+    return fallbackTimezone;
+  }
+
+  return null;
+};
+
+const parseTimeToDate = (
+  timeValue: string | null | undefined,
+  day: Date,
+  options?: { timeZone?: string | null },
+) => {
   if (!timeValue) return null;
   const [hours, minutes] = timeValue.split(":").map((part) => Number(part));
   if (
@@ -236,10 +331,69 @@ const parseTimeToDate = (timeValue: string | null | undefined, day: Date) => {
   ) {
     return null;
   }
+  if (options?.timeZone) {
+    return convertLocalTimeToUtc(day, hours, minutes, options.timeZone);
+  }
   const date = new Date(day);
   date.setHours(hours, minutes, 0, 0);
   return date;
 };
+
+const convertLocalTimeToUtc = (day: Date, hours: number, minutes: number, timeZone: string) => {
+  const base = new Date(
+    `${formatDateKey(day)}T${padTimeUnit(hours)}:${padTimeUnit(minutes)}:00.000Z`,
+  );
+  const initialOffset = getTimeZoneOffsetMs(base, timeZone);
+  const candidate = new Date(base.getTime() - initialOffset);
+  const verifiedOffset = getTimeZoneOffsetMs(candidate, timeZone);
+  if (verifiedOffset !== initialOffset) {
+    return new Date(base.getTime() - verifiedOffset);
+  }
+  return candidate;
+};
+
+const getTimeZoneOffsetMs = (date: Date, timeZone: string) => {
+  const formatter = getTimeZoneFormatter(timeZone);
+  const parts = formatter.formatToParts(date);
+  const filled = parts.reduce<Record<string, number>>((acc, part) => {
+    if (part.type !== "literal") {
+      acc[part.type] = Number(part.value);
+    }
+    return acc;
+  }, {});
+
+  const asUtc = Date.UTC(
+    filled.year ?? date.getUTCFullYear(),
+    (filled.month ?? date.getUTCMonth() + 1) - 1,
+    filled.day ?? date.getUTCDate(),
+    filled.hour ?? 0,
+    filled.minute ?? 0,
+    filled.second ?? 0,
+    0,
+  );
+
+  return asUtc - date.getTime();
+};
+
+const getTimeZoneFormatter = (timeZone: string) => {
+  let formatter = timezoneFormatterCache.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    timezoneFormatterCache.set(timeZone, formatter);
+  }
+  return formatter;
+};
+
+const padTimeUnit = (value: number) => value.toString().padStart(2, "0");
 
 const calculateTotalSeconds = (checkInAt: Date | null, checkOutAt: Date | null) => {
   if (!checkInAt || !checkOutAt) return null;
@@ -436,6 +590,16 @@ export const hrAttendanceService = {
       },
       select: {
         id: true,
+        employment: {
+          select: {
+            primaryLocation: true,
+          },
+        },
+        organization: {
+          select: {
+            timezone: true,
+          },
+        },
       },
     });
 
@@ -443,8 +607,17 @@ export const hrAttendanceService = {
       throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
     }
 
-    const checkInAt = parseTimeToDate(input.checkIn ?? null, attendanceDate);
-    const checkOutAt = parseTimeToDate(input.checkOut ?? null, attendanceDate);
+    const locationTimeZone = resolveTimeZoneFromLocation(
+      employee.employment?.primaryLocation ?? null,
+      employee.organization?.timezone ?? null,
+    );
+
+    const checkInAt = parseTimeToDate(input.checkIn ?? null, attendanceDate, {
+      timeZone: locationTimeZone,
+    });
+    const checkOutAt = parseTimeToDate(input.checkOut ?? null, attendanceDate, {
+      timeZone: locationTimeZone,
+    });
     const totalWorkSeconds = calculateTotalSeconds(checkInAt, checkOutAt);
 
     const record = await ctx.prisma.attendanceRecord.upsert({

@@ -8,7 +8,7 @@ import type { IconType } from "react-icons";
 import { FiEdit2, FiEye, FiTrash2 } from "react-icons/fi";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { EmploymentType, UserRole } from "@prisma/client";
+import type { EmploymentType, UserRole, WorkModel } from "@prisma/client";
 
 import Button from "../../../components/atoms/buttons/Button";
 import TextArea from "../../../components/atoms/inputs/TextArea";
@@ -97,6 +97,7 @@ const phoneRegex = /^\+?[0-9()\s-]{7,20}$/;
 
 const manualInviteSchema = z.object({
   fullName: z.string().min(3, "Full name is required"),
+  employeeCode: z.string().min(1, "Employee ID is required"),
   workEmail: z.string().email("Provide a valid work email"),
   inviteRole: z.string().min(1, "Select a role"),
   designation: z.string().min(2, "Designation is required"),
@@ -109,6 +110,9 @@ const manualInviteSchema = z.object({
   managerId: z.string().optional(),
   startDate: z.string().optional(),
   workLocation: z.string().optional(),
+  workModel: z.enum(["ONSITE", "HYBRID", "REMOTE"], {
+    errorMap: () => ({ message: "Select a work arrangement" }),
+  }),
   employmentType: z.string().min(1, "Choose an employment type"),
   notes: z.string().max(2000).optional(),
   sendInvite: z.boolean().optional(),
@@ -140,6 +144,7 @@ export default function EmployeeManagementPage() {
   const teamOptions = manualInviteOptions?.teams ?? [];
   const locationOptions = manualInviteOptions?.locations ?? [];
   const employmentTypeOptions = manualInviteOptions?.employmentTypes ?? [];
+  const workModelOptions = manualInviteOptions?.workModels ?? [];
   const inviteRoleOptions = manualInviteOptions?.allowedRoles ?? [];
   const manualInviteDisabled = inviteRoleOptions.length === 0;
   const [searchTerm, setSearchTerm] = useState("");
@@ -152,19 +157,21 @@ export default function EmployeeManagementPage() {
   const [terminatingEmployeeId, setTerminatingEmployeeId] = useState<string | null>(null);
   const manualInviteForm = useForm<ManualInviteFormValues>({
     resolver: zodResolver(manualInviteSchema),
-  defaultValues: {
-    fullName: "",
-    workEmail: "",
-    inviteRole: "",
-    designation: "",
-    phoneNumber: "",
-    departmentId: "",
-    teamId: "",
-    managerId: "",
-    startDate: "",
-    workLocation: "",
-    employmentType: "",
-    notes: "",
+    defaultValues: {
+      fullName: "",
+      employeeCode: "",
+      workEmail: "",
+      inviteRole: "",
+      designation: "",
+      phoneNumber: "",
+      departmentId: "",
+      teamId: "",
+      managerId: "",
+      startDate: "",
+      workLocation: "",
+      workModel: "HYBRID",
+      employmentType: "",
+      notes: "",
       sendInvite: true,
     },
   });
@@ -179,6 +186,7 @@ export default function EmployeeManagementPage() {
   const defaultManualInviteValues = useMemo<ManualInviteFormValues>(
     () => ({
       fullName: "",
+      employeeCode: "",
       workEmail: "",
       inviteRole: manualInviteOptions?.allowedRoles[0]?.value ?? "",
       designation: "",
@@ -188,6 +196,7 @@ export default function EmployeeManagementPage() {
       managerId: "",
       startDate: "",
       workLocation: "",
+      workModel: manualInviteOptions?.workModels[0]?.value ?? "HYBRID",
       employmentType: manualInviteOptions?.employmentTypes[0]?.value ?? "",
       notes: "",
       sendInvite: true,
@@ -280,8 +289,10 @@ export default function EmployeeManagementPage() {
   const handleManualInviteSubmit = handleInviteSubmit((values) => {
     inviteMutation.mutate({
       ...values,
+      employeeCode: values.employeeCode.trim(),
       inviteRole: values.inviteRole as UserRole,
       employmentType: values.employmentType as EmploymentType,
+      workModel: values.workModel as WorkModel,
       departmentId: values.departmentId || undefined,
       teamId: values.teamId || undefined,
       managerId: values.managerId || undefined,
@@ -695,6 +706,16 @@ export default function EmployeeManagementPage() {
               }}
             />
             <TextInput
+              label="Employee ID"
+              placeholder="e.g. NDI-0102"
+              className="w-full"
+              name="employeeCode"
+              register={inviteRegister}
+              error={inviteErrors.employeeCode}
+              isRequired
+              disabled={manualInviteDisabled}
+            />
+            <TextInput
               label="Work email"
               type="email"
               placeholder={workEmailPlaceholder}
@@ -775,6 +796,26 @@ export default function EmployeeManagementPage() {
               </select>
               {inviteErrors.workLocation ? (
                 <p className="mt-1 text-xs text-rose-500">{inviteErrors.workLocation.message}</p>
+              ) : null}
+            </div>
+            <div className="flex flex-col">
+              <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
+                Work arrangement
+              </label>
+              <select
+                className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                {...inviteRegister("workModel")}
+                disabled={manualInviteDisabled}
+              >
+                <option value="">Select arrangement</option>
+                {workModelOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {inviteErrors.workModel ? (
+                <p className="mt-1 text-xs text-rose-500">{inviteErrors.workModel.message}</p>
               ) : null}
             </div>
             <div className="flex flex-col">
@@ -863,21 +904,6 @@ export default function EmployeeManagementPage() {
               error={inviteErrors.notes}
               disabled={manualInviteDisabled}
             />
-            <div className="md:col-span-2">
-              <label className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-200">
-                <input
-                  type="checkbox"
-                  className="rounded border-slate-300 text-indigo-600"
-                  {...inviteRegister("sendInvite")}
-                  defaultChecked
-                  disabled={manualInviteDisabled}
-                />
-                Send account invite email now
-              </label>
-              <p className="mt-2 text-xs text-slate-400">
-                Invitees can sign in immediately after completing their profile.
-              </p>
-            </div>
             <div className="flex flex-wrap gap-3 md:col-span-2">
               <Button
                 type="submit"

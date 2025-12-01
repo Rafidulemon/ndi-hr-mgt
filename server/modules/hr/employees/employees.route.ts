@@ -1,4 +1,4 @@
-import { EmploymentType, UserRole } from "@prisma/client";
+import { EmploymentType, UserRole, WorkModel } from "@prisma/client";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
@@ -42,6 +42,7 @@ const updateLeaveQuotaInput = z.object({
 
 const inviteEmployeeInput = z.object({
   fullName: z.string().min(3, "Full name is required."),
+  employeeCode: z.string().min(1, "Employee ID is required."),
   workEmail: z.string().email("Provide a valid work email."),
   inviteRole: z.nativeEnum(UserRole, {
     required_error: "Select a role to invite.",
@@ -58,6 +59,9 @@ const inviteEmployeeInput = z.object({
   workLocation: z.string().optional().nullable(),
   employmentType: z.nativeEnum(EmploymentType, {
     required_error: "Choose an employment type.",
+  }),
+  workModel: z.nativeEnum(WorkModel, {
+    required_error: "Select a work arrangement.",
   }),
   notes: z.string().max(2000).optional().nullable(),
   sendInvite: z.boolean().optional(),

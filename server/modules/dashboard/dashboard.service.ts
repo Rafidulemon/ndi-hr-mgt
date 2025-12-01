@@ -112,7 +112,6 @@ const employmentSelect = {
   employmentType: true,
   status: true,
   startDate: true,
-  workHours: true,
   primaryLocation: true,
   currentProjectNote: true,
   department: {
