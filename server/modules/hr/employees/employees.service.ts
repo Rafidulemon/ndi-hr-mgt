@@ -1,5 +1,7 @@
 import { EmploymentStatus, EmploymentType, Prisma, UserRole, WorkModel } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import bcrypt from "bcryptjs";
+import nodemailer from "nodemailer";
 
 import type { TRPCContext } from "@/server/api/trpc";
 import type {
@@ -8,8 +10,12 @@ import type {
   HrEmployeeDashboardResponse,
   HrEmployeeForm,
   HrEmployeeFormResponse,
+  HrEmployeeInviteInput,
+  HrEmployeeInviteResponse,
   HrEmployeeLeaveQuotaResponse,
   HrEmployeeLeaveQuotaUpdateInput,
+  HrInviteRoleOption,
+  HrManualInviteOptions,
   HrEmployeeProfile,
   HrEmployeeProfileResponse,
   HrEmployeeUpdateInput,
@@ -18,10 +24,37 @@ import type {
 } from "@/types/hr-admin";
 
 import { requireHrAdmin } from "@/server/modules/hr/utils";
+import { addHours, createRandomToken, hashToken } from "@/server/utils/token";
 
 type PrismaTransaction = Prisma.TransactionClient;
 
 const privilegedDeletionRoles: UserRole[] = ["SUPER_ADMIN", "ORG_OWNER", "ORG_ADMIN", "MANAGER"];
+const managerEligibleRoles: UserRole[] = ["SUPER_ADMIN", "ORG_OWNER", "ORG_ADMIN", "MANAGER", "HR_ADMIN"];
+
+const INVITE_TOKEN_TTL_HOURS =
+  Number(
+    process.env.NEXT_PUBLIC_INVITE_TOKEN_TTL_HOURS ??
+      process.env.INVITE_TOKEN_TTL_HOURS ??
+      72,
+  ) || 72;
+
+const inviteRoleMatrix: Record<UserRole, UserRole[]> = {
+  SUPER_ADMIN: ["ORG_ADMIN", "MANAGER", "HR_ADMIN", "EMPLOYEE"],
+  ORG_OWNER: ["ORG_ADMIN", "MANAGER", "HR_ADMIN", "EMPLOYEE"],
+  ORG_ADMIN: ["MANAGER", "HR_ADMIN", "EMPLOYEE"],
+  MANAGER: ["HR_ADMIN", "EMPLOYEE"],
+  HR_ADMIN: ["EMPLOYEE"],
+  EMPLOYEE: [],
+};
+
+const roleLabels: Record<UserRole, string> = {
+  SUPER_ADMIN: "Super Admin",
+  ORG_OWNER: "Org Owner",
+  ORG_ADMIN: "Org Admin",
+  HR_ADMIN: "HR Admin",
+  MANAGER: "Manager",
+  EMPLOYEE: "Employee",
+};
 
 const employmentStatusToDirectoryStatus: Record<
   EmploymentStatus,
@@ -45,6 +78,52 @@ const employmentTypeLabels: Record<EmploymentType, string> = {
   PART_TIME: "Part-time",
   CONTRACT: "Contract",
   INTERN: "Intern",
+};
+
+const getAllowedInviteRoles = (role: UserRole): UserRole[] => inviteRoleMatrix[role] ?? [];
+
+const formatRoleLabel = (role: UserRole) => roleLabels[role] ?? role;
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const sanitizeOptional = (value?: string | null) => {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+};
+
+const parseStartDateInput = (value?: string | null) => {
+  if (!value) {
+    return new Date();
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid start date." });
+  }
+  return parsed;
+};
+
+const getSiteUrl = () => {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL.replace(/\/$/, "");
+  }
+  return `http://localhost:${process.env.PORT ?? 3000}`;
+};
+
+const buildInviteLink = (token: string, email: string) =>
+  `${getSiteUrl()}/auth/signup?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+
+const createPlaceholderPasswordHash = async () => {
+  const randomSecret = createRandomToken(24);
+  return bcrypt.hash(randomSecret, 10);
 };
 
 const employeeSelect = {
@@ -219,6 +298,186 @@ const buildFullName = (profile: NameLikeProfile, fallback?: string) => {
   }
 
   return fallback ?? "Team member";
+};
+
+const sendInvitationEmail = async ({
+  to,
+  inviteLink,
+  organizationName,
+  invitedRole,
+  recipientName,
+  expiresAt,
+  senderName,
+}: {
+  to: string;
+  inviteLink: string;
+  organizationName: string;
+  invitedRole: UserRole;
+  recipientName: string;
+  expiresAt: Date;
+  senderName?: string | null;
+}) => {
+  const emailUser = process.env.NEXT_PUBLIC_EMAIL_USER;
+  const emailPass = process.env.NEXT_PUBLIC_EMAIL_PASS;
+
+  if (!emailUser || !emailPass) {
+    console.warn("Email credentials are not configured. Skipping invite email.");
+    return false;
+  }
+
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: emailUser,
+      pass: emailPass,
+    },
+  });
+
+  const greeting = recipientName ? `Hi ${recipientName},` : "Hi there,";
+  const expiresLabel = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(expiresAt);
+  const senderDisplay = senderName?.trim()?.length ? senderName : "NDI HR team";
+  const roleLabel = formatRoleLabel(invitedRole);
+
+  const textBody = [
+    greeting,
+    "",
+    `${senderDisplay} invited you to join ${organizationName} on NDI HR as ${roleLabel}.`,
+    "Use the secure link below to finish setting up your account and choose a password.",
+    "",
+    inviteLink,
+    "",
+    `For security, your invitation link will expire on ${expiresLabel}.`,
+    "",
+    "See you inside,",
+    senderDisplay,
+  ].join("\n");
+
+  await transporter.sendMail({
+    from: `"${organizationName} HR" <${emailUser}>`,
+    to,
+    subject: `You're invited to ${organizationName} on NDI HR`,
+    text: textBody,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+        <p>${greeting}</p>
+        <p>${senderDisplay} invited you to join <strong>${organizationName}</strong> on NDI HR as <strong>${roleLabel}</strong>.</p>
+        <p>Use the secure link below to finish setting up your account and choose a password. The link will expire on <strong>${expiresLabel}</strong>.</p>
+        <p style="margin: 24px 0;">
+          <a
+            href="${inviteLink}"
+            style="background: #4f46e5; color: #fff; padding: 12px 20px; border-radius: 8px; text-decoration: none;"
+          >
+            Get started
+          </a>
+        </p>
+        <p style="margin-bottom: 16px;">If the button doesn't work, copy and paste this link into your browser:<br/><a href="${inviteLink}">${inviteLink}</a></p>
+        <p>See you inside,<br />${senderDisplay}</p>
+      </div>
+    `,
+  });
+
+  return true;
+};
+
+const buildManualInviteOptions = async ({
+  prisma,
+  organizationId,
+  viewerRole,
+}: {
+  prisma: TRPCContext["prisma"];
+  organizationId: string;
+  viewerRole: UserRole;
+}): Promise<HrManualInviteOptions> => {
+  const [organization, departments, managerRecords, locationRecords] = await Promise.all([
+    prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+      },
+    }),
+    prisma.department.findMany({
+      where: { organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.user.findMany({
+      where: {
+        organizationId,
+        role: {
+          in: managerEligibleRoles,
+        },
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        profile: {
+          select: {
+            firstName: true,
+            lastName: true,
+            preferredName: true,
+          },
+        },
+        employment: {
+          select: {
+            designation: true,
+          },
+        },
+      },
+    }),
+    prisma.employmentDetail.findMany({
+      where: {
+        organizationId,
+        primaryLocation: {
+          not: null,
+        },
+      },
+      distinct: ["primaryLocation"],
+      select: {
+        primaryLocation: true,
+      },
+    }),
+  ]);
+
+  const employmentTypes = (Object.keys(employmentTypeLabels) as EmploymentType[]).map((type) => ({
+    value: type,
+    label: employmentTypeLabels[type],
+  }));
+
+  const locations = locationRecords
+    .map((record) => record.primaryLocation?.trim())
+    .filter((value): value is string => Boolean(value))
+    .sort((a, b) => a.localeCompare(b));
+
+  const managers = managerRecords.map((record) => ({
+    id: record.id,
+    name: buildFullName(record.profile, record.email),
+    role: record.role,
+    designation: record.employment?.designation ?? null,
+  }));
+
+  const allowedRoles: HrInviteRoleOption[] = getAllowedInviteRoles(viewerRole).map((role) => ({
+    value: role,
+    label: formatRoleLabel(role),
+  }));
+
+  return {
+    organizationDomain: organization?.domain ?? null,
+    organizationName: organization?.name ?? "Your organization",
+    departments,
+    managers,
+    locations,
+    employmentTypes,
+    allowedRoles,
+  };
 };
 
 const buildInitials = (
@@ -527,7 +786,7 @@ export const hrEmployeesService = {
   async getDashboard(ctx: TRPCContext): Promise<HrEmployeeDashboardResponse> {
     const user = requireHrAdmin(ctx);
 
-    const [employees, pendingApprovals] = await Promise.all([
+    const [employees, pendingApprovals, manualInvite] = await Promise.all([
       ctx.prisma.user.findMany({
         where: {
           organizationId: user.organizationId,
@@ -551,12 +810,18 @@ export const hrEmployeesService = {
         },
         select: pendingApprovalSelect,
       }),
+      buildManualInviteOptions({
+        prisma: ctx.prisma,
+        organizationId: user.organizationId,
+        viewerRole: user.role as UserRole,
+      }),
     ]);
 
     return {
       viewerRole: user.role as UserRole,
       directory: employees.map(mapEmployeeRecord),
       pendingApprovals: pendingApprovals.map(mapPendingRecord),
+      manualInvite,
     };
   },
 
@@ -778,6 +1043,196 @@ export const hrEmployeesService = {
         casual: decimalToNumber(updated.casualLeaveBalance),
         parental: decimalToNumber(updated.parentalLeaveBalance),
       },
+    };
+  },
+
+  async inviteEmployee(
+    ctx: TRPCContext,
+    input: HrEmployeeInviteInput,
+  ): Promise<HrEmployeeInviteResponse> {
+    const sessionUser = requireHrAdmin(ctx);
+    const viewerRole = sessionUser.role as UserRole;
+    const allowedRoles = getAllowedInviteRoles(viewerRole);
+
+    if (!allowedRoles.includes(input.inviteRole)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You are not allowed to invite that role.",
+      });
+    }
+
+    const organization = await ctx.prisma.organization.findUnique({
+      where: { id: sessionUser.organizationId },
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+      },
+    });
+
+    if (!organization) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Your organization is not available.",
+      });
+    }
+
+    const normalizedEmail = normalizeEmail(input.workEmail);
+    const departmentId = sanitizeOptional(input.departmentId);
+    const managerId = sanitizeOptional(input.managerId);
+
+    if (departmentId) {
+      const departmentExists = await ctx.prisma.department.findFirst({
+        where: {
+          id: departmentId,
+          organizationId: organization.id,
+        },
+        select: { id: true },
+      });
+      if (!departmentExists) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Selected department does not exist.",
+        });
+      }
+    }
+
+    if (managerId) {
+      const managerExists = await ctx.prisma.user.findFirst({
+        where: {
+          id: managerId,
+          organizationId: organization.id,
+        },
+        select: { id: true },
+      });
+      if (!managerExists) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Selected manager does not exist.",
+        });
+      }
+    }
+
+    const designation = input.designation.trim();
+    if (!designation) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Role/title cannot be empty.",
+      });
+    }
+
+    const { firstName, lastName } = splitFullName(input.fullName);
+    const startDate = parseStartDateInput(input.startDate);
+    const placeholderPasswordHash = await createPlaceholderPasswordHash();
+
+    const invitation = await ctx.prisma.$transaction(async (tx) => {
+      const existingUser = await tx.user.findUnique({
+        where: { email: normalizedEmail },
+        select: { id: true },
+      });
+
+      if (existingUser) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "An account already exists for that email address.",
+        });
+      }
+
+      const user = await tx.user.create({
+        data: {
+          organizationId: organization.id,
+          email: normalizedEmail,
+          passwordHash: placeholderPasswordHash,
+          role: input.inviteRole,
+          status: EmploymentStatus.INACTIVE,
+          invitedAt: new Date(),
+        },
+        select: {
+          id: true,
+          email: true,
+        },
+      });
+
+      await tx.employeeProfile.create({
+        data: {
+          userId: user.id,
+          firstName,
+          lastName,
+          preferredName: firstName,
+          workEmail: normalizedEmail,
+        },
+      });
+
+      await tx.employmentDetail.create({
+        data: {
+          userId: user.id,
+          organizationId: organization.id,
+          designation,
+          employmentType: input.employmentType,
+          status: EmploymentStatus.INACTIVE,
+          startDate,
+          departmentId: departmentId ?? undefined,
+          primaryLocation: sanitizeOptional(input.workLocation),
+          reportingManagerId: managerId ?? undefined,
+          currentProjectNote: sanitizeOptional(input.notes),
+        },
+      });
+
+      await tx.invitationToken.deleteMany({
+        where: { userId: user.id },
+      });
+
+      const rawToken = createRandomToken();
+      const tokenHash = hashToken(rawToken);
+      const expiresAt = addHours(INVITE_TOKEN_TTL_HOURS);
+
+      await tx.invitationToken.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt,
+        },
+      });
+
+      return {
+        user,
+        rawToken,
+        expiresAt,
+      };
+    });
+
+    const inviteLink = buildInviteLink(invitation.rawToken, normalizedEmail);
+    const senderDisplayName =
+      ctx.session?.user?.profile?.preferredName ??
+      ctx.session?.user?.profile?.firstName ??
+      ctx.session?.user?.email ??
+      sessionUser.email ??
+      null;
+    let invitationSent = false;
+
+    if (input.sendInvite ?? true) {
+      try {
+        invitationSent = await sendInvitationEmail({
+          to: normalizedEmail,
+          inviteLink,
+          organizationName: organization.name,
+          invitedRole: input.inviteRole,
+          recipientName: firstName,
+          expiresAt: invitation.expiresAt,
+          senderName: senderDisplayName,
+        });
+      } catch (error) {
+        console.error("Failed to send invite email:", error);
+        invitationSent = false;
+      }
+    }
+
+    return {
+      userId: invitation.user.id,
+      email: normalizedEmail,
+      role: input.inviteRole,
+      invitationSent,
+      inviteUrl: inviteLink,
     };
   },
 

@@ -2,7 +2,7 @@ import { UserPasswordUpdateType } from "@/types/types";
 import { TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import { AuthService } from "./auth.service";
-import type { RegisterInput } from "./auth.validation";
+import type { CompleteInviteInput, RegisterInput } from "./auth.validation";
 
 const getSignupOptionsHandler = async () => {
   try {
@@ -129,6 +129,34 @@ const getIsTrialExpired = async (email: string) => {
   }
 };
 
+const getInviteDetailsHandler = async (token: string) => {
+  try {
+    return await AuthService.getInviteDetails(token);
+  } catch (error) {
+    if (error instanceof TRPCError) {
+      throw error;
+    }
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Unable to load invitation details.",
+    });
+  }
+};
+
+const completeInviteHandler = async (input: CompleteInviteInput) => {
+  try {
+    return await AuthService.completeInvite(input);
+  } catch (error) {
+    if (error instanceof TRPCError) {
+      throw error;
+    }
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Unable to complete invitation.",
+    });
+  }
+};
+
 export const AuthController = {
   getSignupOptionsHandler,
   registerUserHandler,
@@ -137,4 +165,6 @@ export const AuthController = {
   getUserRegistrationPayloadHandler,
   getIsAuthorisationChange,
   getIsTrialExpired,
+  getInviteDetailsHandler,
+  completeInviteHandler,
 };

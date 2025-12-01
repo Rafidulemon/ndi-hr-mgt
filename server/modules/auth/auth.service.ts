@@ -1,4 +1,4 @@
-import { UserInfoParam } from "@/app/(auth)/auth/registration/[email]/[token]/page";
+import type { UserInfoParam } from "@/types/types";
 import { nextAuthOptions } from "@/app/utils/next-auth-options";
 import { prisma } from "@/prisma";
 import { EmploymentStatus, EmploymentType, Prisma } from "@prisma/client";
@@ -8,6 +8,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { getServerSession } from "next-auth";
 import type { RegisterInput } from "./auth.validation";
+import { hashToken } from "@/server/utils/token";
 
 const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
 
@@ -19,6 +20,59 @@ const sanitizeUrl = (value?: string | null) => {
   }
   const trimmed = value.trim();
   return trimmed.length ? trimmed : null;
+};
+
+const loadInviteByToken = async (token: string) => {
+  const tokenHash = hashToken(token);
+
+  return prisma.invitationToken.findFirst({
+    where: {
+      tokenHash,
+      usedAt: null,
+      expiresAt: {
+        gt: new Date(),
+      },
+    },
+    select: {
+      id: true,
+      userId: true,
+      expiresAt: true,
+      user: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          organizationId: true,
+          organization: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          profile: {
+            select: {
+              firstName: true,
+              lastName: true,
+              preferredName: true,
+              profilePhotoUrl: true,
+            },
+          },
+          employment: {
+            select: {
+              designation: true,
+              startDate: true,
+              department: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
 };
 
 const getOrganizationOrThrow = async (organizationId: string) => {
@@ -298,6 +352,109 @@ const tokenValidate = async ({ token }: { token: string }) => {
   }
 };
 
+const getInviteDetails = async (token: string) => {
+  const record = await loadInviteByToken(token);
+
+  if (!record || !record.user) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Invalid or expired invitation link.",
+    });
+  }
+
+  return {
+    token,
+    userId: record.user.id,
+    email: record.user.email,
+    role: record.user.role,
+    organizationId: record.user.organizationId,
+    organizationName: record.user.organization?.name ?? "Your organization",
+    departmentId: record.user.employment?.department?.id ?? null,
+    departmentName: record.user.employment?.department?.name ?? null,
+    designation: record.user.employment?.designation ?? null,
+    startDate: record.user.employment?.startDate?.toISOString() ?? null,
+    firstName: record.user.profile?.firstName ?? "",
+    lastName: record.user.profile?.lastName ?? "",
+    preferredName: record.user.profile?.preferredName ?? "",
+    profilePhotoUrl: record.user.profile?.profilePhotoUrl ?? null,
+    expiresAt: record.expiresAt.toISOString(),
+  };
+};
+
+const completeInvite = async ({
+  token,
+  firstName,
+  lastName,
+  preferredName,
+  password,
+  profilePhotoUrl,
+}: {
+  token: string;
+  firstName: string;
+  lastName: string;
+  preferredName?: string | null;
+  password: string;
+  profilePhotoUrl?: string | null;
+}) => {
+  const record = await loadInviteByToken(token);
+
+  if (!record || !record.user) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Invalid or expired invitation link.",
+    });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const normalizedFirstName = firstName.trim();
+  const normalizedLastName = lastName.trim();
+  const normalizedPreferredName = preferredName?.trim() || null;
+  const normalizedPhoto = profilePhotoUrl?.trim() || null;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: record.userId },
+      data: {
+        passwordHash: hashedPassword,
+      },
+    });
+
+    await tx.employeeProfile.upsert({
+      where: { userId: record.userId },
+      update: {
+        firstName: normalizedFirstName,
+        lastName: normalizedLastName,
+        preferredName: normalizedPreferredName ?? normalizedFirstName,
+        profilePhotoUrl: normalizedPhoto ?? record.user.profile?.profilePhotoUrl ?? null,
+      },
+      create: {
+        userId: record.userId,
+        firstName: normalizedFirstName,
+        lastName: normalizedLastName,
+        preferredName: normalizedPreferredName ?? normalizedFirstName,
+        workEmail: record.user.email,
+        profilePhotoUrl: normalizedPhoto,
+      },
+    });
+
+    await tx.invitationToken.update({
+      where: { id: record.id },
+      data: { usedAt: new Date() },
+    });
+
+    await tx.invitationToken.deleteMany({
+      where: {
+        userId: record.userId,
+        usedAt: null,
+      },
+    });
+  });
+
+  return {
+    message: "Invitation accepted. You can now sign in.",
+  };
+};
+
 const isAuthorisationChange = async () => {
   const session = await getServerSession(nextAuthOptions);
 
@@ -368,6 +525,8 @@ export const AuthService = {
   sendResetPasswordLinkService,
   updateUserPassworIntoDb,
   tokenValidate,
+  getInviteDetails,
+  completeInvite,
   isAuthorisationChange,
   isTrialExpired,
 };

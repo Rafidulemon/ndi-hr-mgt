@@ -1,3 +1,4 @@
+import { EmploymentType, UserRole } from "@prisma/client";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
@@ -39,6 +40,24 @@ const updateLeaveQuotaInput = z.object({
   parental: leaveQuotaValue,
 });
 
+const inviteEmployeeInput = z.object({
+  fullName: z.string().min(3, "Full name is required."),
+  workEmail: z.string().email("Provide a valid work email."),
+  inviteRole: z.nativeEnum(UserRole, {
+    required_error: "Select a role to invite.",
+  }),
+  designation: z.string().min(2, "Role/title is required."),
+  departmentId: z.string().min(1).optional().nullable(),
+  managerId: z.string().min(1).optional().nullable(),
+  startDate: z.string().optional().nullable(),
+  workLocation: z.string().optional().nullable(),
+  employmentType: z.nativeEnum(EmploymentType, {
+    required_error: "Choose an employment type.",
+  }),
+  notes: z.string().max(2000).optional().nullable(),
+  sendInvite: z.boolean().optional(),
+});
+
 export const hrEmployeesRouter = createTRPCRouter({
   dashboard: protectedProcedure.query(({ ctx }) =>
     hrEmployeesController.dashboard({ ctx }),
@@ -61,6 +80,9 @@ export const hrEmployeesRouter = createTRPCRouter({
     .mutation(({ ctx, input }) =>
       hrEmployeesController.updateLeaveQuota({ ctx, input }),
     ),
+  invite: protectedProcedure
+    .input(inviteEmployeeInput)
+    .mutation(({ ctx, input }) => hrEmployeesController.invite({ ctx, input })),
   approveSignup: protectedProcedure
     .input(employeeIdParam)
     .mutation(({ ctx, input }) =>

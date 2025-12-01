@@ -1,5 +1,6 @@
 import type { TRPCContext } from "@/server/api/trpc";
 import type {
+  HrEmployeeInviteInput,
   HrEmployeeLeaveQuotaUpdateInput,
   HrEmployeeUpdateInput,
 } from "@/types/hr-admin";
@@ -26,4 +27,6 @@ export const hrEmployeesController = {
     hrEmployeesService.rejectPendingEmployee(ctx, employeeId),
   delete: ({ ctx, employeeId }: { ctx: TRPCContext; employeeId: string }) =>
     hrEmployeesService.deleteEmployee(ctx, employeeId),
+  invite: ({ ctx, input }: { ctx: TRPCContext; input: HrEmployeeInviteInput }) =>
+    hrEmployeesService.inviteEmployee(ctx, input),
 };

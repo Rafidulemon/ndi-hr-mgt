@@ -153,6 +153,7 @@ model User {
   teamMemberships       TeamManager[]
   sessions              Session[]
   passwordResetTokens   PasswordResetToken[]
+  invitationTokens      InvitationToken[]
   notificationReceipts  NotificationReceipt[]
 
   @@index([organizationId])
@@ -172,6 +173,20 @@ model Session {
 }
 
 model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model InvitationToken {
   id        String    @id @default(uuid())
   userId    String
   tokenHash String    @unique

@@ -3,8 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
 import type { IconType } from "react-icons";
 import { FiEdit2, FiEye, FiTrash2 } from "react-icons/fi";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { EmploymentType, UserRole } from "@prisma/client";
 
 import Button from "../../../components/atoms/buttons/Button";
 import TextArea from "../../../components/atoms/inputs/TextArea";
@@ -98,16 +102,6 @@ const countNewHiresInDays = (
   }).length;
 };
 
-const departmentOptions = ["Engineering", "Design", "Management"];
-
-const locationOptions = [
-  "Dhaka HQ",
-  "Remote",
-  "Remote — GMT+6",
-  "Remote — PST",
-];
-
-const employmentTypes = ["Full-time", "Part-time", "Contract"];
 const statusFilterOptions: EmployeeStatus[] = [
   "Active",
   "On Leave",
@@ -115,12 +109,50 @@ const statusFilterOptions: EmployeeStatus[] = [
   "Pending",
 ];
 
+const manualInviteSchema = z.object({
+  fullName: z.string().min(3, "Full name is required"),
+  workEmail: z.string().email("Provide a valid work email"),
+  inviteRole: z.string().min(1, "Select an access level"),
+  designation: z.string().min(2, "Role/title is required"),
+  departmentId: z.string().optional(),
+  managerId: z.string().optional(),
+  startDate: z.string().optional(),
+  workLocation: z.string().optional(),
+  employmentType: z.string().min(1, "Choose an employment type"),
+  notes: z.string().max(2000).optional(),
+  sendInvite: z.boolean().optional(),
+});
+
+type ManualInviteFormValues = z.infer<typeof manualInviteSchema>;
+
+const buildSuggestedEmail = (fullName: string, domain?: string | null) => {
+  const safeDomain = (domain ?? "ndihr.io").replace(/^@/, "");
+  if (!fullName.trim()) {
+    return `name@${safeDomain}`;
+  }
+  const slug = fullName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ".")
+    .replace(/\.+/g, ".")
+    .replace(/^\./, "")
+    .replace(/\.$/, "");
+  return `${slug || "name"}@${safeDomain}`;
+};
+
 export default function EmployeeManagementPage() {
   const utils = trpc.useUtils();
   const dashboardQuery = trpc.hrEmployees.dashboard.useQuery();
   const employeeDirectory = dashboardQuery.data?.directory ?? [];
   const pendingApprovals = dashboardQuery.data?.pendingApprovals ?? [];
   const viewerRole = dashboardQuery.data?.viewerRole ?? "EMPLOYEE";
+  const manualInviteOptions = dashboardQuery.data?.manualInvite;
+  const departmentOptions = manualInviteOptions?.departments ?? [];
+  const managerOptions = manualInviteOptions?.managers ?? [];
+  const locationOptions = manualInviteOptions?.locations ?? [];
+  const employmentTypeOptions = manualInviteOptions?.employmentTypes ?? [];
+  const inviteRoleOptions = manualInviteOptions?.allowedRoles ?? [];
+  const manualInviteDisabled = inviteRoleOptions.length === 0;
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"all" | EmployeeStatus>("all");
@@ -132,6 +164,49 @@ export default function EmployeeManagementPage() {
     id: string;
     type: "approve" | "reject" | "delete";
   } | null>(null);
+  const manualInviteForm = useForm<ManualInviteFormValues>({
+    resolver: zodResolver(manualInviteSchema),
+    defaultValues: {
+      fullName: "",
+      workEmail: "",
+      inviteRole: "",
+      designation: "",
+      departmentId: "",
+      managerId: "",
+      startDate: "",
+      workLocation: "",
+      employmentType: "",
+      notes: "",
+      sendInvite: true,
+    },
+  });
+  const {
+    register: inviteRegister,
+    handleSubmit: handleInviteSubmit,
+    reset: resetInviteForm,
+    formState: { errors: inviteErrors },
+  } = manualInviteForm;
+  const defaultManualInviteValues = useMemo<ManualInviteFormValues>(
+    () => ({
+      fullName: "",
+      workEmail: "",
+      inviteRole: manualInviteOptions?.allowedRoles[0]?.value ?? "",
+      designation: "",
+      departmentId: "",
+      managerId: "",
+      startDate: "",
+      workLocation: "",
+      employmentType: manualInviteOptions?.employmentTypes[0]?.value ?? "",
+      notes: "",
+      sendInvite: true,
+    }),
+    [manualInviteOptions],
+  );
+  const [fullNameForPlaceholder, setFullNameForPlaceholder] = useState("");
+  const workEmailPlaceholder = useMemo(
+    () => buildSuggestedEmail(fullNameForPlaceholder ?? "", manualInviteOptions?.organizationDomain),
+    [fullNameForPlaceholder, manualInviteOptions?.organizationDomain],
+  );
 
   const canDeleteEmployees = ["SUPER_ADMIN", "ORG_OWNER", "ORG_ADMIN", "MANAGER"].includes(
     viewerRole,
@@ -145,6 +220,13 @@ export default function EmployeeManagementPage() {
     return () => window.clearTimeout(timer);
   }, [actionAlert]);
 
+  useEffect(() => {
+    if (!manualInviteOptions) {
+      return;
+    }
+    resetInviteForm(defaultManualInviteValues);
+  }, [defaultManualInviteValues, manualInviteOptions, resetInviteForm]);
+
   const approveMutation = trpc.hrEmployees.approveSignup.useMutation({
     onSettled: () => setPendingAction(null),
   });
@@ -153,6 +235,38 @@ export default function EmployeeManagementPage() {
   });
   const deleteMutation = trpc.hrEmployees.deleteEmployee.useMutation({
     onSettled: () => setPendingAction(null),
+  });
+  const inviteMutation = trpc.hrEmployees.invite.useMutation({
+    onSuccess: (data) => {
+      setActionAlert({
+        type: "success",
+        message: data.invitationSent
+          ? `Invitation email sent to ${data.email}.`
+          : `Pending profile created for ${data.email}.`,
+      });
+      resetInviteForm(defaultManualInviteValues);
+      setFullNameForPlaceholder("");
+      void utils.hrEmployees.dashboard.invalidate();
+    },
+    onError: (error) => {
+      setActionAlert({
+        type: "error",
+        message: error.message,
+      });
+    },
+  });
+  const handleManualInviteSubmit = handleInviteSubmit((values) => {
+    inviteMutation.mutate({
+      ...values,
+      inviteRole: values.inviteRole as UserRole,
+      employmentType: values.employmentType as EmploymentType,
+      departmentId: values.departmentId || undefined,
+      managerId: values.managerId || undefined,
+      startDate: values.startDate || undefined,
+      workLocation: values.workLocation || undefined,
+      notes: values.notes?.trim() || undefined,
+      sendInvite: values.sendInvite ?? true,
+    });
   });
 
   const isProcessingAction = (type: "approve" | "reject" | "delete", id: string) =>
@@ -425,8 +539,8 @@ export default function EmployeeManagementPage() {
             >
               <option value="all">All departments</option>
               {departmentOptions.map((department) => (
-                <option key={department} value={department}>
-                  {department}
+                <option key={department.id} value={department.name}>
+                  {department.name}
                 </option>
               ))}
             </select>
@@ -585,42 +699,84 @@ export default function EmployeeManagementPage() {
               active.
             </p>
           </div>
-          <form className="grid gap-4 md:grid-cols-2">
+          <form className="grid gap-4 md:grid-cols-2" onSubmit={handleManualInviteSubmit}>
             <TextInput
               label="Full name"
               placeholder="e.g. Afsana Khan"
               className="w-full"
+              name="fullName"
+              register={inviteRegister}
+              error={inviteErrors.fullName}
+              isRequired
+              disabled={manualInviteDisabled}
+              registerOptions={{
+                onChange: (event) => {
+                  setFullNameForPlaceholder(event.target.value);
+                  return event;
+                },
+              }}
             />
             <TextInput
               label="Work email"
               type="email"
-              placeholder="name@ndihr.io"
+              placeholder={workEmailPlaceholder}
               className="w-full"
+              name="workEmail"
+              register={inviteRegister}
+              error={inviteErrors.workEmail}
+              isRequired
+              disabled={manualInviteDisabled}
             />
             <div className="flex flex-col">
               <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
-                Department
+                Access level
               </label>
-              <select className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white">
-                <option value="">Select team</option>
-                {departmentOptions.map((department) => (
-                  <option key={department} value={department}>
-                    {department}
+              <select
+                className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                {...inviteRegister("inviteRole")}
+                disabled={manualInviteDisabled}
+              >
+                {inviteRoleOptions.length === 0 ? (
+                  <option value="">No roles available</option>
+                ) : null}
+                {inviteRoleOptions.map((role) => (
+                  <option key={role.value} value={role.value}>
+                    {role.label}
                   </option>
                 ))}
               </select>
+              {inviteErrors.inviteRole ? (
+                <p className="mt-1 text-xs text-rose-500">{inviteErrors.inviteRole.message}</p>
+              ) : null}
             </div>
             <TextInput
               label="Role / title"
               placeholder="e.g. Payroll Associate"
               className="w-full"
+              name="designation"
+              register={inviteRegister}
+              error={inviteErrors.designation}
+              isRequired
+              disabled={manualInviteDisabled}
             />
-            <TextInput label="Start date" type="date" className="w-full" />
+            <TextInput
+              label="Start date"
+              type="date"
+              className="w-full"
+              name="startDate"
+              register={inviteRegister}
+              error={inviteErrors.startDate}
+              disabled={manualInviteDisabled}
+            />
             <div className="flex flex-col">
               <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
                 Work location
               </label>
-              <select className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+              <select
+                className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                {...inviteRegister("workLocation")}
+                disabled={manualInviteDisabled}
+              >
                 <option value="">Select location</option>
                 {locationOptions.map((location) => (
                   <option key={location} value={location}>
@@ -628,51 +784,114 @@ export default function EmployeeManagementPage() {
                   </option>
                 ))}
               </select>
+              {inviteErrors.workLocation ? (
+                <p className="mt-1 text-xs text-rose-500">{inviteErrors.workLocation.message}</p>
+              ) : null}
             </div>
-            <TextInput
-              label="Manager"
-              placeholder="e.g. Sharif Uddin"
-              className="w-full"
-            />
+            <div className="flex flex-col">
+              <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
+                Department
+              </label>
+              <select
+                className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                {...inviteRegister("departmentId")}
+                disabled={manualInviteDisabled}
+              >
+                <option value="">Select team</option>
+                {departmentOptions.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+              {inviteErrors.departmentId ? (
+                <p className="mt-1 text-xs text-rose-500">{inviteErrors.departmentId.message}</p>
+              ) : null}
+            </div>
+            <div className="flex flex-col">
+              <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
+                Manager
+              </label>
+              <select
+                className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                {...inviteRegister("managerId")}
+                disabled={manualInviteDisabled}
+              >
+                <option value="">Select manager</option>
+                {managerOptions.map((manager) => (
+                  <option key={manager.id} value={manager.id}>
+                    {manager.name}
+                    {manager.designation ? ` · ${manager.designation}` : ""}
+                  </option>
+                ))}
+              </select>
+              {inviteErrors.managerId ? (
+                <p className="mt-1 text-xs text-rose-500">{inviteErrors.managerId.message}</p>
+              ) : null}
+            </div>
             <div className="flex flex-col">
               <label className="mb-2 text-[16px] font-bold text-text_bold dark:text-slate-200">
                 Employment type
               </label>
-              <select className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white">
-                <option value="">Select type</option>
-                {employmentTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
+              <select
+                className="rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-200/70 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                {...inviteRegister("employmentType")}
+                disabled={manualInviteDisabled}
+              >
+                {employmentTypeOptions.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
                   </option>
                 ))}
               </select>
+              {inviteErrors.employmentType ? (
+                <p className="mt-1 text-xs text-rose-500">{inviteErrors.employmentType.message}</p>
+              ) : null}
             </div>
             <TextArea
               label="Notes for HR (optional)"
               placeholder="Share onboarding context, paperwork status, or equipment needs."
               className="md:col-span-2 w-full"
               height="120px"
+              name="notes"
+              register={inviteRegister}
+              error={inviteErrors.notes}
+              disabled={manualInviteDisabled}
             />
             <div className="md:col-span-2">
               <label className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-200">
                 <input
                   type="checkbox"
                   className="rounded border-slate-300 text-indigo-600"
+                  {...inviteRegister("sendInvite")}
+                  defaultChecked
+                  disabled={manualInviteDisabled}
                 />
                 Send account invite email now
               </label>
               <p className="mt-2 text-xs text-slate-400">
-                The profile stays in{" "}
-                <span className="font-semibold">Pending</span> until HR approves
-                inside this dashboard.
+                The profile stays in <span className="font-semibold">Pending</span> until HR approves it inside this dashboard.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 md:col-span-2">
-              <Button className="px-6 py-3 text-sm">
-                Create pending profile
+              <Button
+                type="submit"
+                className="px-6 py-3 text-sm"
+                disabled={manualInviteDisabled || inviteMutation.isPending}
+              >
+                {inviteMutation.isPending ? "Sending invite..." : "Create pending profile"}
               </Button>
-              <Button theme="white" className="px-6 py-3 text-sm">
-                Save draft
+              <Button
+                type="button"
+                theme="white"
+                className="px-6 py-3 text-sm"
+                onClick={() => {
+                  resetInviteForm(defaultManualInviteValues);
+                  setFullNameForPlaceholder("");
+                }}
+                disabled={manualInviteDisabled || inviteMutation.isPending}
+              >
+                Reset form
               </Button>
             </div>
           </form>

@@ -52,8 +52,30 @@ export const trialStatusSchema = z.object({
 
 export type TrialStatusInput = z.infer<typeof trialStatusSchema>;
 
+export const inviteTokenSchema = z.object({
+  token: z.string().min(16, "Invitation token is required"),
+});
+
+export const completeInviteSchema = z.object({
+  token: z.string().min(16, "Invitation token is required"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  preferredName: z.string().optional().nullable(),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  profilePhotoUrl: z
+    .string()
+    .url("Profile photo must be a valid URL")
+    .optional()
+    .nullable(),
+});
+
+export type InviteTokenInput = z.infer<typeof inviteTokenSchema>;
+export type CompleteInviteInput = z.infer<typeof completeInviteSchema>;
+
 export const AuthZodSchema = {
   userEmailParams: sendResetPasswordLinkSchema,
   userPasswordUpdateParams: updateUserPasswordSchema,
   userRegistrationParams: registerSchema,
+  inviteTokenParams: inviteTokenSchema,
+  completeInviteParams: completeInviteSchema,
 };

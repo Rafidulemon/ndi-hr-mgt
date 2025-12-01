@@ -1,9 +1,10 @@
-import type { UserInfoParam as RegistrationUserInfoParam } from "@/types/types";
+import { redirect } from "next/navigation";
 
-export type UserInfoParam = RegistrationUserInfoParam;
-
-const RegistrationTokenPage = () => {
-  return null;
+type Props = {
+  params: { email: string; token: string };
 };
 
-export default RegistrationTokenPage;
+export default function RegistrationTokenPage({ params }: Props) {
+  const searchParams = new URLSearchParams({ token: params.token });
+  redirect(`/auth/signup?${searchParams.toString()}`);
+}

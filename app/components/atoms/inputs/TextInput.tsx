@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { UseFormRegister, type FieldError } from "react-hook-form";
+import type { FieldError, RegisterOptions, UseFormRegister } from "react-hook-form";
 
 type Props = {
   className?: string;
@@ -13,6 +13,7 @@ type Props = {
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   name?: string;
   register?: UseFormRegister<any>;
+  registerOptions?: RegisterOptions;
   readOnly?: boolean;
   disabled?: boolean;
   type?: string;
@@ -34,6 +35,7 @@ function TextInput(props: Props) {
     readOnly = false,
     disabled = false,
     type = "text",
+    registerOptions,
   } = props;
 
   return (
@@ -59,7 +61,7 @@ function TextInput(props: Props) {
         onChange={onChange}
         readOnly={readOnly}
         disabled={disabled}
-        {...register?.(name)}
+        {...register?.(name, registerOptions)}
       />
       {error && (
         <div className="text-[14px] text-tertiary">{error.message}</div>

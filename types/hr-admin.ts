@@ -37,12 +37,28 @@ export type PendingApproval = {
   status: PendingApprovalStatus;
 };
 
-import type { UserRole } from "@prisma/client";
+import type { EmploymentType, UserRole } from "@prisma/client";
+
+export type HrInviteRoleOption = {
+  value: UserRole;
+  label: string;
+};
+
+export type HrManualInviteOptions = {
+  organizationDomain: string | null;
+  organizationName: string;
+  departments: Array<{ id: string; name: string }>;
+  managers: Array<{ id: string; name: string; role: UserRole; designation: string | null }>;
+  locations: string[];
+  employmentTypes: Array<{ value: EmploymentType; label: string }>;
+  allowedRoles: HrInviteRoleOption[];
+};
 
 export type HrEmployeeDashboardResponse = {
   directory: EmployeeDirectoryEntry[];
   pendingApprovals: PendingApproval[];
   viewerRole: UserRole;
+  manualInvite: HrManualInviteOptions;
 };
 
 export type HrEmployeeDocument = {
@@ -150,4 +166,26 @@ export type HrEmployeeLeaveQuotaUpdateInput = {
 
 export type HrEmployeeLeaveQuotaResponse = {
   leaveBalances: HrEmployeeLeaveBalances;
+};
+
+export type HrEmployeeInviteResponse = {
+  userId: string;
+  email: string;
+  role: UserRole;
+  invitationSent: boolean;
+  inviteUrl: string;
+};
+
+export type HrEmployeeInviteInput = {
+  fullName: string;
+  workEmail: string;
+  inviteRole: UserRole;
+  designation: string;
+  departmentId?: string | null;
+  managerId?: string | null;
+  startDate?: string | null;
+  workLocation?: string | null;
+  employmentType: EmploymentType;
+  notes?: string | null;
+  sendInvite?: boolean;
 };

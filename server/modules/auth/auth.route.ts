@@ -40,6 +40,12 @@ export const AuthRouter = router({
         throw error;
       }
     }),
+  inviteDetails: procedure
+    .input(AuthZodSchema.inviteTokenParams)
+    .query(({ input }) => AuthController.getInviteDetailsHandler(input.token)),
+  completeInvite: procedure
+    .input(AuthZodSchema.completeInviteParams)
+    .mutation(({ input }) => AuthController.completeInviteHandler(input)),
 
   IsAuthorisationChange: procedure.query(async () => {
     try {

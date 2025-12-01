@@ -3,37 +3,51 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import type { ChangeEvent } from "react";
-import { trpc } from "@/trpc/client";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 
 import AuthLayout from "../_components/AuthLayout";
 import Button from "../../../components/atoms/buttons/Button";
-import EmailInput from "../../../components/atoms/inputs/EmailInput";
 import ImageInput from "../../../components/atoms/inputs/ImageInput";
 import PasswordInput from "../../../components/atoms/inputs/PasswordInput";
 import Text from "../../../components/atoms/Text/Text";
 import TextInput from "../../../components/atoms/inputs/TextInput";
-import SelectBox from "../../../components/atoms/selectBox/SelectBox";
+import { trpc } from "@/trpc/client";
+
+const roleLabelMap: Record<string, string> = {
+  SUPER_ADMIN: "Super Admin",
+  ORG_OWNER: "Org Owner",
+  ORG_ADMIN: "Org Admin",
+  HR_ADMIN: "HR Admin",
+  MANAGER: "Manager",
+  EMPLOYEE: "Employee",
+};
+
+const formatDate = (value?: string | null) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  }).format(date);
+};
 
 const schema = z
   .object({
-    employeeId: z.string().nonempty("Employee ID is required"),
-    organizationId: z.string().nonempty("Organization is required"),
-    departmentId: z.string().nonempty("Department is required"),
-    firstName: z.string().nonempty("Employee First Name is required"),
-    lastName: z.string().nonempty("Employee Last Name is required"),
-    designation: z.string().nonempty("Employee Designation is required"),
-    email: z
-      .string()
-      .nonempty("Email is required")
-      .email("Please enter a valid email address"),
+    firstName: z.string().min(1, "First name is required"),
+    lastName: z.string().min(1, "Last name is required"),
+    preferredName: z.string().optional(),
     password: z
       .string()
-      .nonempty("Password is required")
-      .min(8, { message: "Password must be at least 8 characters" }),
-    confirm_password: z.string().nonempty("Confirm Password is required"),
+      .min(8, { message: "Password must be at least 8 characters" })
+      .max(64, { message: "Password is too long" }),
+    confirm_password: z
+      .string()
+      .min(8, { message: "Confirm password is required" }),
   })
   .refine((data) => data.password === data.confirm_password, {
     message: "Passwords do not match",
@@ -44,56 +58,64 @@ type FormData = z.infer<typeof schema>;
 
 function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("token");
+
   const [serverMessage, setServerMessage] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
-  const [imageError, setImageError] = useState<string | null>(null);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState("/dp.png");
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  const form = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      preferredName: "",
+      password: "",
+      confirm_password: "",
+    },
+  });
+
   const {
     register,
     handleSubmit,
     formState: { errors },
-    watch,
-    setValue,
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      organizationId: "",
-      departmentId: "",
-    },
-  });
-  const signupOptionsQuery = trpc.auth.signupOptions.useQuery();
-  const signupMutation = trpc.auth.register.useMutation({
+    reset,
+  } = form;
+
+  const inviteQuery = trpc.auth.inviteDetails.useQuery(
+    { token: inviteToken ?? "" },
+    { enabled: Boolean(inviteToken) },
+  );
+
+  const completeInvite = trpc.auth.completeInvite.useMutation({
     onSuccess: () => {
       setServerError(null);
-      setServerMessage(null);
+      setServerMessage("Invitation accepted. Redirecting you to sign in...");
       setShowSuccessModal(true);
     },
     onError: (error) => {
       setServerMessage(null);
-      setServerError(error.message || "Unable to create the account right now.");
+      setServerError(error.message ?? "Unable to complete your invitation.");
     },
   });
-  const isSubmitting = signupMutation.isPending;
-  const selectedOrganizationId = watch("organizationId");
-  const organizations = signupOptionsQuery.data?.organizations ?? [];
-  const organizationOptions = organizations.map((organization) => ({
-    label: organization.name,
-    value: organization.id,
-  }));
-  const selectedOrganization = organizations.find(
-    (organization) => organization.id === selectedOrganizationId,
-  );
-  const departmentOptions =
-    selectedOrganization?.departments.map((department) => ({
-      label: department.name,
-      value: department.id,
-    })) ?? [];
+  const isSubmitting = completeInvite.isPending;
 
   useEffect(() => {
-    setValue("departmentId", "");
-  }, [selectedOrganizationId, setValue]);
+    if (inviteQuery.data) {
+      reset({
+        firstName: inviteQuery.data.firstName ?? "",
+        lastName: inviteQuery.data.lastName ?? "",
+        preferredName: inviteQuery.data.preferredName ?? "",
+        password: "",
+        confirm_password: "",
+      });
+      setPhotoUrl(inviteQuery.data.profilePhotoUrl ?? "/dp.png");
+    }
+  }, [inviteQuery.data, reset]);
 
   useEffect(() => {
     if (!showSuccessModal) {
@@ -101,33 +123,28 @@ function SignupPage() {
     }
     const timeout = setTimeout(() => {
       router.push("/auth/login");
-    }, 4000);
+    }, 3000);
     return () => clearTimeout(timeout);
   }, [showSuccessModal, router]);
 
-  const handleLoginButton = () => {
-    router.push("/auth/login");
-  };
-
-  const handleOnSubmit = (data: FormData) => {
-    setServerError(null);
-    setServerMessage(null);
-    if (!profilePhotoUrl) {
-      setImageError("Please upload your profile photo.");
-      return;
+  const invitationSummary = useMemo(() => {
+    if (!inviteQuery.data) {
+      return [];
     }
-    signupMutation.mutate({
-      employeeId: data.employeeId,
-      organizationId: data.organizationId,
-      departmentId: data.departmentId,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      designation: data.designation,
-      email: data.email,
-      password: data.password,
-      profilePhotoUrl: profilePhotoUrl ?? undefined,
-    });
-  };
+    const details = inviteQuery.data;
+    return [
+      { label: "Organization", value: details.organizationName },
+      { label: "Department", value: details.departmentName ?? "—" },
+      {
+        label: "Role",
+        value: `${roleLabelMap[details.role] ?? details.role}${
+          details.designation ? ` · ${details.designation}` : ""
+        }`,
+      },
+      { label: "Work email", value: details.email },
+      { label: "Tentative start", value: formatDate(details.startDate) },
+    ];
+  }, [inviteQuery.data]);
 
   const handleProfilePhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -135,8 +152,16 @@ function SignupPage() {
       return;
     }
 
-    setImageError(null);
-    setIsUploadingImage(true);
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoError("Please choose an image smaller than 5MB.");
+      event.target.value = "";
+      return;
+    }
+
+    setPhotoError(null);
+    setIsPhotoUploading(true);
+    const previewUrl = URL.createObjectURL(file);
+    setPhotoUrl(previewUrl);
 
     try {
       const formData = new FormData();
@@ -147,195 +172,220 @@ function SignupPage() {
       });
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload.error || "Unable to upload image");
+        throw new Error(payload.error || "Unable to upload photo");
       }
-      setProfilePhotoUrl(payload.url);
+      setPhotoUrl(payload.url);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to upload image";
-      setImageError(message);
+      const message = error instanceof Error ? error.message : "Unable to upload image.";
+      setPhotoError(message);
     } finally {
-      setIsUploadingImage(false);
+      setIsPhotoUploading(false);
+      URL.revokeObjectURL(previewUrl);
+      event.target.value = "";
     }
   };
+
+  const handleOnSubmit = (data: FormData) => {
+    setServerError(null);
+    setServerMessage(null);
+
+    if (!inviteToken) {
+      setServerError("A valid invitation link is required.");
+      return;
+    }
+
+    if (!photoUrl || photoUrl === "/dp.png") {
+      setPhotoError("Please upload your profile photo.");
+      return;
+    }
+
+    completeInvite.mutate({
+      token: inviteToken,
+      firstName: data.firstName.trim(),
+      lastName: data.lastName.trim(),
+      preferredName: data.preferredName?.trim() || undefined,
+      password: data.password,
+      profilePhotoUrl: photoUrl,
+    });
+  };
+
+  const handleLoginButton = () => {
+    router.push("/auth/login");
+  };
+
+  const renderForm = () => (
+    <form onSubmit={handleSubmit(handleOnSubmit)} className="space-y-6" autoComplete="off">
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
+          Invitation details
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {invitationSummary.map((item) => (
+            <div key={item.label}>
+              <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                {item.label}
+              </p>
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                {item.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <ImageInput
+            id="invite-profile-photo"
+            initialImage={photoUrl}
+            isUploading={isPhotoUploading}
+            error={photoError}
+            onChange={handleProfilePhotoChange}
+          />
+          <div className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="font-semibold text-slate-900 dark:text-white">Profile photo</p>
+            <p>Uploads save immediately · JPG/PNG/WEBP · Max 5 MB</p>
+          </div>
+        </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <TextInput
+            label="First name"
+            className="w-full"
+            name="firstName"
+            register={register}
+            isRequired
+            error={errors.firstName}
+          />
+          <TextInput
+            label="Last name"
+            className="w-full"
+            name="lastName"
+            register={register}
+            isRequired
+            error={errors.lastName}
+          />
+          <TextInput
+            label="Preferred name"
+            className="w-full md:col-span-2"
+            name="preferredName"
+            register={register}
+            error={errors.preferredName}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <PasswordInput
+          label="Password"
+          name="password"
+          register={register}
+          placeholder="Enter a new password"
+          error={errors.password}
+        />
+        <PasswordInput
+          label="Confirm password"
+          name="confirm_password"
+          register={register}
+          placeholder="Re-type your password"
+          error={errors.confirm_password}
+        />
+      </div>
+
+      {serverError ? (
+        <p className="rounded-2xl border border-rose-200 bg-rose-50/60 px-4 py-3 text-sm text-rose-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+          {serverError}
+        </p>
+      ) : null}
+      {serverMessage ? (
+        <p className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">
+          {serverMessage}
+        </p>
+      ) : null}
+
+      <Button type="submit" theme="primary" isWidthFull disabled={isSubmitting || isPhotoUploading}>
+        <Text
+          text={
+            isPhotoUploading
+              ? "Uploading photo..."
+              : isSubmitting
+                ? "Completing invitation..."
+                : "Create account"
+          }
+          className="text-[16px] font-semibold"
+        />
+      </Button>
+    </form>
+  );
+
+  const layoutTitle = inviteQuery.data
+    ? `Join ${inviteQuery.data.organizationName}`
+    : "Accept your invitation";
+
+  const content = (() => {
+    if (!inviteToken) {
+      return (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50/60 p-6 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+          A valid invitation link is required to create an account. Please check your email for the
+          latest invite or contact your HR administrator.
+        </div>
+      );
+    }
+
+    if (inviteQuery.isLoading) {
+      return (
+        <div className="flex min-h-[200px] items-center justify-center text-sm text-slate-500">
+          Checking your invitation...
+        </div>
+      );
+    }
+
+    if (inviteQuery.isError || !inviteQuery.data) {
+      return (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50/60 p-6 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+          {inviteQuery.error?.message ?? "We couldn't validate your invitation. Please request a new link."}
+        </div>
+      );
+    }
+
+    return renderForm();
+  })();
 
   return (
     <>
       <AuthLayout
-      title="Create workspace access"
-      subtitle="Let’s get your employee workspace ready."
-      description="Complete the onboarding form so we can tailor your dashboard, permissions and payroll lanes automatically."
-      helper="Use your company-issued information so we can sync you with the right department, manager, and policy set."
-      badge="Onboarding"
-      footer={
-        <p className="text-sm">
-          Already invited?
-          <button
-            type="button"
-            onClick={handleLoginButton}
-            className="ml-2 font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-sky-400 dark:hover:text-sky-300"
-          >
-            Sign in instead
-          </button>
-        </p>
-      }
-      showcase={{
-        footer: (
-          <Button onClick={handleLoginButton} theme="white" isWidthFull>
-            <Text text="Return to login" className="text-[15px] font-semibold" />
-          </Button>
-        ),
-      }}
-    >
-      <form
-        onSubmit={handleSubmit(handleOnSubmit)}
-        className="space-y-6"
-        autoComplete="off"
+        title={layoutTitle}
+        subtitle="Let’s confirm a few details and set up your secure access."
+        description="We pre-filled everything your administrator provided. You can update your preferred name and choose a password."
+        helper="This link is unique to you. Keep it private."
+        badge="Invitation"
+        footer={
+          <p className="text-sm">
+            Already have an account?
+            <button
+              type="button"
+              onClick={handleLoginButton}
+              className="ml-2 font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-sky-400 dark:hover:text-sky-300"
+            >
+              Sign in instead
+            </button>
+          </p>
+        }
+        showcase={{
+          footer: (
+            <Button onClick={handleLoginButton} theme="white" isWidthFull>
+              <Text text="Return to login" className="text-[15px] font-semibold" />
+            </Button>
+          ),
+        }}
       >
-        {signupOptionsQuery.isError ? (
-          <p className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-800 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
-            {signupOptionsQuery.error?.message ?? "Unable to load organization options right now."}
-          </p>
-        ) : null}
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <TextInput
-            label="Employee ID"
-            isRequired
-            placeholder="1234564798"
-            register={register}
-            name="employeeId"
-            error={errors.employeeId}
-          />
-          <SelectBox
-            label="Organization"
-            isRequired
-            name="organizationId"
-            register={register}
-            options={organizationOptions}
-            error={errors.organizationId}
-            placeholderLabel={
-              signupOptionsQuery.isLoading ? "Loading organizations..." : "Select organization"
-            }
-            isDisabled={signupOptionsQuery.isLoading}
-          />
-          <SelectBox
-            label="Department"
-            isRequired
-            name="departmentId"
-            register={register}
-            options={departmentOptions}
-            error={errors.departmentId}
-            placeholderLabel={
-              selectedOrganization
-                ? departmentOptions.length
-                  ? "Select department"
-                  : "No departments found"
-                : "Select organization first"
-            }
-            isDisabled={!selectedOrganization || signupOptionsQuery.isLoading}
-          />
-          <TextInput
-            label="First Name"
-            isRequired
-            placeholder="Md. Rafidul"
-            register={register}
-            name="firstName"
-            error={errors.firstName}
-          />
-          <TextInput
-            label="Last Name"
-            isRequired
-            placeholder="Islam"
-            register={register}
-            name="lastName"
-            error={errors.lastName}
-          />
-          <TextInput
-            label="Designation"
-            isRequired
-            placeholder="Software Engineer"
-            register={register}
-            name="designation"
-            error={errors.designation}
-          />
-          <EmailInput
-            label="Email"
-            isRequired
-            placeholder="you@ndi.team"
-            register={register}
-            name="email"
-            error={errors.email}
-          />
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <PasswordInput
-            label="Password"
-            placeholder="Password"
-            register={register}
-            name="password"
-            error={errors.password}
-            isRequired
-          />
-          <PasswordInput
-            label="Confirm Password"
-            placeholder="Confirm Password"
-            register={register}
-            name="confirm_password"
-            error={errors.confirm_password}
-            isRequired
-          />
-        </div>
-
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/70">
-          <ImageInput
-            label="Upload Profile Picture"
-            isRequired
-            id="profilePic"
-            initialImage={profilePhotoUrl ?? "/default_profile.png"}
-            onChange={handleProfilePhotoChange}
-            isUploading={isUploadingImage}
-            error={imageError}
-          />
-        </div>
-
-        {serverError ? (
-          <p className="rounded-2xl border border-rose-200 bg-rose-50/60 px-4 py-3 text-sm text-rose-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
-            {serverError}
-          </p>
-        ) : null}
-        {serverMessage ? (
-          <p className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">
-            {serverMessage}
-          </p>
-        ) : null}
-
-        <Button
-          type="submit"
-          theme="primary"
-          isWidthFull
-          disabled={isSubmitting || isUploadingImage || signupOptionsQuery.isLoading}
-        >
-          <Text
-            text={
-              isUploadingImage
-                ? "Uploading photo..."
-                : isSubmitting
-                  ? "Creating account..."
-                  : "Create account"
-            }
-            className="text-[16px] font-semibold"
-          />
-        </Button>
-      </form>
+        {content}
       </AuthLayout>
       {showSuccessModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4">
           <div className="w-full max-w-md space-y-4 rounded-3xl border border-white/20 bg-white p-8 text-center shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-            <Text text="Signup request submitted" className="text-2xl font-semibold text-text_primary" />
+            <Text text="Invitation accepted" className="text-2xl font-semibold text-text_primary" />
             <p className="text-sm text-text_secondary">
-              Your signup request has been submitted. After confirmation you will get email. Please
-              wait.
+              Your account is ready. You’ll be redirected to login so you can access your workspace.
             </p>
             <Button theme="primary" isWidthFull onClick={() => router.push("/auth/login")}>
               <Text text="Go to login" className="font-semibold" />
