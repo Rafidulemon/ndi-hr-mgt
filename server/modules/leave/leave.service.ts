@@ -12,6 +12,11 @@ import {
 import { TRPCError } from "@trpc/server";
 
 import type { TRPCContext } from "@/server/api/trpc";
+import {
+  emitNotificationRealtimeEvent,
+  notificationRealtimeSelect,
+  type NotificationRealtimeRecord,
+} from "@/server/modules/notification/notification.events";
 import { leaveTypeLabelMap } from "@/lib/leave-types";
 import {
   buildBalanceResponse,
@@ -210,6 +215,7 @@ export const leaveService = {
     const dayLabel = totalDays === 1 ? "day" : "days";
 
     const result = await ctx.prisma.$transaction(async (tx) => {
+      const notifications: NotificationRealtimeRecord[] = [];
       const employment = await tx.employmentDetail.findUnique({
         where: { userId: session.user.id },
         select: employmentBalanceSelect,
@@ -258,7 +264,7 @@ export const leaveService = {
         },
       });
 
-      await tx.notification.create({
+      const notificationRecord = await tx.notification.create({
         data: {
           organizationId,
           senderId: session.user.id,
@@ -286,13 +292,20 @@ export const leaveService = {
           },
           sentAt: new Date(),
         },
+        select: notificationRealtimeSelect,
       });
+      notifications.push(notificationRecord);
 
       return {
         updatedEmployment: updatedEmployment as EmploymentLeaveBalances,
         request: createdRequest,
+        notifications,
       };
     });
+
+    if (result.notifications.length > 0) {
+      void emitNotificationRealtimeEvent(ctx.prisma, result.notifications);
+    }
 
     return {
       request: serializeLeaveRequest(result.request),

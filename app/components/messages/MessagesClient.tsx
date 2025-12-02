@@ -5,18 +5,17 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type Dispatch,
   type FormEvent,
   type SetStateAction,
 } from "react";
-import { io, type Socket } from "socket.io-client";
 import { HiOutlineChatBubbleLeftRight } from "react-icons/hi2";
 import { RiUserAddLine } from "react-icons/ri";
 
 import Button from "@/app/components/atoms/buttons/Button";
 import { Modal } from "@/app/components/atoms/frame/Modal";
+import { useRealtimeSocket } from "@/app/components/realtime/RealtimeProvider";
 import { trpc } from "@/trpc/client";
 
 const relativeTimeFormatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
@@ -106,7 +105,7 @@ const MessagesClient = () => {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [composerValue, setComposerValue] = useState("");
   const [isNewChatOpen, setIsNewChatOpen] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
+  const socket = useRealtimeSocket();
 
   const listQuery = trpc.message.list.useQuery(
     searchTerm.trim() ? { query: searchTerm.trim() } : undefined,
@@ -248,49 +247,37 @@ const MessagesClient = () => {
     [utils],
   );
 
-  useEffect(() => {
-    let isMounted = true;
-    const setupSocket = async () => {
-      try {
-        await fetch("/api/socket");
-      } catch (error) {
-        console.error("Socket init failed", error);
-        return;
+  const handleIncomingRealtimeMessage = useCallback(
+    (payload: { threadId: string }) => {
+      if (payload?.threadId) {
+        refreshThreadMessages(payload.threadId);
       }
-      if (!isMounted) return;
-      const socket = io({
-        path: "/api/socket_io",
-      });
-      socketRef.current = socket;
-
-      socket.on("connect_error", (error) => {
-        console.error("Socket error", error.message);
-      });
-      socket.on("thread:created", invalidateThreadList);
-      socket.on("thread:updated", invalidateThreadList);
-      socket.on("message:new", (payload: { threadId: string }) => {
-        if (payload?.threadId) {
-          refreshThreadMessages(payload.threadId);
-        }
-        invalidateThreadList();
-      });
-    };
-
-    void setupSocket();
-
-    return () => {
-      isMounted = false;
-      socketRef.current?.disconnect();
-      socketRef.current = null;
-    };
-  }, [invalidateThreadList, refreshThreadMessages]);
+      invalidateThreadList();
+    },
+    [invalidateThreadList, refreshThreadMessages],
+  );
 
   useEffect(() => {
-    if (!socketRef.current || !resolvedThreadId) {
+    if (!socket) {
       return;
     }
-    socketRef.current.emit("thread:subscribe", { threadId: resolvedThreadId });
-  }, [resolvedThreadId]);
+    socket.on("thread:created", invalidateThreadList);
+    socket.on("thread:updated", invalidateThreadList);
+    socket.on("message:new", handleIncomingRealtimeMessage);
+
+    return () => {
+      socket.off("thread:created", invalidateThreadList);
+      socket.off("thread:updated", invalidateThreadList);
+      socket.off("message:new", handleIncomingRealtimeMessage);
+    };
+  }, [handleIncomingRealtimeMessage, invalidateThreadList, socket]);
+
+  useEffect(() => {
+    if (!socket || !resolvedThreadId) {
+      return;
+    }
+    socket.emit("thread:subscribe", { threadId: resolvedThreadId });
+  }, [resolvedThreadId, socket]);
 
   return (
     <>

@@ -24,6 +24,10 @@ import type {
   HrLeaveListInput,
   HrLeaveUpdateStatusInput,
 } from "./leave.validation";
+import {
+  emitNotificationRealtimeEvent,
+  notificationRealtimeSelect,
+} from "@/server/modules/notification/notification.events";
 
 const employmentSummarySelect = {
   employeeCode: true,
@@ -374,7 +378,7 @@ export const hrLeaveService = {
         }
       })();
 
-      await ctx.prisma.notification.create({
+      const employeeNotification = await ctx.prisma.notification.create({
         data: {
           organizationId,
           senderId: sessionUser.id,
@@ -395,7 +399,9 @@ export const hrLeaveService = {
           },
           sentAt: new Date(),
         },
+        select: notificationRealtimeSelect,
       });
+      void emitNotificationRealtimeEvent(ctx.prisma, employeeNotification);
     }
 
     if (organizationId && nextStatus === LeaveStatus.APPROVED) {
@@ -418,7 +424,7 @@ export const hrLeaveService = {
       if (managerRecipients.length > 0) {
         const sentAt = new Date();
         const managerBody = `${employeeDisplayName}'s ${leaveTypeLabel} (${rangeLabel}) was approved (${totalLeaveDays} ${dayLabel}).`;
-        await Promise.all(
+        const managerNotifications = await Promise.all(
           managerRecipients.map((targetUserId) =>
             ctx.prisma.notification.create({
               data: {
@@ -442,9 +448,13 @@ export const hrLeaveService = {
                 },
                 sentAt,
               },
+              select: notificationRealtimeSelect,
             }),
           ),
         );
+        if (managerNotifications.length > 0) {
+          void emitNotificationRealtimeEvent(ctx.prisma, managerNotifications);
+        }
       }
     }
 

@@ -14,6 +14,10 @@ import type {
 } from "@/types/hr-work";
 import { WEEKDAY_OPTIONS, canManageWork } from "@/types/hr-work";
 import { requireWorkManager } from "@/server/modules/hr/utils";
+import {
+  emitNotificationRealtimeEvent,
+  notificationRealtimeSelect,
+} from "@/server/modules/notification/notification.events";
 
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -167,7 +171,7 @@ export const hrWorkService = {
     const readableDate = timeFormatter.format(normalizedDate);
 
     try {
-      await ctx.prisma.$transaction(async (tx) => {
+      const notifications = await ctx.prisma.$transaction(async (tx) => {
         const holidayRecord = await tx.holiday.create({
           data: {
             organizationId,
@@ -180,7 +184,7 @@ export const hrWorkService = {
         const sentAt = new Date();
         const descriptionSuffix = description ? ` ${description}` : "";
 
-        await tx.notification.create({
+        const notificationRecord = await tx.notification.create({
           data: {
             organizationId,
             senderId: user.id,
@@ -198,8 +202,13 @@ export const hrWorkService = {
             },
             sentAt,
           },
+          select: notificationRealtimeSelect,
         });
+        return [notificationRecord];
       });
+      if (notifications.length > 0) {
+        void emitNotificationRealtimeEvent(ctx.prisma, notifications);
+      }
     } catch (error) {
       void error;
       throw new TRPCError({
@@ -252,7 +261,7 @@ export const hrWorkService = {
     const onsiteWindow = `${onsStart} - ${onsEnd}`;
     const remoteWindow = `${remoteStart} - ${remoteEnd}`;
 
-    await ctx.prisma.notification.create({
+    const notificationRecord = await ctx.prisma.notification.create({
       data: {
         organizationId,
         senderId: user.id,
@@ -273,6 +282,7 @@ export const hrWorkService = {
         sentAt,
       },
     });
+    void emitNotificationRealtimeEvent(ctx.prisma, notificationRecord);
   },
 
   async updateWeekSchedule(
@@ -330,7 +340,7 @@ export const hrWorkService = {
     const workingLabel = formatDayList(workingDays);
     const weekendLabel = formatDayList(weekendDays);
 
-    await ctx.prisma.notification.create({
+    const notificationRecord = await ctx.prisma.notification.create({
       data: {
         organizationId,
         senderId: user.id,
@@ -349,5 +359,6 @@ export const hrWorkService = {
         sentAt,
       },
     });
+    void emitNotificationRealtimeEvent(ctx.prisma, notificationRecord);
   },
 };
