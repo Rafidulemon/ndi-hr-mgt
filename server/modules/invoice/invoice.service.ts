@@ -65,7 +65,10 @@ export const invoiceService = {
   async list({ ctx }: { ctx: TRPCContext }): Promise<EmployeeInvoiceListResponse> {
     const user = ensureUser(ctx);
     const invoices = await ctx.prisma.invoice.findMany({
-      where: { employeeId: user.id },
+      where: {
+        employeeId: user.id,
+        status: { not: "DRAFT" },
+      },
       select: employeeInvoiceSummarySelect,
       orderBy: { updatedAt: "desc" },
     });
@@ -185,6 +188,58 @@ export const invoiceService = {
         status: "READY_TO_DELIVER",
         confirmedAt: now,
         readyAt: now,
+      },
+      include: invoiceDetailInclude,
+    });
+
+    return { invoice: mapInvoiceDetail(updated) };
+  },
+
+  async requestReview({
+    ctx,
+    input,
+  }: {
+    ctx: TRPCContext;
+    input: { invoiceId: string; token: string; comment: string };
+  }): Promise<InvoiceDetailResponse> {
+    const user = ensureUser(ctx);
+    const decoded = verifyUnlockToken(input.token);
+
+    if (decoded.userId !== user.id || decoded.invoiceId !== input.invoiceId) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: "Access denied." });
+    }
+
+    const invoice = await ctx.prisma.invoice.findFirst({
+      where: { id: input.invoiceId, employeeId: user.id },
+      select: { id: true, status: true },
+    });
+
+    if (!invoice) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Invoice not found." });
+    }
+
+    if (invoice.status !== "PENDING_REVIEW") {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "You can only request changes on invoices awaiting review.",
+      });
+    }
+
+    const cleanedComment = input.comment.trim();
+    if (cleanedComment.length < 5) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Provide a comment with at least 5 characters.",
+      });
+    }
+
+    const updated = await ctx.prisma.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        status: "CHANGES_REQUESTED",
+        reviewComment: cleanedComment,
+        reviewedAt: new Date(),
+        reviewedById: user.id,
       },
       include: invoiceDetailInclude,
     });

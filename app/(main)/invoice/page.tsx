@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { IoEye } from "react-icons/io5";
 
@@ -92,11 +92,19 @@ function InvoicePage() {
       }
       setIsModalOpen(false);
       setPassword("");
-      router.push(`/invoice/${selection.id}`);
+      const encodedToken = encodeURIComponent(token);
+      router.push(`/invoice/${selection.id}?token=${encodedToken}`);
     },
   });
 
   const tableRows = useMemo(() => buildRowsForPage(currentInvoices), [currentInvoices]);
+
+  const handlePageDataChange = useCallback(
+    (pageData: typeof invoices) => {
+      setCurrentInvoices(pageData);
+    },
+    [],
+  );
 
   const handlePasswordConfirm = () => {
     if (!selection) return;
@@ -136,10 +144,8 @@ function InvoicePage() {
           <Pagination
             data={invoices}
             postsPerPage={10}
-            setCurrentPageData={(pageData) => {
-            setCurrentInvoices(pageData);
-          }}
-        />
+            setCurrentPageData={handlePageDataChange}
+          />
         )}
       </div>
 

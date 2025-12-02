@@ -1,41 +1,77 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import Button from "@/app/components/atoms/buttons/Button";
 import PasswordInput from "@/app/components/atoms/inputs/PasswordInput";
+import TextArea from "@/app/components/atoms/inputs/TextArea";
 import { EmployeeHeader } from "@/app/components/layouts/EmployeeHeader";
 import LoadingSpinner from "@/app/components/LoadingSpinner";
 import { InvoiceDetailCard } from "@/app/components/invoices/InvoiceDetailCard";
 import { trpc } from "@/trpc/client";
+import { Modal } from "@/app/components/atoms/frame/Modal";
+import { downloadInvoicePdf } from "@/app/lib/downloadInvoicePdf";
 
 const tokenKey = (invoiceId: string) => `ndi.invoice.token:${invoiceId}`;
 
-const resolveInvoiceId = (params?: Record<string, string | string[]> | null) => {
-  if (!params) {
-    return "";
+const resolveInvoiceId = (
+  params?: Record<string, string | string[]> | null,
+  fallbackPath?: string | null,
+) => {
+  if (params) {
+    const raw = params.invoiceId;
+    if (Array.isArray(raw)) {
+      if (raw[0]) return raw[0];
+    } else if (raw) {
+      return raw;
+    }
   }
-  const raw = params.invoiceId;
-  if (Array.isArray(raw)) {
-    return raw[0];
+  if (fallbackPath) {
+    const lastSegment = fallbackPath.split("/").filter(Boolean).at(-1);
+    return lastSegment ?? "";
   }
-  return raw ?? "";
+  return "";
 };
 
 function InvoiceDetailsPage() {
   const params = useParams<Record<string, string | string[]>>();
-  const invoiceId = useMemo(() => resolveInvoiceId(params), [params]);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const invoiceId = useMemo(
+    () => resolveInvoiceId(params, pathname),
+    [params, pathname],
+  );
+  const tokenQueryValue = searchParams?.get("token") ?? null;
+  const searchParamsString = searchParams?.toString() ?? "";
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [unlockError, setUnlockError] = useState<string | null>(null);
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [reviewComment, setReviewComment] = useState("");
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const invoiceContentRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!invoiceId || typeof window === "undefined") return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setToken(window.sessionStorage.getItem(tokenKey(invoiceId)));
+    const stored = window.sessionStorage.getItem(tokenKey(invoiceId));
+    if (stored) {
+      setToken(stored);
+    }
   }, [invoiceId]);
+
+  useEffect(() => {
+    if (!invoiceId || typeof window === "undefined" || !tokenQueryValue) return;
+    window.sessionStorage.setItem(tokenKey(invoiceId), tokenQueryValue);
+    setToken(tokenQueryValue);
+    setPassword("");
+    setUnlockError(null);
+    const paramsCopy = new URLSearchParams(searchParamsString);
+    paramsCopy.delete("token");
+    const nextUrl = `${pathname}${paramsCopy.toString() ? `?${paramsCopy.toString()}` : ""}`;
+    router.replace(nextUrl, { scroll: false });
+  }, [invoiceId, pathname, router, searchParamsString, tokenQueryValue]);
 
   const detailQuery = trpc.invoice.detail.useQuery(
     { invoiceId, token: token ?? "" },
@@ -46,8 +82,9 @@ function InvoiceDetailsPage() {
 
   const unlockMutation = trpc.invoice.unlock.useMutation({
     onSuccess: ({ token: unlockedToken }) => {
-      if (!invoiceId || typeof window === "undefined") return;
-      window.sessionStorage.setItem(tokenKey(invoiceId), unlockedToken);
+      if (typeof window !== "undefined" && invoiceId) {
+        window.sessionStorage.setItem(tokenKey(invoiceId), unlockedToken);
+      }
       setToken(unlockedToken);
       setPassword("");
       setUnlockError(null);
@@ -61,6 +98,15 @@ function InvoiceDetailsPage() {
       detailQuery.refetch();
     },
   });
+  const requestReviewMutation = trpc.invoice.requestReview.useMutation({
+    onSuccess: () => {
+      detailQuery.refetch();
+      setReviewComment("");
+      setRequestError(null);
+      setIsRequestModalOpen(false);
+    },
+    onError: (error) => setRequestError(error.message),
+  });
 
   const handleUnlock = () => {
     if (!invoiceId || !password) return;
@@ -72,6 +118,23 @@ function InvoiceDetailsPage() {
     confirmMutation.mutate({ invoiceId, token });
   };
 
+  const handleSubmitReviewRequest = () => {
+    if (!invoiceId || !token) return;
+    const trimmed = reviewComment.trim();
+    if (trimmed.length < 5) {
+      setRequestError("Describe the changes you need.");
+      return;
+    }
+    requestReviewMutation.mutate({ invoiceId, token, comment: trimmed });
+  };
+
+  const handleDownloadInvoice = async () => {
+    if (!invoiceContentRef.current || !detailQuery.data?.invoice) {
+      return;
+    }
+    await downloadInvoicePdf(invoiceContentRef.current, detailQuery.data.invoice.title);
+  };
+
   const handleReset = () => {
     if (!invoiceId) return;
     if (typeof window !== "undefined") {
@@ -80,9 +143,13 @@ function InvoiceDetailsPage() {
     setToken(null);
     setPassword("");
     setUnlockError(null);
+    setIsRequestModalOpen(false);
+    setReviewComment("");
+    setRequestError(null);
   };
 
   return (
+    <>
     <div className="flex w-full flex-col gap-10">
       <EmployeeHeader />
 
@@ -127,27 +194,43 @@ function InvoiceDetailsPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Button theme="secondary" onClick={() => router.push("/invoice")}>Back to invoices</Button>
           </div>
-          <InvoiceDetailCard
-            invoice={detailQuery.data.invoice}
-            actionSlot=
-              {detailQuery.data.invoice.canConfirm ? (
-                <Button onClick={handleConfirm} disabled={confirmMutation.isPending}>
-                  {confirmMutation.isPending ? "Confirming..." : "Confirm & ready to deliver"}
-                </Button>
-              ) : null}
-            footnote={
-              <div className="mt-6 rounded-3xl border border-white/60 bg-white/90 p-4 text-sm text-slate-600 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-300">
-                <p>If you have any questions about this invoice, please contact:</p>
-                <p className="mt-1 text-base font-semibold text-blue-600 dark:text-sky-400">
-                  {detailQuery.data.invoice.createdBy.email}
-                </p>
-              </div>
-            }
-          />
+          <div ref={invoiceContentRef}>
+            <InvoiceDetailCard
+              invoice={detailQuery.data.invoice}
+              actionSlot=
+                {detailQuery.data.invoice.canConfirm ? (
+                  <Button onClick={handleConfirm} disabled={confirmMutation.isPending}>
+                    {confirmMutation.isPending ? "Confirming..." : "Confirm & ready to deliver"}
+                  </Button>
+                ) : null}
+              footnote={
+                <div className="mt-6 rounded-3xl border border-white/60 bg-white/90 p-4 text-sm text-slate-600 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-300">
+                  <p>If you have any questions about this invoice, please contact:</p>
+                  <p className="mt-1 text-base font-semibold text-blue-600 dark:text-sky-400">
+                    {detailQuery.data.invoice.createdBy.email}
+                  </p>
+                </div>
+              }
+            />
+          </div>
           {confirmMutation.error && (
             <p className="text-sm text-rose-500">{confirmMutation.error.message}</p>
           )}
           <div className="flex flex-wrap gap-3">
+            {detailQuery.data.invoice.canRequestChanges && (
+              <Button
+                theme="secondary"
+                onClick={() => {
+                  setIsRequestModalOpen(true);
+                  setRequestError(null);
+                }}
+              >
+                Request changes
+              </Button>
+            )}
+            <Button theme="secondary" onClick={handleDownloadInvoice}>
+              Download PDF
+            </Button>
             <Button theme="secondary" onClick={handleReset}>
               Use a different password
             </Button>
@@ -155,6 +238,54 @@ function InvoiceDetailsPage() {
         </div>
       ) : null}
     </div>
+      <Modal
+        title="Request invoice changes"
+        open={isRequestModalOpen}
+        setOpen={(open) => {
+          if (!open) {
+            setIsRequestModalOpen(false);
+            setReviewComment("");
+            setRequestError(null);
+          } else {
+            setIsRequestModalOpen(true);
+          }
+        }}
+        isDoneButton={false}
+        isCancelButton={false}
+        doneButtonText=""
+        className="w-[min(90vw,520px)]"
+      >
+        <div className="space-y-4">
+          <TextArea
+            label="Describe the changes"
+            value={reviewComment}
+            onChange={(event) => {
+              setReviewComment(event.target.value);
+              setRequestError(null);
+            }}
+            height="120px"
+            placeholder="Provide specific feedback so HR can adjust the invoice."
+          />
+          {requestError && <p className="text-sm text-rose-500">{requestError}</p>}
+          <div className="flex justify-end gap-3">
+            <Button
+              theme="secondary"
+              onClick={() => {
+                setIsRequestModalOpen(false);
+                setReviewComment("");
+                setRequestError(null);
+              }}
+              disabled={requestReviewMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSubmitReviewRequest} disabled={requestReviewMutation.isPending}>
+              {requestReviewMutation.isPending ? "Sending..." : "Submit request"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 }
 

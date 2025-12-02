@@ -1,19 +1,31 @@
-import { Prisma } from "@prisma/client";
+import {
+  NotificationAudience,
+  NotificationStatus,
+  NotificationType,
+  Prisma,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import type { TRPCContext } from "@/server/api/trpc";
 import { requireHrAdmin } from "@/server/modules/hr/utils";
 import {
+  buildPeriodLabel,
   hrInvoiceSummarySelect,
   invoiceDetailInclude,
   mapHrInvoiceSummary,
   mapInvoiceDetail,
 } from "@/server/modules/invoice/invoice.mapper";
+import {
+  emitNotificationRealtimeEvent,
+  notificationRealtimeSelect,
+} from "@/server/modules/notification/notification.events";
 import type {
   HrInvoiceCreateInput,
   HrInvoiceDashboardResponse,
+  HrInvoiceUpdateInput,
   InvoiceDetailResponse,
 } from "@/types/invoice";
+import { getInvoiceStatusLabel } from "@/types/invoice";
 
 const decimalToNumber = (value?: Prisma.Decimal | null) =>
   value ? Number(value) : 0;
@@ -173,8 +185,9 @@ export const hrInvoiceService = {
     input: { invoiceId: string };
   }) {
     const user = requireHrAdmin(ctx);
+    const organizationId = user.organizationId;
     const invoice = await ctx.prisma.invoice.findFirst({
-      where: { id: input.invoiceId, organizationId: user.organizationId },
+      where: { id: input.invoiceId, organizationId },
       select: { id: true, status: true },
     });
 
@@ -182,16 +195,126 @@ export const hrInvoiceService = {
       throw new TRPCError({ code: "NOT_FOUND", message: "Invoice not found." });
     }
 
-    if (invoice.status !== "DRAFT") {
+    if (!["DRAFT", "CHANGES_REQUESTED"].includes(invoice.status)) {
       throw new TRPCError({
         code: "BAD_REQUEST",
-        message: "Only draft invoices can be sent.",
+        message: "Only draft or change-requested invoices can be sent.",
       });
     }
 
+    const sentAt = new Date();
+
+    const { updatedRecord, notificationRecord } = await ctx.prisma.$transaction(async (tx) => {
+      const updatedRecord = await tx.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          status: "PENDING_REVIEW",
+          sentAt,
+          reviewComment: null,
+          reviewedAt: null,
+          reviewedById: null,
+        },
+        select: hrInvoiceSummarySelect,
+      });
+
+      const periodLabel = buildPeriodLabel(updatedRecord.periodMonth, updatedRecord.periodYear);
+      const totalNumber = Number(updatedRecord.total ?? 0);
+
+      const notificationRecord = await tx.notification.create({
+        data: {
+          organizationId,
+          senderId: user.id,
+          audience: NotificationAudience.INDIVIDUAL,
+          targetUserId: updatedRecord.employeeId,
+          title: `${updatedRecord.title} ready for review`,
+          body: `Please review your ${periodLabel} invoice.`,
+          type: NotificationType.INVOICE,
+          status: NotificationStatus.SENT,
+          actionUrl: `/invoice/${updatedRecord.id}`,
+          metadata: {
+            invoiceId: updatedRecord.id,
+            periodLabel,
+            currency: updatedRecord.currency,
+            total: totalNumber,
+            status: updatedRecord.status,
+            statusLabel: getInvoiceStatusLabel(updatedRecord.status),
+          },
+          sentAt,
+        },
+        select: notificationRealtimeSelect,
+      });
+
+      return { updatedRecord, notificationRecord };
+    });
+
+    if (notificationRecord) {
+      void emitNotificationRealtimeEvent(ctx.prisma, notificationRecord);
+    }
+
+    return mapHrInvoiceSummary(updatedRecord);
+  },
+
+  async update({
+    ctx,
+    input,
+  }: {
+    ctx: TRPCContext;
+    input: HrInvoiceUpdateInput;
+  }) {
+    const user = requireHrAdmin(ctx);
+    const orgId = user.organizationId;
+
+    const existing = await ctx.prisma.invoice.findFirst({
+      where: { id: input.invoiceId, organizationId: orgId },
+      select: { id: true, status: true },
+    });
+
+    if (!existing) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Invoice not found." });
+    }
+
+    if (!["DRAFT", "CHANGES_REQUESTED"].includes(existing.status)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Only draft or change-requested invoices can be edited.",
+      });
+    }
+
+    const items = sanitizeItems(input.items);
+    if (!items.length) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Add at least one line item." });
+    }
+
+    const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    const taxRate = Math.max(0, Number(input.taxRate ?? 0));
+    const tax = subtotal * (taxRate / 100);
+    const total = subtotal + tax;
+
+    const dueDate = parseDueDate(input.dueDate);
+
     const updated = await ctx.prisma.invoice.update({
-      where: { id: invoice.id },
-      data: { status: "PENDING_REVIEW", sentAt: new Date() },
+      where: { id: existing.id },
+      data: {
+        employeeId: input.employeeId,
+        title: input.title.trim(),
+        periodMonth: input.periodMonth,
+        periodYear: input.periodYear,
+        dueDate,
+        currency: input.currency,
+        subtotal: toCurrencyValue(subtotal),
+        tax: toCurrencyValue(tax),
+        total: toCurrencyValue(total),
+        notes: input.notes?.trim() || null,
+        items: {
+          deleteMany: { invoiceId: existing.id },
+          create: items.map((item) => ({
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: toCurrencyValue(item.unitPrice),
+            amount: toCurrencyValue(item.unitPrice * item.quantity),
+          })),
+        },
+      },
       select: hrInvoiceSummarySelect,
     });
 

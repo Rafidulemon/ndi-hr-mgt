@@ -81,6 +81,7 @@ const notificationSourceMap: Record<NotificationType, NotificationSource> = {
   [NotificationType.LEAVE]: "SYSTEM",
   [NotificationType.ATTENDANCE]: "SYSTEM",
   [NotificationType.REPORT]: "SYSTEM",
+  [NotificationType.INVOICE]: "SYSTEM",
 };
 
 const sourceLabelMap: Record<NotificationSource, string> = {
@@ -153,6 +154,32 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const getStringValue = (value: unknown) =>
   typeof value === "string" && value.trim().length > 0 ? value : null;
+
+const parseNumberValue = (value: unknown) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+};
+
+const formatCurrencyValue = (amount: number | null, currency?: string | null) => {
+  if (amount === null) return null;
+  if (currency) {
+    try {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency,
+      }).format(amount);
+    } catch (error) {
+      void error;
+    }
+  }
+  return amount.toFixed(2);
+};
 
 const formatDateLabel = (value?: string | null) => {
   if (!value) return null;
@@ -279,6 +306,27 @@ const buildReportHighlights = (metadata: Record<string, unknown> | null) => {
   return highlights;
 };
 
+const buildInvoiceHighlights = (metadata: Record<string, unknown> | null) => {
+  if (!metadata) return [] as NotificationHighlight[];
+  const highlights: NotificationHighlight[] = [];
+  const period = getStringValue(metadata.periodLabel ?? metadata.period);
+  if (period) {
+    highlights.push({ label: "Period", value: period });
+  }
+  const total = formatCurrencyValue(
+    parseNumberValue(metadata.total),
+    getStringValue(metadata.currency),
+  );
+  if (total) {
+    highlights.push({ label: "Total", value: total });
+  }
+  const status = getStringValue(metadata.statusLabel ?? metadata.status);
+  if (status) {
+    highlights.push({ label: "Status", value: status });
+  }
+  return highlights;
+};
+
 const buildHighlights = (record: NotificationRecord, metadata: Record<string, unknown> | null) => {
   switch (record.type) {
     case NotificationType.ANNOUNCEMENT:
@@ -289,6 +337,8 @@ const buildHighlights = (record: NotificationRecord, metadata: Record<string, un
       return buildAttendanceHighlights(metadata);
     case NotificationType.REPORT:
       return buildReportHighlights(metadata);
+    case NotificationType.INVOICE:
+      return buildInvoiceHighlights(metadata);
     default:
       return [] as NotificationHighlight[];
   }

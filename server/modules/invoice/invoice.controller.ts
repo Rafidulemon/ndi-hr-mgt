@@ -31,4 +31,11 @@ export const invoiceController = {
     ctx: TRPCContext;
     input: { invoiceId: string; token: string };
   }): Promise<InvoiceDetailResponse> => invoiceService.confirm({ ctx, input }),
+  requestReview: ({
+    ctx,
+    input,
+  }: {
+    ctx: TRPCContext;
+    input: { invoiceId: string; token: string; comment: string };
+  }): Promise<InvoiceDetailResponse> => invoiceService.requestReview({ ctx, input }),
 };

@@ -14,6 +14,10 @@ const payrollDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "long",
   day: "numeric",
 });
+const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
 
 type Props = {
   invoice: InvoiceDetail;
@@ -25,6 +29,16 @@ const formatDate = (value: string | null) => {
   if (!value) return "Not set";
   try {
     return dateFormatter.format(new Date(value));
+  } catch (error) {
+    void error;
+    return value;
+  }
+};
+
+const formatDateTime = (value: string | null) => {
+  if (!value) return "Not set";
+  try {
+    return dateTimeFormatter.format(new Date(value));
   } catch (error) {
     void error;
     return value;
@@ -84,6 +98,11 @@ export function InvoiceDetailCard({ invoice, actionSlot, footnote }: Props) {
           <span className="mt-3 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-200">
             {invoice.statusLabel}
           </span>
+          {invoice.reviewRequest.comment && (
+            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-rose-600 dark:text-rose-300">
+              Change requested
+            </p>
+          )}
         </div>
         {actionSlot}
       </div>
@@ -273,6 +292,16 @@ export function InvoiceDetailCard({ invoice, actionSlot, footnote }: Props) {
                 <span className="font-semibold text-slate-700 dark:text-slate-200">Confirmed:</span> {confirmedLabel}
               </p>
             </div>
+            {invoice.reviewRequest.comment && (
+              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
+                <p className="font-semibold">Feedback</p>
+                <p className="mt-1 whitespace-pre-line">{invoice.reviewRequest.comment}</p>
+                <p className="mt-2 text-xs opacity-80">
+                  {invoice.reviewRequest.requestedBy ? `By ${invoice.reviewRequest.requestedBy.name}` : "Requested changes"}
+                  {invoice.reviewRequest.requestedAt ? ` · ${formatDateTime(invoice.reviewRequest.requestedAt)}` : ""}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import Button from "@/app/components/atoms/buttons/Button";
 import TextInput from "@/app/components/atoms/inputs/TextInput";
@@ -12,6 +12,8 @@ import LoadingSpinner from "@/app/components/LoadingSpinner";
 import { InvoiceDetailCard } from "@/app/components/invoices/InvoiceDetailCard";
 
 import { trpc } from "@/trpc/client";
+import type { InvoiceDetail } from "@/types/invoice";
+import { downloadInvoicePdf } from "@/app/lib/downloadInvoicePdf";
 
 type LineItemKind = "EARNING" | "DEDUCTION";
 
@@ -39,6 +41,10 @@ const LUNCH_DAILY_RATE = 400;
 const payrollDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "long",
   day: "numeric",
+});
+const reviewDateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeStyle: "short",
 });
 
 const formatPayrollRange = (start: Date, end: Date) =>
@@ -110,6 +116,7 @@ const lineItemTypeOptions = [
 const statusBadgeClass: Record<string, string> = {
   DRAFT: "bg-slate-100 text-slate-600 dark:bg-slate-800/70 dark:text-slate-300",
   PENDING_REVIEW: "bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-200",
+  CHANGES_REQUESTED: "bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200",
   READY_TO_DELIVER: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200",
 };
 
@@ -155,9 +162,20 @@ function HrInvoiceManagementPage() {
       utils.hrInvoices.dashboard.invalidate();
     },
   });
+  const updateMutation = trpc.hrInvoices.update.useMutation({
+    onSuccess: () => {
+      utils.hrInvoices.dashboard.invalidate();
+      resetForm();
+      setEditingInvoiceId(null);
+      setIsCreateModalOpen(false);
+    },
+  });
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(null);
+  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
+  const [isEditingLoading, setIsEditingLoading] = useState(false);
+  const [editingError, setEditingError] = useState<string | null>(null);
   const invoiceDetailQuery = trpc.hrInvoices.detail.useQuery(
     { invoiceId: previewInvoiceId ?? "" },
     { enabled: Boolean(previewInvoiceId) },
@@ -174,7 +192,12 @@ function HrInvoiceManagementPage() {
   });
   const [dueDate, setDueDate] = useState<Date | null>(new Date());
   const [lineItems, setLineItems] = useState<LineItem[]>([buildLineItem()]);
+  const previewContentRef = useRef<HTMLDivElement | null>(null);
   const [hasManualLineItems, setHasManualLineItems] = useState(false);
+  const [activeReviewContext, setActiveReviewContext] = useState<{
+    comment: string;
+    requestedAt: string | null;
+  } | null>(null);
 
   const invoices = dashboardQuery.data?.invoices ?? [];
   const employeeOptions = dashboardQuery.data?.employeeOptions ?? [];
@@ -183,6 +206,17 @@ function HrInvoiceManagementPage() {
     () => employeeOptions.find((employee) => employee.id === form.employeeId),
     [employeeOptions, form.employeeId],
   );
+  const reviewRequestedLabel = useMemo(() => {
+    if (!activeReviewContext?.requestedAt) {
+      return null;
+    }
+    try {
+      return reviewDateTimeFormatter.format(new Date(activeReviewContext.requestedAt));
+    } catch (error) {
+      void error;
+      return null;
+    }
+  }, [activeReviewContext?.requestedAt]);
 
   const totals = useMemo(() => {
     const earnings = lineItems.reduce((sum, item) => {
@@ -213,7 +247,16 @@ function HrInvoiceManagementPage() {
     setDueDate(new Date());
     setLineItems([buildLineItem()]);
     setHasManualLineItems(false);
+    setEditingInvoiceId(null);
+    setEditingError(null);
+    setIsEditingLoading(false);
+    setActiveReviewContext(null);
   }
+
+  const handleCloseFormModal = () => {
+    setIsCreateModalOpen(false);
+    resetForm();
+  };
 
   const updateLineItem = (id: string, updates: Partial<LineItem>) => {
     setLineItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)));
@@ -259,7 +302,66 @@ function HrInvoiceManagementPage() {
     applyPayrollDefaults(selectedEmployee.id, form.periodMonth, form.periodYear);
   };
 
-  const handleSubmit = () => {
+  const hydrateFormFromInvoice = useCallback((invoice: InvoiceDetail) => {
+    const calculatedTaxRate =
+      invoice.subtotal > 0 ? ((invoice.tax / invoice.subtotal) * 100).toFixed(2) : "0";
+    setForm({
+      employeeId: invoice.employee.id,
+      title: invoice.title,
+      periodMonth: String(invoice.periodMonth),
+      periodYear: String(invoice.periodYear),
+      currency: invoice.currency,
+      taxRate: calculatedTaxRate,
+      notes: invoice.notes ?? "",
+    });
+    setDueDate(invoice.dueDate ? new Date(invoice.dueDate) : null);
+    setLineItems(
+      invoice.items.map((item) =>
+        buildLineItem({
+          kind: item.unitPrice < 0 ? "DEDUCTION" : "EARNING",
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: Math.abs(item.unitPrice),
+        }),
+      ),
+    );
+    setHasManualLineItems(true);
+    setActiveReviewContext(
+      invoice.reviewRequest.comment
+        ? {
+            comment: invoice.reviewRequest.comment,
+            requestedAt: invoice.reviewRequest.requestedAt,
+          }
+        : null,
+    );
+  }, []);
+
+  const handleEditInvoice = useCallback(
+    async (invoiceId: string) => {
+      try {
+        setEditingError(null);
+        setIsEditingLoading(true);
+        const data = await utils.hrInvoices.detail.fetch({ invoiceId });
+        hydrateFormFromInvoice(data.invoice);
+        setEditingInvoiceId(invoiceId);
+        setIsCreateModalOpen(true);
+      } catch (error) {
+        setEditingError(error instanceof Error ? error.message : "Failed to load invoice.");
+      } finally {
+        setIsEditingLoading(false);
+      }
+    },
+    [hydrateFormFromInvoice, utils],
+  );
+
+  const handleDownloadPreview = async () => {
+    if (!previewContentRef.current || !invoiceDetailQuery.data?.invoice) {
+      return;
+    }
+    await downloadInvoicePdf(previewContentRef.current, invoiceDetailQuery.data.invoice.title);
+  };
+
+  const handleSaveInvoice = () => {
     const payloadItems = lineItems.map((item) => {
       const quantity = Math.max(1, Math.floor(item.quantity));
       const normalizedUnitPrice = Math.max(0, item.unitPrice);
@@ -270,7 +372,7 @@ function HrInvoiceManagementPage() {
         unitPrice,
       };
     });
-    createMutation.mutate({
+    const payload = {
       employeeId: form.employeeId,
       title: form.title,
       periodMonth: Number(form.periodMonth),
@@ -280,14 +382,23 @@ function HrInvoiceManagementPage() {
       taxRate: Number(form.taxRate ?? 0),
       notes: form.notes || null,
       items: payloadItems,
-    });
+    };
+    if (editingInvoiceId) {
+      updateMutation.mutate({
+        invoiceId: editingInvoiceId,
+        ...payload,
+      });
+    } else {
+      createMutation.mutate(payload);
+    }
   };
 
   const isCreateDisabled =
     !form.employeeId ||
     !form.title.trim() ||
-    lineItems.some((item) => !item.description.trim() || item.unitPrice <= 0) ||
-    createMutation.isPending;
+    lineItems.some((item) => !item.description.trim() || item.unitPrice <= 0);
+  const isSaving = editingInvoiceId ? updateMutation.isPending : createMutation.isPending;
+  const disableSubmit = isCreateDisabled || isSaving;
 
   return (
     <div className="space-y-10">
@@ -305,7 +416,14 @@ function HrInvoiceManagementPage() {
           <div className="rounded-2xl border border-amber-200/70 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
             {pendingReview} pending review
           </div>
-          <Button onClick={() => setIsCreateModalOpen(true)}>New invoice</Button>
+          <Button
+            onClick={() => {
+              resetForm();
+              setIsCreateModalOpen(true);
+            }}
+          >
+            New invoice
+          </Button>
         </div>
       </header>
 
@@ -345,6 +463,14 @@ function HrInvoiceManagementPage() {
                   >
                     {invoice.statusLabel}
                   </span>
+                  {invoice.reviewComment && (
+                    <p className="text-xs text-rose-600 dark:text-rose-300">
+                      “{invoice.reviewComment}”
+                      {invoice.reviewRequestedAt
+                        ? ` · ${reviewDateTimeFormatter.format(new Date(invoice.reviewRequestedAt))}`
+                        : ""}
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     <Button
                       theme="secondary"
@@ -353,6 +479,16 @@ function HrInvoiceManagementPage() {
                     >
                       Preview
                     </Button>
+                    {invoice.status === "CHANGES_REQUESTED" && (
+                      <Button
+                        theme="secondary"
+                        className="text-xs"
+                        onClick={() => void handleEditInvoice(invoice.id)}
+                        disabled={isEditingLoading}
+                      >
+                        Edit
+                      </Button>
+                    )}
                     {invoice.canSend && (
                       <Button
                         className="text-xs"
@@ -361,7 +497,9 @@ function HrInvoiceManagementPage() {
                       >
                         {sendMutation.isPending && sendMutation.variables?.invoiceId === invoice.id
                           ? "Sending..."
-                          : "Send"}
+                          : invoice.status === "CHANGES_REQUESTED"
+                            ? "Resend"
+                            : "Send"}
                       </Button>
                     )}
                   </div>
@@ -373,9 +511,15 @@ function HrInvoiceManagementPage() {
       </section>
 
       <Modal
-        title="Create invoice"
+        title={editingInvoiceId ? "Edit invoice" : "Create invoice"}
         open={isCreateModalOpen}
-        setOpen={setIsCreateModalOpen}
+        setOpen={(value) => {
+          if (!value) {
+            handleCloseFormModal();
+          } else {
+            setIsCreateModalOpen(true);
+          }
+        }}
         isDoneButton={false}
         isCancelButton={false}
         doneButtonText=""
@@ -383,6 +527,25 @@ function HrInvoiceManagementPage() {
         className="max-h-[80vh] overflow-y-auto"
       >
         <div className="space-y-6">
+          {editingError && (
+            <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+              {editingError}
+            </p>
+          )}
+          {isEditingLoading && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700/70 dark:bg-slate-900/60 dark:text-slate-200">
+              Loading invoice details...
+            </div>
+          )}
+          {activeReviewContext && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
+              <p className="font-semibold">Requested changes</p>
+              <p className="mt-1 whitespace-pre-line">{activeReviewContext.comment}</p>
+              {reviewRequestedLabel && (
+                <p className="mt-1 text-xs opacity-80">Requested {reviewRequestedLabel}</p>
+              )}
+            </div>
+          )}
           <div className="grid gap-4 md:grid-cols-2">
             <SelectBox
               label="Employee"
@@ -393,6 +556,7 @@ function HrInvoiceManagementPage() {
                   : employee.name,
                 value: employee.id,
               }))}
+              isDisabled={Boolean(editingInvoiceId)}
               onChange={(event) => {
                 const nextEmployeeId = event.target.value;
                 setForm((prev) => ({ ...prev, employeeId: nextEmployeeId }));
@@ -530,11 +694,11 @@ function HrInvoiceManagementPage() {
             <p className="text-sm text-rose-500">{createMutation.error.message}</p>
           )}
           <div className="flex flex-wrap justify-end gap-3">
-            <Button theme="secondary" onClick={() => setIsCreateModalOpen(false)}>
+            <Button theme="secondary" onClick={handleCloseFormModal}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={isCreateDisabled}>
-              {createMutation.isPending ? "Creating..." : "Create"}
+            <Button onClick={handleSaveInvoice} disabled={disableSubmit}>
+              {isSaving ? (editingInvoiceId ? "Saving..." : "Creating...") : editingInvoiceId ? "Save changes" : "Create"}
             </Button>
           </div>
         </div>
@@ -551,6 +715,7 @@ function HrInvoiceManagementPage() {
         isDoneButton={false}
         isCancelButton={false}
         doneButtonText=""
+        minWidthModal=""
         className="max-h-[90vh] overflow-y-auto"
       >
         {invoiceDetailQuery.isLoading ? (
@@ -558,14 +723,23 @@ function HrInvoiceManagementPage() {
             <LoadingSpinner />
           </div>
         ) : invoiceDetailQuery.data ? (
-          <InvoiceDetailCard
-            invoice={invoiceDetailQuery.data.invoice}
-            footnote={
-              <p className="mt-4 text-sm text-slate-500 dark:text-slate-300">
-                Created by {invoiceDetailQuery.data.invoice.createdBy.name} · {invoiceDetailQuery.data.invoice.createdBy.email}
-              </p>
-            }
-          />
+          <>
+            <div ref={previewContentRef}>
+              <InvoiceDetailCard
+                invoice={invoiceDetailQuery.data.invoice}
+                footnote={
+                  <p className="mt-4 text-sm text-slate-500 dark:text-slate-300">
+                    Created by {invoiceDetailQuery.data.invoice.createdBy.name} · {invoiceDetailQuery.data.invoice.createdBy.email}
+                  </p>
+                }
+              />
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button theme="secondary" onClick={handleDownloadPreview}>
+                Download PDF
+              </Button>
+            </div>
+          </>
         ) : (
           <p className="text-sm text-slate-500 dark:text-slate-300">
             {invoiceDetailQuery.error?.message ?? "Select an invoice to preview."}

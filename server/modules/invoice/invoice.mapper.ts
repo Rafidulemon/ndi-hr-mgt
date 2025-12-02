@@ -76,6 +76,8 @@ export const hrInvoiceSummarySelect = {
   subtotal: true,
   tax: true,
   total: true,
+  reviewComment: true,
+  reviewedAt: true,
   updatedAt: true,
   employee: {
     select: {
@@ -111,7 +113,9 @@ export const mapHrInvoiceSummary = (invoice: HrInvoiceSummaryRecord): HrInvoiceL
     currency: invoice.currency,
     totalFormatted: formatInvoiceCurrency(total, invoice.currency),
     updatedAt: invoice.updatedAt.toISOString(),
-    canSend: invoice.status === "DRAFT",
+    canSend: invoice.status === "DRAFT" || invoice.status === "CHANGES_REQUESTED",
+    reviewComment: invoice.reviewComment ?? null,
+    reviewRequestedAt: invoice.reviewedAt ? invoice.reviewedAt.toISOString() : null,
   };
 };
 
@@ -199,6 +203,15 @@ export const invoiceDetailInclude = {
       },
     },
   },
+  reviewedBy: {
+    select: {
+      id: true,
+      email: true,
+      profile: {
+        select: profileSummarySelect,
+      },
+    },
+  },
 } satisfies Prisma.InvoiceInclude;
 
 export type InvoiceDetailRecord = Prisma.InvoiceGetPayload<{
@@ -212,6 +225,7 @@ export const mapInvoiceDetail = (invoice: InvoiceDetailRecord): InvoiceDetail =>
   const employeeProfile = invoice.employee.profile;
   const creatorProfile = invoice.creator.profile;
   const bankAccount = invoice.employee.bankAccounts[0] ?? null;
+  const reviewerProfile = invoice.reviewedBy?.profile;
 
   return {
     id: invoice.id,
@@ -249,6 +263,17 @@ export const mapInvoiceDetail = (invoice: InvoiceDetailRecord): InvoiceDetail =>
       confirmedAt: invoice.confirmedAt ? invoice.confirmedAt.toISOString() : null,
       readyAt: invoice.readyAt ? invoice.readyAt.toISOString() : null,
     },
+    reviewRequest: {
+      comment: invoice.reviewComment ?? null,
+      requestedAt: invoice.reviewedAt ? invoice.reviewedAt.toISOString() : null,
+      requestedBy: invoice.reviewedBy
+        ? {
+            id: invoice.reviewedBy.id,
+            name: getDisplayName(reviewerProfile ?? null),
+            email: invoice.reviewedBy.email,
+          }
+        : null,
+    },
     bankAccount: bankAccount
       ? {
           accountHolder: bankAccount.accountHolder,
@@ -266,5 +291,6 @@ export const mapInvoiceDetail = (invoice: InvoiceDetailRecord): InvoiceDetail =>
       amount: safeNumber(item.amount),
     })),
     canConfirm: invoice.status === "PENDING_REVIEW",
+    canRequestChanges: invoice.status === "PENDING_REVIEW",
   };
 };

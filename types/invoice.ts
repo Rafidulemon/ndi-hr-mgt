@@ -11,6 +11,11 @@ export const invoiceStatusMeta: Record<InvoiceStatus, { label: string; descripti
     description: "Waiting for the employee to review and confirm.",
     highlight: "text-amber-600",
   },
+  CHANGES_REQUESTED: {
+    label: "Changes requested",
+    description: "Employee asked for updates before confirming.",
+    highlight: "text-rose-600",
+  },
   READY_TO_DELIVER: {
     label: "Ready to deliver",
     description: "Employee has confirmed. You can now deliver the invoice.",
@@ -47,6 +52,8 @@ export type HrInvoiceListItem = {
   totalFormatted: string;
   updatedAt: string;
   canSend: boolean;
+  reviewComment: string | null;
+  reviewRequestedAt: string | null;
 };
 
 export type HrInvoiceEmployeeOption = {
@@ -80,6 +87,10 @@ export type HrInvoiceCreateInput = {
   taxRate?: number | null;
   notes?: string | null;
   items: HrInvoiceCreateItemInput[];
+};
+
+export type HrInvoiceUpdateInput = HrInvoiceCreateInput & {
+  invoiceId: string;
 };
 
 export type InvoiceDetail = {
@@ -118,6 +129,15 @@ export type InvoiceDetail = {
     confirmedAt: string | null;
     readyAt: string | null;
   };
+  reviewRequest: {
+    comment: string | null;
+    requestedAt: string | null;
+    requestedBy: {
+      id: string;
+      name: string;
+      email: string;
+    } | null;
+  };
   bankAccount: {
     accountHolder: string;
     bankName: string;
@@ -127,6 +147,7 @@ export type InvoiceDetail = {
   } | null;
   items: InvoiceLineItem[];
   canConfirm: boolean;
+  canRequestChanges: boolean;
 };
 
 export type InvoiceDetailResponse = {

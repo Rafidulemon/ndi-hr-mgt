@@ -3,6 +3,7 @@ import type {
   HrInvoiceCreateInput,
   HrInvoiceDashboardResponse,
   HrInvoiceListItem,
+  HrInvoiceUpdateInput,
   InvoiceDetailResponse,
 } from "@/types/invoice";
 
@@ -25,6 +26,13 @@ export const hrInvoiceController = {
     ctx: TRPCContext;
     input: { invoiceId: string };
   }): Promise<HrInvoiceListItem> => hrInvoiceService.send({ ctx, input }),
+  update: ({
+    ctx,
+    input,
+  }: {
+    ctx: TRPCContext;
+    input: HrInvoiceUpdateInput;
+  }): Promise<HrInvoiceListItem> => hrInvoiceService.update({ ctx, input }),
   detail: ({
     ctx,
     input,

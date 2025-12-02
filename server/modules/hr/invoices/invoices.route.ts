@@ -23,6 +23,10 @@ const createInvoiceInput = z.object({
   items: z.array(lineItemSchema).min(1, "Add at least one line item."),
 });
 
+const updateInvoiceInput = createInvoiceInput.extend({
+  invoiceId: z.string().min(1, "Invoice ID is required."),
+});
+
 const invoiceIdParam = z.object({
   invoiceId: z.string().min(1, "Invoice ID is required."),
 });
@@ -32,6 +36,9 @@ export const hrInvoicesRouter = createTRPCRouter({
   create: protectedProcedure
     .input(createInvoiceInput)
     .mutation(({ ctx, input }) => hrInvoiceController.create({ ctx, input })),
+  update: protectedProcedure
+    .input(updateInvoiceInput)
+    .mutation(({ ctx, input }) => hrInvoiceController.update({ ctx, input })),
   send: protectedProcedure
     .input(invoiceIdParam)
     .mutation(({ ctx, input }) => hrInvoiceController.send({ ctx, input })),

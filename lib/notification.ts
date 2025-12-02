@@ -3,6 +3,7 @@ export const notificationTypeLabels = {
   LEAVE: "Leave",
   ATTENDANCE: "Attendance",
   REPORT: "Reports",
+  INVOICE: "Invoices",
 } as const;
 
 export type NotificationTypeValue = keyof typeof notificationTypeLabels;
