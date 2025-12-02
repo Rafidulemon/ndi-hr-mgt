@@ -199,8 +199,8 @@ const MessagesClient = () => {
 
   const handleSend = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedThreadId || !composerValue.trim()) return;
-    sendMessage.mutate({ threadId: selectedThreadId, body: composerValue });
+    if (!resolvedThreadId || !composerValue.trim()) return;
+    sendMessage.mutate({ threadId: resolvedThreadId, body: composerValue });
   };
 
   const handleCreateThread = () => {
@@ -217,7 +217,8 @@ const MessagesClient = () => {
   const messages = selectedThread?.messages ?? [];
 
   const showComposer = Boolean(resolvedThreadId);
-  const isComposerDisabled = sendMessage.isPending || !composerValue.trim();
+  const isComposerDisabled =
+    sendMessage.isPending || !composerValue.trim() || !resolvedThreadId;
 
   return (
     <>
