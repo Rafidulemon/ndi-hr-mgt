@@ -59,7 +59,7 @@ type FormData = z.infer<typeof schema>;
 function SignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const inviteToken = searchParams.get("token");
+  const inviteToken = searchParams?.get("token") ?? null;
 
   const [serverMessage, setServerMessage] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);

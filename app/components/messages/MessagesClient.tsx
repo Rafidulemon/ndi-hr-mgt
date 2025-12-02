@@ -1,7 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+} from "react";
+import { io, type Socket } from "socket.io-client";
 import { HiOutlineChatBubbleLeftRight } from "react-icons/hi2";
 import { RiUserAddLine } from "react-icons/ri";
 
@@ -96,6 +106,7 @@ const MessagesClient = () => {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [composerValue, setComposerValue] = useState("");
   const [isNewChatOpen, setIsNewChatOpen] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
 
   const listQuery = trpc.message.list.useQuery(
     searchTerm.trim() ? { query: searchTerm.trim() } : undefined,
@@ -104,7 +115,10 @@ const MessagesClient = () => {
     },
   );
 
-  const threads = listQuery.data?.threads ?? [];
+  const threads = useMemo(
+    () => listQuery.data?.threads ?? [],
+    [listQuery.data?.threads],
+  );
   const defaultThreadId = threads[0]?.id ?? null;
   const resolvedThreadId = selectedThreadId ?? defaultThreadId;
 
@@ -146,7 +160,7 @@ const MessagesClient = () => {
     setNewChatMessage("");
   }, []);
 
-  const handleModalToggle: React.Dispatch<React.SetStateAction<boolean>> = useCallback(
+  const handleModalToggle: Dispatch<SetStateAction<boolean>> = useCallback(
     (value) => {
       setIsNewChatOpen((previous) => {
         const nextValue = typeof value === "function" ? value(previous) : value;
@@ -160,7 +174,10 @@ const MessagesClient = () => {
   );
 
   const selectedThread = threadMessagesQuery.data;
-  const availableMembers = directoryQuery.data?.members ?? [];
+  const availableMembers = useMemo(
+    () => directoryQuery.data?.members ?? [],
+    [directoryQuery.data?.members],
+  );
   const viewerId = selectedThread?.viewerId ?? directoryQuery.data?.viewerId ?? null;
   const shareableParticipantIds = useMemo(
     () => (viewerId ? participantIds.filter((id) => id !== viewerId) : participantIds),
@@ -220,6 +237,61 @@ const MessagesClient = () => {
   const isComposerDisabled =
     sendMessage.isPending || !composerValue.trim() || !resolvedThreadId;
 
+  const invalidateThreadList = useCallback(() => {
+    void utils.message.list.invalidate();
+  }, [utils]);
+
+  const refreshThreadMessages = useCallback(
+    (threadId: string) => {
+      void utils.message.threadMessages.invalidate({ threadId });
+    },
+    [utils],
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+    const setupSocket = async () => {
+      try {
+        await fetch("/api/socket");
+      } catch (error) {
+        console.error("Socket init failed", error);
+        return;
+      }
+      if (!isMounted) return;
+      const socket = io({
+        path: "/api/socket_io",
+      });
+      socketRef.current = socket;
+
+      socket.on("connect_error", (error) => {
+        console.error("Socket error", error.message);
+      });
+      socket.on("thread:created", invalidateThreadList);
+      socket.on("thread:updated", invalidateThreadList);
+      socket.on("message:new", (payload: { threadId: string }) => {
+        if (payload?.threadId) {
+          refreshThreadMessages(payload.threadId);
+        }
+        invalidateThreadList();
+      });
+    };
+
+    void setupSocket();
+
+    return () => {
+      isMounted = false;
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+    };
+  }, [invalidateThreadList, refreshThreadMessages]);
+
+  useEffect(() => {
+    if (!socketRef.current || !resolvedThreadId) {
+      return;
+    }
+    socketRef.current.emit("thread:subscribe", { threadId: resolvedThreadId });
+  }, [resolvedThreadId]);
+
   return (
     <>
       <section className="grid gap-6 lg:grid-cols-[320px,1fr]">
@@ -229,7 +301,7 @@ const MessagesClient = () => {
             <Button
               theme="secondary"
               className="px-3 py-1 text-xs font-semibold"
-              onClick={() => setIsNewChatOpen(true)}
+              onClick={() => handleModalToggle(true)}
             >
               <RiUserAddLine className="mr-1" />
               Start chat
@@ -362,15 +434,17 @@ const MessagesClient = () => {
                       }`}
                     >
                       <div
-                        className={`max-w-3xl rounded-3xl px-5 py-2 text-sm leading-relaxed ${
-                          viewerId && message.senderId === viewerId
-                            ? "bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 text-white shadow-lg shadow-indigo-500/30"
-                            : "border border-slate-100 bg-white text-slate-700 shadow dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-                        }`}
+                        className={`max-w-3xl rounded px-5 py-2 text-sm leading-relaxed min-w-[200px]`}
                       >
-                        <div className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wide">
+                        <div className={`flex items-center ${viewerId && message.senderId === viewerId ? "justify-end" : "justify-start"} gap-3 text-xs font-semibold uppercase tracking-wide`}>
                           <span>{message.senderName}</span>
-                          <span
+                        </div>
+                        <p className={`mt-2 px-2 py-1 rounded whitespace-pre-line shadow-lg shadow-indigo-500/30 ${
+                          viewerId && message.senderId === viewerId
+                            ? "bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 text-white"
+                            : "border border-slate-100 bg-white text-slate-700 shadow dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                        }`}>{message.body}</p>
+                        <span
                             className={
                               viewerId && message.senderId === viewerId
                                 ? "text-white/80"
@@ -379,8 +453,6 @@ const MessagesClient = () => {
                           >
                             {formatMessageTimestamp(message.createdAt)}
                           </span>
-                        </div>
-                        <p className="mt-2 whitespace-pre-line">{message.body}</p>
                       </div>
                     </div>
                   ))
