@@ -107,6 +107,7 @@ model Organization {
   updatedAt DateTime @updatedAt
 
   users             User[]
+  threads           Thread[]
   departments       Department[]
   employmentDetails EmploymentDetail[]
   teams             Team[]
@@ -156,6 +157,9 @@ model User {
   passwordResetTokens   PasswordResetToken[]
   invitationTokens      InvitationToken[]
   notificationReceipts  NotificationReceipt[]
+  threadMemberships     ThreadParticipant[]
+  chatMessages          ChatMessage[]
+  createdThreads        Thread[]              @relation("ThreadCreator")
   invitedBy             User?                 @relation("UserInvitations", fields: [invitedById], references: [id], onDelete: SetNull)
   invitedUsers          User[]                @relation("UserInvitations")
 
@@ -509,6 +513,55 @@ model NotificationReceipt {
 
   @@unique([notificationId, userId])
   @@index([userId])
+}
+
+model Thread {
+  id              String              @id @default(uuid())
+  organizationId  String
+  createdById     String
+  title           String?
+  isPrivate       Boolean             @default(true)
+  lastMessageAt   DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  createdBy   User          @relation("ThreadCreator", fields: [createdById], references: [id])
+  messages    ChatMessage[]
+  participants ThreadParticipant[]
+
+  @@index([organizationId])
+  @@index([createdById])
+  @@index([organizationId, lastMessageAt])
+}
+
+model ThreadParticipant {
+  id        String   @id @default(uuid())
+  threadId  String
+  userId    String
+  joinedAt  DateTime @default(now())
+  lastReadAt DateTime?
+
+  thread Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+  @@index([userId])
+  @@index([threadId])
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  threadId  String
+  senderId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  thread Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender User   @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@index([senderId])
 }
 
 model Holiday {

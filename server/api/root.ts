@@ -15,6 +15,7 @@ import { teamRouter } from "@/server/modules/team/team.route";
 import { reportRouter } from "@/server/modules/report/report.route";
 import { hrReportRouter } from "@/server/modules/hr/reports/reports.route";
 import { notificationRouter } from "@/server/modules/notification/notification.route";
+import { messageRouter } from "@/server/modules/messages/message.route";
 
 export const appRouter = createTRPCRouter({
   health: healthRouter,
@@ -26,6 +27,7 @@ export const appRouter = createTRPCRouter({
   team: teamRouter,
   report: reportRouter,
   notification: notificationRouter,
+  message: messageRouter,
   hrEmployees: hrEmployeesRouter,
   hrAttendance: hrAttendanceRouter,
   hrLeave: hrLeaveRouter,

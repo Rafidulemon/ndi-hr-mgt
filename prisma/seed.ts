@@ -8,6 +8,7 @@ import { seedNotifications } from "./seeds/notification";
 import { seedProjects } from "./seeds/project";
 import { seedReports } from "./seeds/report";
 import { seedUsers } from "./seeds/user";
+import { seedChat } from "./seeds/chat";
 
 const prisma = new PrismaClient();
 
@@ -84,6 +85,7 @@ async function main() {
     await seedAttendance(prisma);
     await seedLeaveRequests(prisma);
     await seedNotifications(prisma);
+    await seedChat(prisma);
     baseSeeded = true;
     console.log("Seeded organizations, people, attendance, projects, leave, and notifications.");
   } else {
@@ -91,6 +93,10 @@ async function main() {
   }
 
   await seedReports(prisma);
+
+  if (!baseSeeded) {
+    await seedChat(prisma);
+  }
 
   if (!baseSeeded) {
     console.log("Reports seeding executed against existing data set.");
