@@ -7,11 +7,13 @@ import CustomDatePicker from "@/app/components/atoms/inputs/DatePicker";
 import { trpc } from "@/trpc/client";
 import type { HrAttendanceCalendarSignal, HrAttendanceStatus } from "@/types/hr-attendance";
 
+type ManualWorkType = "REMOTE" | "ONSITE";
+
 type ManualFormState = {
   employeeId: string;
   checkIn: string;
   checkOut: string;
-  status: HrAttendanceStatus;
+  workType: ManualWorkType;
 };
 
 type DaySignal = HrAttendanceCalendarSignal;
@@ -37,6 +39,11 @@ const statusColorScale: Record<HrAttendanceStatus, string> = {
 };
 
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const manualWorkTypeLabels: Record<ManualWorkType, string> = {
+  ONSITE: "On-site",
+  REMOTE: "Remote",
+};
 
 const formatDateKey = (date: Date) =>
   new Intl.DateTimeFormat("en-CA", {
@@ -144,7 +151,7 @@ export default function HrAdminAttendancePage() {
     employeeId: "",
     checkIn: "",
     checkOut: "",
-    status: "On time",
+    workType: "ONSITE",
   });
   const [formFeedback, setFormFeedback] = useState<string | null>(null);
   const [logFilters, setLogFilters] = useState<LogFilters>({ query: "", status: "all" });
@@ -297,7 +304,7 @@ export default function HrAdminAttendancePage() {
           year: historyMonth.getFullYear(),
         });
       }
-      setManualForm((prev) => ({ ...prev, checkIn: "", checkOut: "", status: "On time" }));
+      setManualForm((prev) => ({ ...prev, checkIn: "", checkOut: "" }));
     },
     onError: (error) => {
       setFormFeedback(error.message || "Unable to save manual attendance.");
@@ -387,13 +394,17 @@ export default function HrAdminAttendancePage() {
     if (!resolvedManualEmployeeId || !manualDate || manualEntryMutation.isPending) {
       return;
     }
+    if (!manualForm.checkIn) {
+      setFormFeedback("Check-in time is required to log attendance.");
+      return;
+    }
 
     await manualEntryMutation.mutateAsync({
       employeeId: resolvedManualEmployeeId,
       date: formatDateKey(manualDate),
-      checkIn: manualForm.checkIn || undefined,
+      checkIn: manualForm.checkIn,
       checkOut: manualForm.checkOut || undefined,
-      status: manualForm.status,
+      workType: manualForm.workType,
     });
   };
 
@@ -979,8 +990,12 @@ export default function HrAdminAttendancePage() {
               onChange={(event) =>
                 setManualForm((prev) => ({ ...prev, checkIn: event.target.value }))
               }
+              required
               className="mt-2 h-[46px] rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
+            <span className="mt-1 text-xs font-normal text-slate-500 dark:text-slate-400">
+              Status is inferred from this time against the selected work type.
+            </span>
           </label>
 
           <label className="flex flex-col text-sm font-semibold text-slate-600 dark:text-slate-300">
@@ -996,22 +1011,26 @@ export default function HrAdminAttendancePage() {
           </label>
 
           <label className="flex flex-col text-sm font-semibold text-slate-600 dark:text-slate-300">
-            Status
+            Work type
             <select
               className="mt-2 h-[46px] rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              value={manualForm.status}
+              value={manualForm.workType}
               onChange={(event) =>
                 setManualForm((prev) => ({
                   ...prev,
-                  status: event.target.value as HrAttendanceStatus,
+                  workType: event.target.value as ManualWorkType,
                 }))
               }
             >
-              <option value="On time">On time</option>
-              <option value="Late">Late</option>
-              <option value="On leave">On leave</option>
-              <option value="Absent">Absent</option>
+              {Object.entries(manualWorkTypeLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </select>
+            <span className="mt-1 text-xs font-normal text-slate-500 dark:text-slate-400">
+              Determines whether onsite or remote start time thresholds apply.
+            </span>
           </label>
 
           <div className="md:col-span-2 lg:col-span-4">

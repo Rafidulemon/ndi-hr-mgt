@@ -471,13 +471,11 @@ const LeftMenu = ({
             </li>
         </ul>
         {canAccessHrAdmin && (
-          <div className="mt-4 rounded-2xl border border-slate-200/70 bg-slate-50/80 p-3 dark:border-slate-700/80 dark:bg-slate-800/60">
-            <p className="px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Admin Tools
-            </p>
+          <div className="mt-4 rounded-2xl border border-slate-200/70 bg-slate-50/80 rounded dark:border-slate-700/80 dark:bg-slate-800/60">
             <Link
               href="/hr-admin"
-              className={`${getNavClasses(isRouteActive("/hr-admin"))} mt-3`}
+              target="_blank"
+              className={`${getNavClasses(isRouteActive("/hr-admin"))}`}
             >
               <MdOutlineAdminPanelSettings className="text-lg" />
               <span className="text-[16px] font-semibold">

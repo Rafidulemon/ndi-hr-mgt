@@ -12,6 +12,7 @@ import { trpc } from "@/trpc/client";
 import { Card } from "@/app/components/atoms/frame/Card";
 
 const STORAGE_KEY = "ndi.attendance.timer.v1";
+const MAX_WORK_SECONDS = 8 * 60 * 60;
 
 const backendStatuses = [
   "PRESENT",
@@ -259,6 +260,7 @@ function AttendancePage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<WorkLocationChoice | null>(null);
   const stateRef = useRef<TimerState>(timerState);
+  const completionInFlightRef = useRef(false);
   const startDayMutation = trpc.attendance.startDay.useMutation();
   const completeDayMutation = trpc.attendance.completeDay.useMutation();
   const todayAttendanceQuery = trpc.attendance.today.useQuery(undefined, {
@@ -568,20 +570,20 @@ function AttendancePage() {
     });
   };
 
-  const handleLeave = async () => {
-    if (completeDayMutation.isPending) {
+  const finalizeAndSubmitAttendance = useCallback(async () => {
+    if (completeDayMutation.isPending || completionInFlightRef.current) {
       return;
     }
 
-    setIsLeaveModalOpen(false);
-    const nowTimestamp = Date.now();
     const currentState = stateRef.current;
-
     if (!currentState.hasStarted || currentState.isLeaved) {
       return;
     }
 
-    const finalWorkSeconds = finalizeWorkSeconds(currentState, nowTimestamp);
+    completionInFlightRef.current = true;
+    const nowTimestamp = Date.now();
+    const rawWorkSeconds = finalizeWorkSeconds(currentState, nowTimestamp);
+    const finalWorkSeconds = Math.min(Math.max(0, rawWorkSeconds), MAX_WORK_SECONDS);
     const finalBreakSeconds = finalizeBreakSeconds(currentState, nowTimestamp);
 
     updateTimerState((prev) => {
@@ -610,8 +612,28 @@ function AttendancePage() {
       const message =
         error instanceof Error ? error.message : "Failed to complete attendance.";
       setActionError(message);
+    } finally {
+      completionInFlightRef.current = false;
     }
+  }, [completeDayMutation, todayAttendanceQuery, updateTimerState]);
+
+  const handleLeave = async () => {
+    if (completeDayMutation.isPending) {
+      return;
+    }
+    setIsLeaveModalOpen(false);
+    await finalizeAndSubmitAttendance();
   };
+
+  useEffect(() => {
+    if (!stateRef.current.hasStarted || stateRef.current.isLeaved) {
+      return;
+    }
+    if (workDisplaySeconds < MAX_WORK_SECONDS) {
+      return;
+    }
+    void finalizeAndSubmitAttendance();
+  }, [finalizeAndSubmitAttendance, workDisplaySeconds]);
 
   const isStarted = timerState.hasStarted;
   const isOnBreak = timerState.isOnBreak;

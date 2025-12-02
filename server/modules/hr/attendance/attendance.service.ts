@@ -56,18 +56,8 @@ const hrStatusByAttendance: Record<AttendanceStatus, HrAttendanceStatus> = {
   [AttendanceStatus.HOLIDAY]: "On leave",
 };
 
-const attendanceStatusByHr: Record<HrAttendanceStatus, AttendanceStatus> = {
-  "On time": AttendanceStatus.PRESENT,
-  Late: AttendanceStatus.LATE,
-  "On leave": AttendanceStatus.HOLIDAY,
-  Absent: AttendanceStatus.ABSENT,
-};
-
 const toHrStatus = (status: AttendanceStatus): HrAttendanceStatus =>
   hrStatusByAttendance[status] ?? "On time";
-
-const toAttendanceStatus = (status: HrAttendanceStatus): AttendanceStatus =>
-  attendanceStatusByHr[status] ?? AttendanceStatus.PRESENT;
 
 const emptyStatusCounts = (): HrAttendanceStatusCounts => ({
   "On time": 0,
@@ -75,6 +65,128 @@ const emptyStatusCounts = (): HrAttendanceStatusCounts => ({
   "On leave": 0,
   Absent: 0,
 });
+
+const DEFAULT_POLICY_TIMINGS = {
+  onsiteStartTime: "09:00",
+  remoteStartTime: "08:00",
+} as const;
+
+const LATE_TOLERANCE_MS = 10 * 60 * 1000;
+
+const WORK_TYPE_LABELS: Record<HrAttendanceManualEntryInput["workType"], string> = {
+  REMOTE: "Remote",
+  ONSITE: "On-site",
+};
+
+const buildScheduledStartForWorkType = (
+  workType: HrAttendanceManualEntryInput["workType"],
+  timings: PolicyTimings,
+  reference: Date,
+) =>
+  workType === "REMOTE"
+    ? buildScheduledStart(
+        timings.remoteStartTime,
+        DEFAULT_POLICY_TIMINGS.remoteStartTime,
+        reference,
+      )
+    : buildScheduledStart(
+        timings.onsiteStartTime,
+        DEFAULT_POLICY_TIMINGS.onsiteStartTime,
+        reference,
+      );
+
+const resolveStatusFromCheckIn = (
+  checkInAt: Date | null,
+  attendanceDate: Date,
+  workType: HrAttendanceManualEntryInput["workType"],
+  timings: PolicyTimings,
+) => {
+  if (!checkInAt) {
+    return AttendanceStatus.PRESENT;
+  }
+  const reference = checkInAt ?? attendanceDate;
+  const scheduledStart = buildScheduledStartForWorkType(workType, timings, reference);
+  return checkInAt.getTime() > scheduledStart.getTime() + LATE_TOLERANCE_MS
+    ? AttendanceStatus.LATE
+    : AttendanceStatus.PRESENT;
+};
+
+type PolicyTimings = {
+  onsiteStartTime: string;
+  remoteStartTime: string;
+};
+
+const resolvePolicyTimings = (
+  policy?: { onsiteStartTime: string; remoteStartTime: string } | null,
+): PolicyTimings => ({
+  onsiteStartTime: policy?.onsiteStartTime ?? DEFAULT_POLICY_TIMINGS.onsiteStartTime,
+  remoteStartTime: policy?.remoteStartTime ?? DEFAULT_POLICY_TIMINGS.remoteStartTime,
+});
+
+const buildScheduledStart = (timeValue: string, fallbackValue: string, reference: Date) => {
+  const scheduled = new Date(reference);
+  const [hourStr, minuteStr] = timeValue.split(":");
+  const hour = Number.parseInt(hourStr ?? "", 10);
+  const minute = Number.parseInt(minuteStr ?? "", 10);
+
+  if (Number.isNaN(hour) || Number.isNaN(minute)) {
+    const [fallbackHourStr, fallbackMinuteStr] = fallbackValue.split(":");
+    const fallbackHour = Number.parseInt(fallbackHourStr ?? "", 10) || 0;
+    const fallbackMinute = Number.parseInt(fallbackMinuteStr ?? "", 10) || 0;
+    scheduled.setHours(fallbackHour, fallbackMinute, 0, 0);
+    return scheduled;
+  }
+
+  scheduled.setHours(hour, minute, 0, 0);
+  return scheduled;
+};
+
+const inferWorkType = (
+  record: Pick<AttendanceRecordWithEmployee, "status" | "location">,
+): "REMOTE" | "ONSITE" => {
+  if (record.status === AttendanceStatus.REMOTE) {
+    return "REMOTE";
+  }
+  const normalized = record.location?.toLowerCase().trim() ?? "";
+  if (normalized.includes("remote")) {
+    return "REMOTE";
+  }
+  return "ONSITE";
+};
+
+const resolveScheduledStartForRecord = (
+  record: AttendanceRecordWithEmployee,
+  timings: PolicyTimings,
+) => {
+  const reference = record.checkInAt ?? record.attendanceDate;
+  const workType = inferWorkType(record);
+  return workType === "REMOTE"
+    ? buildScheduledStart(
+        timings.remoteStartTime,
+        DEFAULT_POLICY_TIMINGS.remoteStartTime,
+        reference,
+      )
+    : buildScheduledStart(
+        timings.onsiteStartTime,
+        DEFAULT_POLICY_TIMINGS.onsiteStartTime,
+        reference,
+      );
+};
+
+const resolveHrStatusWithPolicy = (
+  record: AttendanceRecordWithEmployee,
+  timings?: PolicyTimings | null,
+): HrAttendanceStatus => {
+  const baseStatus = toHrStatus(record.status);
+  if (!timings || baseStatus !== "On time" || !record.checkInAt) {
+    return baseStatus;
+  }
+  const scheduledStart = resolveScheduledStartForRecord(record, timings);
+  if (record.checkInAt.getTime() > scheduledStart.getTime() + LATE_TOLERANCE_MS) {
+    return "Late";
+  }
+  return baseStatus;
+};
 
 const isManualSource = (source?: string | null) =>
   source ? source.toLowerCase().includes("manual") : false;
@@ -101,6 +213,7 @@ const attendanceRecordSelect = {
   checkOutAt: true,
   status: true,
   source: true,
+  location: true,
   employee: {
     select: {
       id: true,
@@ -129,7 +242,10 @@ type AttendanceRecordWithEmployee = Prisma.AttendanceRecordGetPayload<{
   select: typeof attendanceRecordSelect;
 }>;
 
-const mapLog = (record: AttendanceRecordWithEmployee): HrAttendanceLog => ({
+const mapLog = (
+  record: AttendanceRecordWithEmployee,
+  timings?: PolicyTimings | null,
+): HrAttendanceLog => ({
   id: record.id,
   employeeId: record.employeeId,
   name: formatEmployeeName({
@@ -141,7 +257,7 @@ const mapLog = (record: AttendanceRecordWithEmployee): HrAttendanceLog => ({
   squad: record.employee.employment?.team?.name ?? null,
   checkIn: formatTimeLabel(record.checkInAt),
   checkOut: formatTimeLabel(record.checkOutAt),
-  status: toHrStatus(record.status),
+  status: resolveHrStatusWithPolicy(record, timings),
   source: isManualSource(record.source) ? "Manual" : "System",
 });
 
@@ -149,12 +265,13 @@ const buildCalendar = (
   monthStart: Date,
   monthEnd: Date,
   records: AttendanceRecordWithEmployee[],
+  timings?: PolicyTimings | null,
 ): HrAttendanceCalendarDay[] => {
   const statusByDate = new Map<string, Set<HrAttendanceStatus>>();
 
   records.forEach((record) => {
     const dateKey = formatDateKey(record.attendanceDate);
-    const status = toHrStatus(record.status);
+    const status = resolveHrStatusWithPolicy(record, timings);
     const collection = statusByDate.get(dateKey) ?? new Set<HrAttendanceStatus>();
     collection.add(status);
     statusByDate.set(dateKey, collection);
@@ -188,12 +305,13 @@ const buildWeeklyTrend = (
   days: number,
   records: AttendanceRecordWithEmployee[],
   totalEmployees: number,
+  timings?: PolicyTimings | null,
 ): HrAttendanceWeeklyTrendPoint[] => {
   const presentByDate = new Map<string, number>();
 
   records.forEach((record) => {
     const key = formatDateKey(record.attendanceDate);
-    const status = toHrStatus(record.status);
+    const status = resolveHrStatusWithPolicy(record, timings);
     if (status === "On time") {
       presentByDate.set(key, (presentByDate.get(key) ?? 0) + 1);
     }
@@ -437,7 +555,7 @@ export const hrAttendanceService = {
     const trendStart = startOfDay(addDays(targetDate, -(trendDays - 1)));
     const trendEnd = addDays(targetDate, 1);
 
-    const [employees, dayRecords, monthRecords, trendRecords] = await Promise.all([
+    const [employees, dayRecords, monthRecords, trendRecords, policyRecord] = await Promise.all([
       ctx.prisma.user.findMany({
         where: {
           organizationId,
@@ -513,21 +631,30 @@ export const hrAttendanceService = {
         },
         select: attendanceRecordSelect,
       }),
+      ctx.prisma.workPolicy.findUnique({
+        where: { organizationId },
+        select: {
+          onsiteStartTime: true,
+          remoteStartTime: true,
+        },
+      }),
     ]);
 
     const employeesOptions = buildEmployees(employees);
-    const dayLogs = dayRecords.map(mapLog);
+    const policyTimings = resolvePolicyTimings(policyRecord);
+    const dayLogs = dayRecords.map((record) => mapLog(record, policyTimings));
     const statusCounts = dayLogs.reduce((acc, log) => {
       acc[log.status] += 1;
       return acc;
     }, emptyStatusCounts());
 
-    const calendar = buildCalendar(monthStart, monthEnd, monthRecords);
+    const calendar = buildCalendar(monthStart, monthEnd, monthRecords, policyTimings);
     const weeklyTrend = buildWeeklyTrend(
       trendStart,
       trendDays,
       trendRecords,
       employeesOptions.length,
+      policyTimings,
     );
 
     return {
@@ -547,22 +674,33 @@ export const hrAttendanceService = {
     const monthStart = new Date(input.year, input.month, 1);
     const monthEnd = new Date(input.year, input.month + 1, 1);
 
-    const rows = await ctx.prisma.attendanceRecord.findMany({
-      where: {
-        employeeId: input.employeeId,
-        attendanceDate: {
-          gte: monthStart,
-          lt: monthEnd,
+    const [rows, policyRecord] = await Promise.all([
+      ctx.prisma.attendanceRecord.findMany({
+        where: {
+          employeeId: input.employeeId,
+          attendanceDate: {
+            gte: monthStart,
+            lt: monthEnd,
+          },
+          employee: {
+            organizationId,
+          },
         },
-        employee: {
-          organizationId,
+        orderBy: {
+          attendanceDate: "desc",
         },
-      },
-      orderBy: {
-        attendanceDate: "desc",
-      },
-      select: attendanceRecordSelect,
-    });
+        select: attendanceRecordSelect,
+      }),
+      ctx.prisma.workPolicy.findUnique({
+        where: { organizationId },
+        select: {
+          onsiteStartTime: true,
+          remoteStartTime: true,
+        },
+      }),
+    ]);
+
+    const policyTimings = resolvePolicyTimings(policyRecord);
 
     return {
       employeeId: input.employeeId,
@@ -572,7 +710,7 @@ export const hrAttendanceService = {
         date: formatDateKey(record.attendanceDate),
         checkIn: formatTimeLabel(record.checkInAt),
         checkOut: formatTimeLabel(record.checkOutAt),
-        status: toHrStatus(record.status),
+        status: resolveHrStatusWithPolicy(record, policyTimings),
         source: isManualSource(record.source) ? "Manual" : "System",
       })),
     };
@@ -583,25 +721,34 @@ export const hrAttendanceService = {
     const organizationId = sessionUser.organizationId;
     const attendanceDate = startOfDay(parseDateOrThrow(input.date, "Invalid date provided."));
 
-    const employee = await ctx.prisma.user.findFirst({
-      where: {
-        id: input.employeeId,
-        organizationId,
-      },
-      select: {
-        id: true,
-        employment: {
-          select: {
-            primaryLocation: true,
+    const [employee, policyRecord] = await Promise.all([
+      ctx.prisma.user.findFirst({
+        where: {
+          id: input.employeeId,
+          organizationId,
+        },
+        select: {
+          id: true,
+          employment: {
+            select: {
+              primaryLocation: true,
+            },
+          },
+          organization: {
+            select: {
+              timezone: true,
+            },
           },
         },
-        organization: {
-          select: {
-            timezone: true,
-          },
+      }),
+      ctx.prisma.workPolicy.findUnique({
+        where: { organizationId },
+        select: {
+          onsiteStartTime: true,
+          remoteStartTime: true,
         },
-      },
-    });
+      }),
+    ]);
 
     if (!employee) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
@@ -619,6 +766,9 @@ export const hrAttendanceService = {
       timeZone: locationTimeZone,
     });
     const totalWorkSeconds = calculateTotalSeconds(checkInAt, checkOutAt);
+    const locationLabel = WORK_TYPE_LABELS[input.workType];
+    const policyTimings = resolvePolicyTimings(policyRecord);
+    const attendanceStatus = resolveStatusFromCheckIn(checkInAt, attendanceDate, input.workType, policyTimings);
 
     const record = await ctx.prisma.attendanceRecord.upsert({
       where: {
@@ -631,8 +781,9 @@ export const hrAttendanceService = {
         checkInAt,
         checkOutAt,
         totalWorkSeconds: totalWorkSeconds ?? undefined,
-        status: toAttendanceStatus(input.status),
+        status: attendanceStatus,
         source: "HR_MANUAL",
+        location: locationLabel,
       },
       create: {
         employeeId: input.employeeId,
@@ -640,12 +791,13 @@ export const hrAttendanceService = {
         checkInAt,
         checkOutAt,
         totalWorkSeconds: totalWorkSeconds ?? undefined,
-        status: toAttendanceStatus(input.status),
+        status: attendanceStatus,
         source: "HR_MANUAL",
+        location: locationLabel,
       },
       select: attendanceRecordSelect,
     });
 
-    return mapLog(record);
+    return mapLog(record, policyTimings);
   },
 };

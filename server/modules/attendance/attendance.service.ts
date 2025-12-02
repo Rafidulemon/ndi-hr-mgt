@@ -56,6 +56,7 @@ const LOCATION_LABELS: Record<StartDayInput["location"], string> = {
 };
 
 const LATE_TOLERANCE_MS = 10 * 60 * 1000;
+const MAX_DAILY_WORK_SECONDS = 8 * 60 * 60;
 
 type PolicyTimings = {
   onsiteStartTime: string;
@@ -244,11 +245,13 @@ export const attendanceService = {
       });
     }
 
+    const sanitizedWorkSeconds = Math.max(0, Math.min(input.workSeconds, MAX_DAILY_WORK_SECONDS));
+
     const updated = await prisma.attendanceRecord.update({
       where: { id: activeRecord.id },
       data: {
         checkOutAt: new Date(),
-        totalWorkSeconds: input.workSeconds,
+        totalWorkSeconds: sanitizedWorkSeconds,
         totalBreakSeconds: input.breakSeconds,
       },
     });
