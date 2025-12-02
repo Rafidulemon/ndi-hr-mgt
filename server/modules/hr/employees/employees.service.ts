@@ -279,6 +279,8 @@ const employeeDetailSelect = {
       sickLeaveBalance: true,
       annualLeaveBalance: true,
       parentalLeaveBalance: true,
+      grossSalary: true,
+      incomeTax: true,
     },
   },
   emergencyContacts: {
@@ -653,6 +655,14 @@ const employmentStatusFromLabel = (status: EmployeeStatus): EmploymentStatus => 
 const decimalToNumber = (value?: Prisma.Decimal | null) =>
   value ? Number(value) : 0;
 
+const parseMoneyInput = (value?: number | null) => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return null;
+  }
+  const normalized = Math.max(0, value);
+  return Number(normalized.toFixed(2));
+};
+
 const findEmploymentTypeByLabel = (label?: string | null) => {
   if (!label) {
     return EmploymentType.FULL_TIME;
@@ -782,6 +792,8 @@ const mapEmployeeForm = (record: EmployeeDetailRecord): HrEmployeeForm => {
       casual: decimalToNumber(employment?.casualLeaveBalance),
       parental: decimalToNumber(employment?.parentalLeaveBalance),
     },
+    grossSalary: decimalToNumber(employment?.grossSalary),
+    incomeTax: decimalToNumber(employment?.incomeTax),
   };
 };
 
@@ -964,6 +976,9 @@ export const hrEmployeesService = {
       parsedStartDate = candidate;
     }
 
+    const grossSalary = parseMoneyInput(input.grossSalary);
+    const incomeTax = parseMoneyInput(input.incomeTax);
+
     await ctx.prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: input.employeeId },
@@ -995,6 +1010,8 @@ export const hrEmployeesService = {
           startDate: parsedStartDate ?? undefined,
           departmentId,
           status: employmentStatus,
+          ...(grossSalary !== null ? { grossSalary } : {}),
+          ...(incomeTax !== null ? { incomeTax } : {}),
         },
       });
 

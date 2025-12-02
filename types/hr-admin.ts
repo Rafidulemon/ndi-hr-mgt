@@ -138,6 +138,8 @@ export type HrEmployeeForm = {
   emergencyContact: HrEmployeeEmergencyContact | null;
   profilePhotoUrl: string | null;
   leaveBalances: HrEmployeeLeaveBalances;
+  grossSalary: number;
+  incomeTax: number;
 };
 
 export type HrEmployeeFormResponse = {
@@ -162,6 +164,8 @@ export type HrEmployeeUpdateInput = {
   emergencyName?: string | null;
   emergencyPhone?: string | null;
   emergencyRelation?: string | null;
+  grossSalary?: number | null;
+  incomeTax?: number | null;
 };
 
 export type HrEmployeeLeaveQuotaUpdateInput = {

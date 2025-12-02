@@ -96,6 +96,12 @@ enum NotificationAudience {
   INDIVIDUAL
 }
 
+enum InvoiceStatus {
+  DRAFT
+  PENDING_REVIEW
+  READY_TO_DELIVER
+}
+
 /// Top-level organisation/workspace that owns employees and policies.
 model Organization {
   id        String   @id @default(uuid())
@@ -117,6 +123,7 @@ model Organization {
   dailyReports      DailyReport[]
   monthlyReports    MonthlyReport[]
   workPolicy        WorkPolicy?
+  invoices          Invoice[]
 
   @@index([name])
 }
@@ -162,6 +169,8 @@ model User {
   createdThreads        Thread[]              @relation("ThreadCreator")
   invitedBy             User?                 @relation("UserInvitations", fields: [invitedById], references: [id], onDelete: SetNull)
   invitedUsers          User[]                @relation("UserInvitations")
+  receivedInvoices      Invoice[]             @relation("EmployeeInvoices")
+  issuedInvoices        Invoice[]             @relation("HrInvoiceCreator")
 
   @@index([organizationId])
   @@index([invitedById])
@@ -290,6 +299,8 @@ model EmploymentDetail {
   sickLeaveBalance     Decimal          @default(0) @db.Decimal(5, 2)
   annualLeaveBalance   Decimal          @default(0) @db.Decimal(5, 2)
   parentalLeaveBalance Decimal          @default(0) @db.Decimal(5, 2)
+  grossSalary          Decimal          @default(0) @db.Decimal(12, 2)
+  incomeTax            Decimal          @default(0) @db.Decimal(12, 2)
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
@@ -513,6 +524,52 @@ model NotificationReceipt {
 
   @@unique([notificationId, userId])
   @@index([userId])
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  organizationId String
+  employeeId     String
+  createdById    String
+  title          String
+  periodMonth    Int
+  periodYear     Int
+  dueDate        DateTime?
+  currency       String        @default("USD")
+  subtotal       Decimal       @db.Decimal(12, 2)
+  tax            Decimal       @db.Decimal(12, 2)
+  total          Decimal       @db.Decimal(12, 2)
+  notes          String?
+  status         InvoiceStatus @default(DRAFT)
+  sentAt         DateTime?
+  confirmedAt    DateTime?
+  readyAt        DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee     User         @relation("EmployeeInvoices", fields: [employeeId], references: [id], onDelete: Cascade)
+  creator      User         @relation("HrInvoiceCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  items        InvoiceItem[]
+
+  @@index([organizationId])
+  @@index([employeeId])
+  @@index([createdById])
+  @@index([status])
+}
+
+model InvoiceItem {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  description String
+  quantity    Int      @default(1)
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  amount      Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
 }
 
 model Thread {

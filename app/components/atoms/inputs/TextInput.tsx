@@ -17,6 +17,7 @@ type Props = {
   readOnly?: boolean;
   disabled?: boolean;
   type?: string;
+  step?: string | number;
 };
 
 function TextInput(props: Props) {
@@ -36,6 +37,7 @@ function TextInput(props: Props) {
     disabled = false,
     type = "text",
     registerOptions,
+    step,
   } = props;
 
   return (
@@ -61,6 +63,7 @@ function TextInput(props: Props) {
         onChange={onChange}
         readOnly={readOnly}
         disabled={disabled}
+        step={step}
         {...register?.(name, registerOptions)}
       />
       {error && (

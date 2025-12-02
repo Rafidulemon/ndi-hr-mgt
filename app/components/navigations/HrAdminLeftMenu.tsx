@@ -8,7 +8,6 @@ import { signOut } from "next-auth/react";
 import type { ReactNode } from "react";
 import type { UserRole } from "@prisma/client";
 import { BiLogOut } from "react-icons/bi";
-import { FiSettings } from "react-icons/fi";
 import { MdOutlineDashboard } from "react-icons/md";
 import {
   FaBell,
@@ -19,6 +18,7 @@ import {
   FaUser,
   FaUsers,
   FaSitemap,
+  FaFileInvoice,
 } from "react-icons/fa";
 import { TbReportAnalytics } from "react-icons/tb";
 
@@ -37,8 +37,8 @@ type MenuItem = {
     | "attendance"
     | "leave"
     | "alerts"
-    | "settings"
-    | "messages";
+    | "messages"
+    | "invoices";
   label: string;
   icon: ReactNode;
   href?: string;
@@ -96,6 +96,12 @@ const hrMenuItems: MenuItem[] = [
     href: "/hr-admin/leave-approvals",
   },
   {
+    id: "invoices",
+    label: "Invoice Management",
+    icon: <FaFileInvoice />,
+    href: "/hr-admin/invoices",
+  },
+  {
     id: "reports",
     label: "Reports & Analytics",
     icon: <TbReportAnalytics />,
@@ -112,12 +118,6 @@ const hrMenuItems: MenuItem[] = [
     label: "Announcements",
     icon: <FaBell />,
     href: "/hr-admin/announcements",
-  },
-  {
-    id: "settings",
-    label: "HR Settings",
-    icon: <FiSettings />,
-    href: "/hr-admin/settings",
   },
 ];
 

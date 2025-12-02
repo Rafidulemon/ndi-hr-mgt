@@ -1,0 +1,579 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
+import Button from "@/app/components/atoms/buttons/Button";
+import TextInput from "@/app/components/atoms/inputs/TextInput";
+import TextArea from "@/app/components/atoms/inputs/TextArea";
+import SelectBox from "@/app/components/atoms/selectBox/SelectBox";
+import CustomDatePicker from "@/app/components/atoms/inputs/DatePicker";
+import { Modal } from "@/app/components/atoms/frame/Modal";
+import LoadingSpinner from "@/app/components/LoadingSpinner";
+import { InvoiceDetailCard } from "@/app/components/invoices/InvoiceDetailCard";
+
+import { trpc } from "@/trpc/client";
+
+type LineItemKind = "EARNING" | "DEDUCTION";
+
+type LineItem = {
+  id: string;
+  kind: LineItemKind;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+};
+
+const monthOptions = Array.from({ length: 12 }, (_, index) => ({
+  label: new Intl.DateTimeFormat("en-US", { month: "long" }).format(new Date(2020, index, 1)),
+  value: String(index + 1),
+}));
+
+const currentYear = new Date().getFullYear();
+const yearOptions = Array.from({ length: 5 }, (_, index) => ({
+  label: String(currentYear + index),
+  value: String(currentYear + index),
+}));
+
+const DEFAULT_CURRENCY = "BDT";
+const LUNCH_DAILY_RATE = 400;
+const payrollDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+});
+
+const formatPayrollRange = (start: Date, end: Date) =>
+  `${payrollDateFormatter.format(start)} – ${payrollDateFormatter.format(end)}`;
+
+const getPayrollWindow = (periodMonth: number, periodYear: number) => {
+  const now = new Date();
+  const normalizedMonth = Number.isFinite(periodMonth) && periodMonth >= 1 ? periodMonth : now.getMonth() + 1;
+  const normalizedYear = Number.isFinite(periodYear) ? periodYear : now.getFullYear();
+  const zeroBasedMonth = normalizedMonth - 1;
+  const end = new Date(normalizedYear, zeroBasedMonth, 15);
+  const start = new Date(normalizedYear, zeroBasedMonth - 1, 16);
+  return { start, end };
+};
+
+const countWorkingDays = (start: Date, end: Date) => {
+  const cursor = new Date(start);
+  let count = 0;
+  while (cursor <= end) {
+    const day = cursor.getDay();
+    if (day !== 0 && day !== 6) {
+      count += 1;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return Math.max(count, 1);
+};
+
+const buildPayrollLineItems = ({
+  employee,
+  periodMonth,
+  periodYear,
+}: {
+  employee?: { grossSalary: number; incomeTax: number };
+  periodMonth: number;
+  periodYear: number;
+}): LineItem[] => {
+  const { start, end } = getPayrollWindow(periodMonth, periodYear);
+  const windowLabel = formatPayrollRange(start, end);
+  const workingDays = countWorkingDays(start, end);
+  const grossSalary = employee?.grossSalary ?? 0;
+  const incomeTax = employee?.incomeTax ?? 0;
+
+  return [
+    buildLineItem({
+      description: `Gross Salary (${windowLabel})`,
+      quantity: 1,
+      unitPrice: grossSalary,
+    }),
+    buildLineItem({
+      description: `Lunch & Conveyance Allowance (${windowLabel})`,
+      quantity: workingDays,
+      unitPrice: LUNCH_DAILY_RATE,
+    }),
+    buildLineItem({
+      description: `Income Tax (${windowLabel})`,
+      quantity: 1,
+      unitPrice: incomeTax,
+      kind: "DEDUCTION",
+    }),
+  ];
+};
+
+const lineItemTypeOptions = [
+  { label: "Earning", value: "EARNING" },
+  { label: "Deduction", value: "DEDUCTION" },
+];
+
+const statusBadgeClass: Record<string, string> = {
+  DRAFT: "bg-slate-100 text-slate-600 dark:bg-slate-800/70 dark:text-slate-300",
+  PENDING_REVIEW: "bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-200",
+  READY_TO_DELIVER: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200",
+};
+
+const createLineItemId = () => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2);
+};
+
+const buildLineItem = (overrides?: Partial<LineItem>): LineItem => ({
+  id: createLineItemId(),
+  kind: "EARNING",
+  description: "",
+  quantity: 1,
+  unitPrice: 0,
+  ...overrides,
+});
+
+const currencyFormatter = (value: number, currency: string) => {
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(value);
+  } catch (error) {
+    void error;
+    return `${currency} ${value.toFixed(2)}`;
+  }
+};
+
+function HrInvoiceManagementPage() {
+  const utils = trpc.useUtils();
+  const dashboardQuery = trpc.hrInvoices.dashboard.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const createMutation = trpc.hrInvoices.create.useMutation({
+    onSuccess: () => {
+      utils.hrInvoices.dashboard.invalidate();
+      resetForm();
+      setIsCreateModalOpen(false);
+    },
+  });
+  const sendMutation = trpc.hrInvoices.send.useMutation({
+    onSuccess: () => {
+      utils.hrInvoices.dashboard.invalidate();
+    },
+  });
+
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(null);
+  const invoiceDetailQuery = trpc.hrInvoices.detail.useQuery(
+    { invoiceId: previewInvoiceId ?? "" },
+    { enabled: Boolean(previewInvoiceId) },
+  );
+
+  const [form, setForm] = useState({
+    employeeId: "",
+    title: "Monthly Invoice",
+    periodMonth: String(new Date().getMonth() + 1),
+    periodYear: String(currentYear),
+    currency: DEFAULT_CURRENCY,
+    taxRate: "0",
+    notes: "",
+  });
+  const [dueDate, setDueDate] = useState<Date | null>(new Date());
+  const [lineItems, setLineItems] = useState<LineItem[]>([buildLineItem()]);
+  const [hasManualLineItems, setHasManualLineItems] = useState(false);
+
+  const invoices = dashboardQuery.data?.invoices ?? [];
+  const employeeOptions = dashboardQuery.data?.employeeOptions ?? [];
+  const pendingReview = dashboardQuery.data?.pendingReview ?? 0;
+  const selectedEmployee = useMemo(
+    () => employeeOptions.find((employee) => employee.id === form.employeeId),
+    [employeeOptions, form.employeeId],
+  );
+
+  const totals = useMemo(() => {
+    const earnings = lineItems.reduce((sum, item) => {
+      const amount = item.quantity * item.unitPrice;
+      return item.kind === "DEDUCTION" ? sum : sum + amount;
+    }, 0);
+    const deductions = lineItems.reduce((sum, item) => {
+      const amount = item.quantity * item.unitPrice;
+      return item.kind === "DEDUCTION" ? sum + amount : sum;
+    }, 0);
+    const subtotal = earnings - deductions;
+    const taxRateNumber = Number(form.taxRate ?? 0);
+    const tax = subtotal * (taxRateNumber / 100);
+    const total = subtotal + tax;
+    return { subtotal, tax, total, earnings, deductions };
+  }, [lineItems, form.taxRate]);
+
+  function resetForm() {
+    setForm({
+      employeeId: "",
+      title: "Monthly Invoice",
+      periodMonth: String(new Date().getMonth() + 1),
+      periodYear: String(currentYear),
+      currency: DEFAULT_CURRENCY,
+      taxRate: "0",
+      notes: "",
+    });
+    setDueDate(new Date());
+    setLineItems([buildLineItem()]);
+    setHasManualLineItems(false);
+  }
+
+  const updateLineItem = (id: string, updates: Partial<LineItem>) => {
+    setLineItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)));
+    setHasManualLineItems(true);
+  };
+
+  const addLineItem = () => {
+    setLineItems((prev) => [...prev, buildLineItem()]);
+    setHasManualLineItems(true);
+  };
+
+  const removeLineItem = (id: string) => {
+    setLineItems((prev) => {
+      if (prev.length === 1) {
+        return prev;
+      }
+      setHasManualLineItems(true);
+      return prev.filter((item) => item.id !== id);
+    });
+  };
+
+  const applyPayrollDefaults = (employeeIdValue: string, monthValue: string, yearValue: string) => {
+    const employee = employeeOptions.find((option) => option.id === employeeIdValue);
+    const periodMonthNumber = Number(monthValue);
+    const periodYearNumber = Number(yearValue);
+    if (!employee || Number.isNaN(periodMonthNumber) || Number.isNaN(periodYearNumber)) {
+      setLineItems([buildLineItem()]);
+      return;
+    }
+    setLineItems(buildPayrollLineItems({ employee, periodMonth: periodMonthNumber, periodYear: periodYearNumber }));
+  };
+
+  const handleResetLineItems = () => {
+    if (!selectedEmployee) {
+      return;
+    }
+    const periodMonthNumber = Number(form.periodMonth);
+    const periodYearNumber = Number(form.periodYear);
+    if (Number.isNaN(periodMonthNumber) || Number.isNaN(periodYearNumber)) {
+      return;
+    }
+    setHasManualLineItems(false);
+    applyPayrollDefaults(selectedEmployee.id, form.periodMonth, form.periodYear);
+  };
+
+  const handleSubmit = () => {
+    const payloadItems = lineItems.map((item) => {
+      const quantity = Math.max(1, Math.floor(item.quantity));
+      const normalizedUnitPrice = Math.max(0, item.unitPrice);
+      const unitPrice = item.kind === "DEDUCTION" ? -normalizedUnitPrice : normalizedUnitPrice;
+      return {
+        description: item.description,
+        quantity,
+        unitPrice,
+      };
+    });
+    createMutation.mutate({
+      employeeId: form.employeeId,
+      title: form.title,
+      periodMonth: Number(form.periodMonth),
+      periodYear: Number(form.periodYear),
+      currency: form.currency,
+      dueDate: dueDate ? dueDate.toISOString() : null,
+      taxRate: Number(form.taxRate ?? 0),
+      notes: form.notes || null,
+      items: payloadItems,
+    });
+  };
+
+  const isCreateDisabled =
+    !form.employeeId ||
+    !form.title.trim() ||
+    lineItems.some((item) => !item.description.trim() || item.unitPrice <= 0) ||
+    createMutation.isPending;
+
+  return (
+    <div className="space-y-10">
+      <header className="flex flex-col gap-6 rounded-[32px] border border-white/60 bg-white/90 p-6 shadow-xl shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">
+            Invoice Operations
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">Invoice Management</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
+            Draft, send, and review employee invoices with clear status tracking.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="rounded-2xl border border-amber-200/70 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+            {pendingReview} pending review
+          </div>
+          <Button onClick={() => setIsCreateModalOpen(true)}>New invoice</Button>
+        </div>
+      </header>
+
+      <section className="rounded-[32px] border border-white/60 bg-white/90 p-6 shadow-xl shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
+        {dashboardQuery.isLoading ? (
+          <div className="flex min-h-[12rem] items-center justify-center">
+            <LoadingSpinner />
+          </div>
+        ) : invoices.length === 0 ? (
+          <div className="flex min-h-[12rem] flex-col items-center justify-center gap-2 text-center text-slate-500 dark:text-slate-300">
+            <p className="text-lg font-semibold">No invoices created yet</p>
+            <p className="text-sm">Start by creating your first invoice for the team.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="grid grid-cols-6 gap-4 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
+              <span>Invoice</span>
+              <span>Employee</span>
+              <span>Period</span>
+              <span>Due</span>
+              <span>Total</span>
+              <span>Status</span>
+            </div>
+            {invoices.map((invoice) => (
+              <div
+                key={invoice.id}
+                className="grid grid-cols-6 items-center gap-4 px-4 py-4 text-sm text-slate-700 transition-colors duration-200 hover:bg-white dark:text-slate-200 dark:hover:bg-slate-900"
+              >
+                <div className="truncate font-semibold text-slate-900 dark:text-white">{invoice.title}</div>
+                <div className="truncate text-slate-500 dark:text-slate-400">{invoice.employeeName}</div>
+                <div>{invoice.periodLabel}</div>
+                <div>{invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "Not set"}</div>
+                <div className="font-semibold text-blue-600 dark:text-sky-400">{invoice.totalFormatted}</div>
+                <div className="flex flex-col gap-2">
+                  <span
+                    className={`inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass[invoice.status] ?? "bg-slate-100"}`}
+                  >
+                    {invoice.statusLabel}
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      theme="secondary"
+                      className="text-xs"
+                      onClick={() => setPreviewInvoiceId(invoice.id)}
+                    >
+                      Preview
+                    </Button>
+                    {invoice.canSend && (
+                      <Button
+                        className="text-xs"
+                        disabled={sendMutation.isPending && sendMutation.variables?.invoiceId === invoice.id}
+                        onClick={() => sendMutation.mutate({ invoiceId: invoice.id })}
+                      >
+                        {sendMutation.isPending && sendMutation.variables?.invoiceId === invoice.id
+                          ? "Sending..."
+                          : "Send"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <Modal
+        title="Create invoice"
+        open={isCreateModalOpen}
+        setOpen={setIsCreateModalOpen}
+        isDoneButton={false}
+        isCancelButton={false}
+        doneButtonText=""
+        minWidthModal="300px"
+        className="max-h-[80vh] overflow-y-auto"
+      >
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <SelectBox
+              label="Employee"
+              value={form.employeeId}
+              options={employeeOptions.map((employee) => ({
+                label: employee.employeeCode
+                  ? `${employee.name} (${employee.employeeCode})`
+                  : employee.name,
+                value: employee.id,
+              }))}
+              onChange={(event) => {
+                const nextEmployeeId = event.target.value;
+                setForm((prev) => ({ ...prev, employeeId: nextEmployeeId }));
+                setHasManualLineItems(false);
+                if (!nextEmployeeId) {
+                  setLineItems([buildLineItem()]);
+                  return;
+                }
+                applyPayrollDefaults(nextEmployeeId, form.periodMonth, form.periodYear);
+              }}
+            />
+            <TextInput
+              label="Invoice title"
+              value={form.title}
+              onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
+            />
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <SelectBox
+              label="Month"
+              value={form.periodMonth}
+              options={monthOptions}
+              onChange={(event) => {
+                const nextMonth = event.target.value;
+                setForm((prev) => ({ ...prev, periodMonth: nextMonth }));
+                if (!hasManualLineItems && form.employeeId) {
+                  applyPayrollDefaults(form.employeeId, nextMonth, form.periodYear);
+                }
+              }}
+            />
+            <SelectBox
+              label="Year"
+              value={form.periodYear}
+              options={yearOptions}
+              onChange={(event) => {
+                const nextYear = event.target.value;
+                setForm((prev) => ({ ...prev, periodYear: nextYear }));
+                if (!hasManualLineItems && form.employeeId) {
+                  applyPayrollDefaults(form.employeeId, form.periodMonth, nextYear);
+                }
+              }}
+            />
+            <CustomDatePicker
+              label="Due date"
+              value={dueDate}
+              onChange={(date) => setDueDate(date)}
+            />
+          </div>
+          <TextArea
+            label="Notes"
+            value={form.notes}
+            onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
+          />
+          <div className="rounded-2xl border border-white/60 bg-white/90 p-4 text-sm shadow-inner shadow-white/30 dark:border-slate-700/70 dark:bg-slate-900/70 dark:shadow-slate-900/40">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold text-slate-900 dark:text-white">Line items</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button theme="secondary" onClick={addLineItem}>
+                    Add line
+                  </Button>
+                  <Button
+                    theme="secondary"
+                    disabled={!selectedEmployee}
+                    onClick={handleResetLineItems}
+                  >
+                    Reset to payroll defaults
+                  </Button>
+                </div>
+              </div>
+              {lineItems.map((item) => (
+                <div key={item.id} className="grid gap-3 rounded-xl border border-slate-100/80 p-3 dark:border-slate-700/60 md:grid-cols-5">
+                  <TextInput
+                    label="Description"
+                    value={item.description}
+                    onChange={(event) => updateLineItem(item.id, { description: event.target.value })}
+                    className="md:col-span-2"
+                  />
+                  <SelectBox
+                    label="Type"
+                    value={item.kind}
+                    includePlaceholder={false}
+                    options={lineItemTypeOptions}
+                    onChange={(event) =>
+                      updateLineItem(item.id, {
+                        kind: event.target.value as LineItemKind,
+                      })
+                    }
+                  />
+                  <TextInput
+                    label="Quantity"
+                    type="number"
+                    value={String(item.quantity)}
+                    onChange={(event) =>
+                      updateLineItem(item.id, {
+                        quantity: Math.max(1, Number(event.target.value) || 1),
+                      })
+                    }
+                  />
+                  <div className="flex items-end gap-2">
+                    <TextInput
+                      label="Unit price (BDT)"
+                      type="number"
+                      value={String(item.unitPrice)}
+                      onChange={(event) =>
+                        updateLineItem(item.id, {
+                          unitPrice: Math.max(0, Number(event.target.value) || 0),
+                        })
+                      }
+                      className="flex-1"
+                    />
+                    <Button theme="cancel-secondary" onClick={() => removeLineItem(item.id)}>Remove</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <TextInput
+              label="Currency"
+              value={form.currency}
+              readOnly
+            />
+            <TextInput
+              label="Tax rate (%)"
+              type="number"
+              value={form.taxRate}
+              onChange={(event) => setForm((prev) => ({ ...prev, taxRate: event.target.value }))}
+            />
+            <div className="rounded-xl border border-slate-100/70 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700/70 dark:bg-slate-900/50 dark:text-slate-200">
+              Net payable preview: {currencyFormatter(totals.total, form.currency)}
+            </div>
+          </div>
+          {createMutation.error && (
+            <p className="text-sm text-rose-500">{createMutation.error.message}</p>
+          )}
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button theme="secondary" onClick={() => setIsCreateModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={isCreateDisabled}>
+              {createMutation.isPending ? "Creating..." : "Create"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        title="Invoice preview"
+        open={Boolean(previewInvoiceId)}
+        setOpen={(value) => {
+          if (!value) {
+            setPreviewInvoiceId(null);
+          }
+        }}
+        isDoneButton={false}
+        isCancelButton={false}
+        doneButtonText=""
+        className="max-h-[90vh] overflow-y-auto"
+      >
+        {invoiceDetailQuery.isLoading ? (
+          <div className="flex min-h-[12rem] items-center justify-center">
+            <LoadingSpinner />
+          </div>
+        ) : invoiceDetailQuery.data ? (
+          <InvoiceDetailCard
+            invoice={invoiceDetailQuery.data.invoice}
+            footnote={
+              <p className="mt-4 text-sm text-slate-500 dark:text-slate-300">
+                Created by {invoiceDetailQuery.data.invoice.createdBy.name} · {invoiceDetailQuery.data.invoice.createdBy.email}
+              </p>
+            }
+          />
+        ) : (
+          <p className="text-sm text-slate-500 dark:text-slate-300">
+            {invoiceDetailQuery.error?.message ?? "Select an invoice to preview."}
+          </p>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+export default HrInvoiceManagementPage;

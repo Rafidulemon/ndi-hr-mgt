@@ -16,6 +16,8 @@ import { reportRouter } from "@/server/modules/report/report.route";
 import { hrReportRouter } from "@/server/modules/hr/reports/reports.route";
 import { notificationRouter } from "@/server/modules/notification/notification.route";
 import { messageRouter } from "@/server/modules/messages/message.route";
+import { invoiceRouter } from "@/server/modules/invoice/invoice.route";
+import { hrInvoicesRouter } from "@/server/modules/hr/invoices/invoices.route";
 
 export const appRouter = createTRPCRouter({
   health: healthRouter,
@@ -28,6 +30,7 @@ export const appRouter = createTRPCRouter({
   report: reportRouter,
   notification: notificationRouter,
   message: messageRouter,
+  invoice: invoiceRouter,
   hrEmployees: hrEmployeesRouter,
   hrAttendance: hrAttendanceRouter,
   hrLeave: hrLeaveRouter,
@@ -35,6 +38,7 @@ export const appRouter = createTRPCRouter({
   hrTeam: hrTeamRouter,
   hrWork: hrWorkRouter,
   hrReport: hrReportRouter,
+  hrInvoices: hrInvoicesRouter,
 });
 
 export type AppRouter = typeof appRouter;

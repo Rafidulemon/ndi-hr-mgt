@@ -25,6 +25,8 @@ const updateEmployeeInput = z.object({
   emergencyName: z.string().optional().nullable(),
   emergencyPhone: z.string().optional().nullable(),
   emergencyRelation: z.string().optional().nullable(),
+  grossSalary: z.coerce.number().min(0).optional().nullable(),
+  incomeTax: z.coerce.number().min(0).optional().nullable(),
 });
 
 const leaveQuotaValue = z.coerce

@@ -39,6 +39,8 @@ type EmployeeFormValues = {
   emergencyName: string;
   emergencyPhone: string;
   emergencyRelation: string;
+  grossSalary: string;
+  incomeTax: string;
 };
 
 const defaultValues: EmployeeFormValues = {
@@ -57,6 +59,8 @@ const defaultValues: EmployeeFormValues = {
   emergencyName: "",
   emergencyPhone: "",
   emergencyRelation: "",
+  grossSalary: "",
+  incomeTax: "",
 };
 
 const extractEmployeeId = (pathname: string | null) => {
@@ -91,9 +95,24 @@ const toFormValues = (form: HrEmployeeForm): EmployeeFormValues => ({
   emergencyName: form.emergencyContact?.name ?? "",
   emergencyPhone: form.emergencyContact?.phone ?? "",
   emergencyRelation: form.emergencyContact?.relation ?? "",
+  grossSalary: form.grossSalary.toString(),
+  incomeTax: form.incomeTax.toString(),
 });
 
-const sanitizePayload = (values: EmployeeFormValues) => ({
+const sanitizePayload = (values: EmployeeFormValues) => {
+  const parseAmount = (value: string) => {
+    if (!value) return undefined;
+    const parsed = Number(value);
+    if (Number.isNaN(parsed) || parsed < 0) {
+      return undefined;
+    }
+    return parsed;
+  };
+
+  const grossSalary = parseAmount(values.grossSalary);
+  const incomeTax = parseAmount(values.incomeTax);
+
+  return {
   fullName: values.fullName.trim(),
   preferredName: values.preferredName.trim() || null,
   email: values.email.trim(),
@@ -109,7 +128,10 @@ const sanitizePayload = (values: EmployeeFormValues) => ({
   emergencyName: values.emergencyName.trim() || null,
   emergencyPhone: values.emergencyPhone.trim() || null,
   emergencyRelation: values.emergencyRelation.trim() || null,
-});
+    ...(typeof grossSalary === "number" ? { grossSalary } : {}),
+    ...(typeof incomeTax === "number" ? { incomeTax } : {}),
+  };
+};
 
 const EmptyState = ({ message }: { message: string }) => (
   <section className="rounded-[32px] border border-dashed border-slate-200 bg-white/95 p-10 text-center shadow-xl shadow-indigo-100 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300">
@@ -539,6 +561,39 @@ export default function EditEmployeePage() {
                   ))}
                 </select>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-[32px] border border-white/60 bg-white/95 p-8 shadow-xl shadow-indigo-100 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                Compensation
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Store the fixed payroll values used for each invoice.
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <TextInput
+                label="Gross salary (BDT)"
+                type="number"
+                step="0.01"
+                className="w-full"
+                name="grossSalary"
+                register={form.register}
+                isRequired
+              />
+              <TextInput
+                label="Income tax (BDT)"
+                type="number"
+                step="0.01"
+                className="w-full"
+                name="incomeTax"
+                register={form.register}
+                isRequired
+              />
             </div>
           </div>
         </div>

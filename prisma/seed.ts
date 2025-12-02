@@ -9,6 +9,7 @@ import { seedProjects } from "./seeds/project";
 import { seedReports } from "./seeds/report";
 import { seedUsers } from "./seeds/user";
 import { seedChat } from "./seeds/chat";
+import { seedInvoices } from "./seeds/invoice";
 
 const prisma = new PrismaClient();
 
@@ -93,6 +94,7 @@ async function main() {
   }
 
   await seedReports(prisma);
+  await seedInvoices(prisma);
 
   if (!baseSeeded) {
     await seedChat(prisma);

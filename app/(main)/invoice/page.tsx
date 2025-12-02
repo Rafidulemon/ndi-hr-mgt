@@ -1,202 +1,187 @@
 "use client";
-import Table from "../../components/atoms/tables/Table";
-import { ReactElement, useState } from "react";
+
+import { useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { IoEye } from "react-icons/io5";
+
+import Table from "../../components/atoms/tables/Table";
 import { Modal } from "../../components/atoms/frame/Modal";
 import PasswordInput from "../../components/atoms/inputs/PasswordInput";
 import { EmployeeHeader } from "../../components/layouts/EmployeeHeader";
 import Pagination from "../../components/pagination/Pagination";
-import { useRouter } from "next/navigation";
+import LoadingSpinner from "../../components/LoadingSpinner";
+import Button from "../../components/atoms/buttons/Button";
 
-const invoiceTableHeader = ["Month", "Year", "Status", "Action"];
+import { trpc } from "@/trpc/client";
+import { invoiceStatusMeta } from "@/types/invoice";
 
-interface Row {
-  Month: string;
-  Year: string;
-  Status: string;
-  Action: ReactElement;
-  [key: string]: string | ReactElement;
-}
+const headers = ["Invoice", "Due Date", "Amount", "Status", "Action"];
 
-const rows: Row[] = [
-  {
-    Month: "January",
-    Year: "2023",
-    Status: "Pending",
-    Action: <IoEye />,
-  },
-  {
-    Month: "February",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "March",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "April",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "May",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "June",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "July",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "August",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "September",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "October",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "November",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "December",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "June",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "July",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "August",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "September",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "October",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "November",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
-  {
-    Month: "December",
-    Year: "2023",
-    Status: "Sent",
-    Action: <IoEye />,
-  },
+const statusTextColors = [
+  { text: invoiceStatusMeta.DRAFT.label, color: "#475569" },
+  { text: invoiceStatusMeta.PENDING_REVIEW.label, color: "#b45309" },
+  { text: invoiceStatusMeta.READY_TO_DELIVER.label, color: "#047857" },
 ];
 
-const dynamicColorValues = [
-  {
-    columnName: "Status",
-    textColors: [
-      {
-        text: "Pending",
-        color: "#D20D0D",
-      },
-      {
-        text: "Sent",
-        color: "#046B53",
-      },
-    ],
-  },
-];
+const dynamicColorValues = [{ columnName: "Status", textColors: statusTextColors }];
+
+const tokenKey = (invoiceId: string) => `ndi.invoice.token:${invoiceId}`;
+
+const formatDate = (value: string | null) => {
+  if (!value) return "—";
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(value));
+  } catch (error) {
+    void error;
+    return value;
+  }
+};
+
+type TableRow = Record<string, string | number | ReactNode>;
 
 function InvoicePage() {
-  const [currentPageData, setCurrentPageData] = useState<Row[]>();
+  const router = useRouter();
+  const [currentInvoices, setCurrentInvoices] = useState<typeof invoices>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [selection, setSelection] = useState<{ id: string; title: string } | null>(null);
 
-  const handleButtonClick = () => {
-    setIsModalOpen(true);
+  const invoiceQuery = trpc.invoice.list.useQuery(undefined, {
+    staleTime: 30_000,
+  });
+
+  const invoices = invoiceQuery.data?.invoices ?? [];
+
+  const buildRowsForPage = (pageData: typeof invoices) =>
+    pageData.map((invoice) => ({
+      Invoice: (
+        <div className="flex flex-col">
+          <span className="font-semibold text-slate-900 dark:text-white">{invoice.title}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">{invoice.periodLabel}</span>
+        </div>
+      ),
+      "Due Date": formatDate(invoice.dueDate),
+      Amount: invoice.totalFormatted,
+      Status: invoice.statusLabel,
+      Action: (
+        <button
+          type="button"
+          className="inline-flex items-center rounded-full bg-gradient-to-r from-indigo-500 to-sky-500 p-2 text-white shadow-sm shadow-indigo-500/40 transition hover:scale-105"
+          onClick={(event) => {
+            event.stopPropagation();
+            setSelection({ id: invoice.id, title: invoice.title });
+            setPassword("");
+            setIsModalOpen(true);
+          }}
+          aria-label="View invoice"
+        >
+          <IoEye />
+        </button>
+      ),
+    }));
+
+  const unlockMutation = trpc.invoice.unlock.useMutation({
+    onSuccess: ({ token }) => {
+      if (!selection) return;
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(tokenKey(selection.id), token);
+      }
+      setIsModalOpen(false);
+      setPassword("");
+      router.push(`/invoice/${selection.id}`);
+    },
+  });
+
+  const tableRows = useMemo(() => buildRowsForPage(currentInvoices), [currentInvoices]);
+
+  const handlePasswordConfirm = () => {
+    if (!selection) return;
+    unlockMutation.mutate({ invoiceId: selection.id, password });
   };
-  const navigate = useRouter();
+
   return (
     <div className="flex w-full flex-col gap-10">
       <EmployeeHeader />
 
       <div className="flex w-full flex-col gap-6 rounded-[32px] border border-white/60 bg-white/85 py-8 shadow-xl shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
-        {currentPageData && (
+        {invoiceQuery.isError ? (
+          <div className="flex min-h-[8rem] flex-col items-center justify-center gap-3 px-6 text-center text-slate-500 dark:text-slate-300">
+            <p>We couldn’t load your invoices right now.</p>
+            <Button theme="secondary" onClick={() => invoiceQuery.refetch()}>
+              Try again
+            </Button>
+          </div>
+        ) : invoiceQuery.isLoading ? (
+          <div className="flex min-h-[8rem] items-center justify-center">
+            <LoadingSpinner />
+          </div>
+        ) : invoices.length === 0 ? (
+          <div className="flex min-h-[8rem] flex-col items-center justify-center gap-2 px-6 text-center text-slate-500 dark:text-slate-300">
+            <p className="text-lg font-semibold">No invoices yet</p>
+            <p className="text-sm">HR will publish invoices here once they send one your way.</p>
+          </div>
+        ) : (
           <Table
-            headers={invoiceTableHeader}
-            rows={currentPageData}
-            onRowClick={handleButtonClick}
+            headers={headers}
+            rows={tableRows}
             dynamicColorValues={dynamicColorValues}
           />
         )}
-        <div>
+
+        {invoices.length > 0 && (
           <Pagination
-            data={rows}
-            postsPerPage={15}
-            setCurrentPageData={setCurrentPageData}
-          />
-        </div>
+            data={invoices}
+            postsPerPage={10}
+            setCurrentPageData={(pageData) => {
+            setCurrentInvoices(pageData);
+          }}
+        />
+        )}
       </div>
 
       <Modal
-        title="Enter Password"
-        className="w-[40%]"
+        title={selection ? `Unlock ${selection.title}` : "Enter Password"}
+        className="w-[min(90vw,480px)]"
         open={isModalOpen}
         setOpen={setIsModalOpen}
-        isDoneButton
-        doneButtonText="Confirm"
-        isCancelButton
-        cancelButtonText="Cancel"
-        buttonWidth="120px"
-        buttonHeight="40px"
-        onDoneClick={() => navigate.push("/invoice/details")}
-        closeOnClick={() => setIsModalOpen(false)}
-        crossOnClick={() => setIsModalOpen(false)}
+        isDoneButton={false}
+        isCancelButton={false}
+        doneButtonText=""
       >
-        <PasswordInput label="Please enter password to view Invoice" />
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500 dark:text-slate-300">
+            Confirm your account password to open this invoice.
+          </p>
+          <PasswordInput
+            label="Password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          {unlockMutation.error && (
+            <p className="text-sm text-rose-500">{unlockMutation.error.message}</p>
+          )}
+          <div className="flex flex-wrap gap-3">
+            <Button
+              className="flex-1"
+              onClick={handlePasswordConfirm}
+              disabled={!password || unlockMutation.isPending}
+            >
+              {unlockMutation.isPending ? "Unlocking..." : "Confirm"}
+            </Button>
+            <Button
+              theme="secondary"
+              className="flex-1"
+              onClick={() => setIsModalOpen(false)}
+              disabled={unlockMutation.isPending}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
