@@ -18,6 +18,7 @@ import { notificationRouter } from "@/server/modules/notification/notification.r
 import { messageRouter } from "@/server/modules/messages/message.route";
 import { invoiceRouter } from "@/server/modules/invoice/invoice.route";
 import { hrInvoicesRouter } from "@/server/modules/hr/invoices/invoices.route";
+import { hrOrganizationRouter } from "@/server/modules/hr/organization/organization.route";
 
 export const appRouter = createTRPCRouter({
   health: healthRouter,
@@ -39,6 +40,7 @@ export const appRouter = createTRPCRouter({
   hrWork: hrWorkRouter,
   hrReport: hrReportRouter,
   hrInvoices: hrInvoicesRouter,
+  hrOrganization: hrOrganizationRouter,
 });
 
 export type AppRouter = typeof appRouter;

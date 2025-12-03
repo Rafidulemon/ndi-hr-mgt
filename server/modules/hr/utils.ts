@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import type { TRPCContext } from "@/server/api/trpc";
 import { canManageTeams } from "@/types/hr-team";
 import { canManageWork } from "@/types/hr-work";
+import { canManageOrganization } from "@/types/hr-organization";
 
 const HR_ALLOWED_ROLES: UserRole[] = [
   "HR_ADMIN",
@@ -53,6 +54,39 @@ export const requireWorkManager = (ctx: TRPCContext) => {
     });
   }
   return user;
+};
+
+export const requireOrganizationManager = (ctx: TRPCContext) => {
+  if (!ctx.session) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  const user = ctx.session.user;
+  if (!canManageOrganization(user.role as UserRole)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only org owners or super admins can manage organization settings.",
+    });
+  }
+  if (!user.organizationId && user.role !== "SUPER_ADMIN") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Join an organization to manage organization settings.",
+    });
+  }
+  return user;
+};
+
+export const requireSuperAdmin = (ctx: TRPCContext) => {
+  if (!ctx.session) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  if (ctx.session.user.role !== "SUPER_ADMIN") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Super admin access required.",
+    });
+  }
+  return ctx.session.user;
 };
 
 const ROLE_ORDER: UserRole[] = [

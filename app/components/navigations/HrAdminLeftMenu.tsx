@@ -11,6 +11,7 @@ import { BiLogOut } from "react-icons/bi";
 import { MdOutlineDashboard } from "react-icons/md";
 import {
   FaBell,
+  FaBuilding,
   FaCalendarCheck,
   FaClipboardList,
   FaEnvelopeOpenText,
@@ -25,6 +26,7 @@ import { TbReportAnalytics } from "react-icons/tb";
 import { Modal } from "../atoms/frame/Modal";
 import { canManageTeams } from "@/types/hr-team";
 import { canManageWork } from "@/types/hr-work";
+import { canManageOrganization } from "@/types/hr-organization";
 import { trpc } from "@/trpc/client";
 
 type MenuItem = {
@@ -32,6 +34,7 @@ type MenuItem = {
     | "dashboard"
     | "employees"
     | "teams"
+    | "organization"
     | "work"
     | "reports"
     | "attendance"
@@ -70,6 +73,12 @@ const hrMenuItems: MenuItem[] = [
     label: "Employee Management",
     icon: <FaUsers />,
     href: "/hr-admin/employees",
+  },
+  {
+    id: "organization",
+    label: "Organization",
+    icon: <FaBuilding />,
+    href: "/hr-admin/organization",
   },
   {
     id: "teams",
@@ -203,6 +212,9 @@ const HrAdminLeftMenu = ({
       }
       if (item.id === "work") {
         return canManageWork(viewerRole);
+      }
+      if (item.id === "organization") {
+        return canManageOrganization(viewerRole);
       }
       return true;
     });

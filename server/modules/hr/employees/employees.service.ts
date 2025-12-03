@@ -1,7 +1,5 @@
 import { EmploymentStatus, EmploymentType, Prisma, UserRole, WorkModel } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import bcrypt from "bcryptjs";
-import nodemailer from "nodemailer";
 
 import type { TRPCContext } from "@/server/api/trpc";
 import type {
@@ -23,15 +21,18 @@ import type {
 
 import { getEditPermission, getTerminationPermission, requireHrAdmin } from "@/server/modules/hr/utils";
 import { addHours, createRandomToken, hashToken } from "@/server/utils/token";
-
-type PrismaTransaction = Prisma.TransactionClient;
-
-const INVITE_TOKEN_TTL_HOURS =
-  Number(
-    process.env.NEXT_PUBLIC_INVITE_TOKEN_TTL_HOURS ??
-      process.env.INVITE_TOKEN_TTL_HOURS ??
-      72,
-  ) || 72;
+import {
+  INVITE_TOKEN_TTL_HOURS,
+  buildInviteLink,
+  createPlaceholderPasswordHash,
+  formatRoleLabel,
+  normalizeEmail,
+  normalizePhoneNumber,
+  sanitizeOptional,
+  sendInvitationEmail,
+  splitFullName,
+} from "./invite.helpers";
+import { deleteUserCascade } from "./delete-user";
 
 const inviteRoleMatrix: Record<UserRole, UserRole[]> = {
   SUPER_ADMIN: ["ORG_ADMIN", "MANAGER", "HR_ADMIN", "EMPLOYEE"],
@@ -40,15 +41,6 @@ const inviteRoleMatrix: Record<UserRole, UserRole[]> = {
   MANAGER: ["HR_ADMIN", "EMPLOYEE"],
   HR_ADMIN: ["EMPLOYEE"],
   EMPLOYEE: [],
-};
-
-const roleLabels: Record<UserRole, string> = {
-  SUPER_ADMIN: "Super Admin",
-  ORG_OWNER: "Org Owner",
-  ORG_ADMIN: "Org Admin",
-  HR_ADMIN: "HR Admin",
-  MANAGER: "Manager",
-  EMPLOYEE: "Employee",
 };
 
 const employmentStatusToDirectoryStatus: Record<
@@ -77,27 +69,7 @@ const employmentTypeLabels: Record<EmploymentType, string> = {
 
 const getAllowedInviteRoles = (role: UserRole): UserRole[] => inviteRoleMatrix[role] ?? [];
 
-const formatRoleLabel = (role: UserRole) => roleLabels[role] ?? role;
-
-const normalizeEmail = (email: string) => email.trim().toLowerCase();
-
 const normalizeEmployeeCode = (value: string) => value.trim().toUpperCase();
-
-const sanitizeOptional = (value?: string | null) => {
-  if (!value) {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed.length ? trimmed : null;
-};
-
-const normalizePhoneNumber = (value?: string | null) => {
-  const trimmed = sanitizeOptional(value);
-  if (!trimmed) {
-    return null;
-  }
-  return trimmed.replace(/\s+/g, " ");
-};
 
 const parseStartDateInput = (value?: string | null) => {
   if (!value) {
@@ -108,42 +80,6 @@ const parseStartDateInput = (value?: string | null) => {
     throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid start date." });
   }
   return parsed;
-};
-
-const normalizeBaseUrl = (value?: string | null) => {
-  if (!value) {
-    return null;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-  return trimmed.replace(/\/$/, "");
-};
-
-const getSiteUrl = () => {
-  const envUrl =
-    normalizeBaseUrl(process.env.NEXT_PUBLIC_BASE_URL) ??
-    normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ??
-    normalizeBaseUrl(process.env.NEXTAUTH_URL);
-
-  if (envUrl) {
-    return envUrl;
-  }
-
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-
-  return `http://localhost:${process.env.PORT ?? 3000}`;
-};
-
-const buildInviteLink = (token: string, email: string) =>
-  `${getSiteUrl()}/auth/signup?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
-
-const createPlaceholderPasswordHash = async () => {
-  const randomSecret = createRandomToken(24);
-  return bcrypt.hash(randomSecret, 10);
 };
 
 const employeeSelect = {
@@ -320,88 +256,6 @@ const buildFullName = (profile: NameLikeProfile, fallback?: string) => {
   }
 
   return fallback ?? "Team member";
-};
-
-const sendInvitationEmail = async ({
-  to,
-  inviteLink,
-  organizationName,
-  invitedRole,
-  recipientName,
-  expiresAt,
-  senderName,
-}: {
-  to: string;
-  inviteLink: string;
-  organizationName: string;
-  invitedRole: UserRole;
-  recipientName: string;
-  expiresAt: Date;
-  senderName?: string | null;
-}) => {
-  const emailUser = process.env.NEXT_PUBLIC_EMAIL_USER;
-  const emailPass = process.env.NEXT_PUBLIC_EMAIL_PASS;
-
-  if (!emailUser || !emailPass) {
-    console.warn("Email credentials are not configured. Skipping invite email.");
-    return false;
-  }
-
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: emailUser,
-      pass: emailPass,
-    },
-  });
-
-  const greeting = recipientName ? `Hi ${recipientName},` : "Hi there,";
-  const expiresLabel = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(expiresAt);
-  const senderDisplay = senderName?.trim()?.length ? senderName : "NDI HR team";
-  const roleLabel = formatRoleLabel(invitedRole);
-
-  const textBody = [
-    greeting,
-    "",
-    `${senderDisplay} invited you to join ${organizationName} on NDI HR as ${roleLabel}.`,
-    "Use the secure link below to finish setting up your account and choose a password.",
-    "",
-    inviteLink,
-    "",
-    `For security, your invitation link will expire on ${expiresLabel}.`,
-    "",
-    "See you inside,",
-    senderDisplay,
-  ].join("\n");
-
-  await transporter.sendMail({
-    from: `"${organizationName} HR" <${emailUser}>`,
-    to,
-    subject: `You're invited to ${organizationName} on NDI HR`,
-    text: textBody,
-    html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.5;">
-        <p>${greeting}</p>
-        <p>${senderDisplay} invited you to join <strong>${organizationName}</strong> on NDI HR as <strong>${roleLabel}</strong>.</p>
-        <p>Use the secure link below to finish setting up your account and choose a password. The link will expire on <strong>${expiresLabel}</strong>.</p>
-        <p style="margin: 24px 0;">
-          <a
-            href="${inviteLink}"
-            style="background: #4f46e5; color: #fff; padding: 12px 20px; border-radius: 8px; text-decoration: none;"
-          >
-            Get started
-          </a>
-        </p>
-        <p style="margin-bottom: 16px;">If the button doesn't work, copy and paste this link into your browser:<br/><a href="${inviteLink}">${inviteLink}</a></p>
-        <p>See you inside,<br />${senderDisplay}</p>
-      </div>
-    `,
-  });
-
-  return true;
 };
 
 const buildManualInviteOptions = async ({
@@ -687,22 +541,6 @@ const findWorkModelByLabel = (label?: string | null) => {
   return (entry?.[0] as WorkModel) ?? null;
 };
 
-const splitFullName = (fullName: string) => {
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length === 0) {
-    return { firstName: fullName.trim() || "Employee", lastName: "" };
-  }
-
-  if (parts.length === 1) {
-    return { firstName: parts[0]!, lastName: "" };
-  }
-
-  return {
-    firstName: parts.slice(0, -1).join(" "),
-    lastName: parts.at(-1) ?? "",
-  };
-};
-
 const mapEmployeeProfileDetail = (record: EmployeeDetailRecord): HrEmployeeProfile => {
   const profile = record.profile;
   const employment = record.employment;
@@ -795,32 +633,6 @@ const mapEmployeeForm = (record: EmployeeDetailRecord): HrEmployeeForm => {
     grossSalary: decimalToNumber(employment?.grossSalary),
     incomeTax: decimalToNumber(employment?.incomeTax),
   };
-};
-
-const deleteUserCascade = async (tx: PrismaTransaction, userId: string) => {
-  await tx.department.updateMany({
-    where: { headId: userId },
-    data: { headId: null },
-  });
-
-  await tx.notification.updateMany({
-    where: { senderId: userId },
-    data: { senderId: null },
-  });
-
-  await tx.emergencyContact.deleteMany({ where: { userId } });
-  await tx.employeeBankAccount.deleteMany({ where: { userId } });
-  await tx.attendanceRecord.deleteMany({ where: { employeeId: userId } });
-  await tx.leaveRequest.deleteMany({
-    where: {
-      OR: [{ employeeId: userId }, { reviewerId: userId }],
-    },
-  });
-  await tx.employeeProfile.deleteMany({ where: { userId } });
-  await tx.employmentDetail.deleteMany({ where: { userId } });
-  await tx.session.deleteMany({ where: { userId } });
-  await tx.passwordResetToken.deleteMany({ where: { userId } });
-  await tx.user.delete({ where: { id: userId } });
 };
 
 export const hrEmployeesService = {
