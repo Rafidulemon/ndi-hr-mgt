@@ -5,6 +5,8 @@ import type { TRPCContext } from "@/server/api/trpc";
 import type {
   EmployeeDirectoryEntry,
   EmployeeStatus,
+  HrEmployeeCompensationResponse,
+  HrEmployeeCompensationUpdateInput,
   HrEmployeeDashboardResponse,
   HrEmployeeForm,
   HrEmployeeFormResponse,
@@ -18,6 +20,7 @@ import type {
   HrEmployeeProfileResponse,
   HrEmployeeUpdateInput,
 } from "@/types/hr-admin";
+import { canManageCompensation } from "@/types/hr-admin";
 
 import { getEditPermission, getTerminationPermission, requireHrAdmin } from "@/server/modules/hr/utils";
 import { addHours, createRandomToken, hashToken } from "@/server/utils/token";
@@ -35,7 +38,7 @@ import {
 import { deleteUserCascade } from "./delete-user";
 
 const inviteRoleMatrix: Record<UserRole, UserRole[]> = {
-  SUPER_ADMIN: ["ORG_ADMIN", "MANAGER", "HR_ADMIN", "EMPLOYEE"],
+  SUPER_ADMIN: ["ORG_OWNER", "ORG_ADMIN", "MANAGER", "HR_ADMIN", "EMPLOYEE"],
   ORG_OWNER: ["ORG_ADMIN", "MANAGER", "HR_ADMIN", "EMPLOYEE"],
   ORG_ADMIN: ["MANAGER", "HR_ADMIN", "EMPLOYEE"],
   MANAGER: ["HR_ADMIN", "EMPLOYEE"],
@@ -709,6 +712,7 @@ export const hrEmployeesService = {
 
     const targetRole = record.role as UserRole;
     const permission = getEditPermission(viewerRole, targetRole);
+    const canEditCompensation = canManageCompensation(viewerRole);
 
     return {
       form: mapEmployeeForm(record),
@@ -717,6 +721,7 @@ export const hrEmployeesService = {
         viewerRole,
         targetRole,
         reason: permission.reason,
+        canEditCompensation,
       },
     };
   },
@@ -912,6 +917,56 @@ export const hrEmployeesService = {
         sick: decimalToNumber(updated.sickLeaveBalance),
         casual: decimalToNumber(updated.casualLeaveBalance),
         parental: decimalToNumber(updated.parentalLeaveBalance),
+      },
+    };
+  },
+
+  async updateCompensation(
+    ctx: TRPCContext,
+    input: HrEmployeeCompensationUpdateInput,
+  ): Promise<HrEmployeeCompensationResponse> {
+    const sessionUser = requireHrAdmin(ctx);
+    const viewerRole = sessionUser.role as UserRole;
+    if (!canManageCompensation(viewerRole)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You do not have permission to update compensation details.",
+      });
+    }
+
+    const employment = await ctx.prisma.employmentDetail.findFirst({
+      where: {
+        userId: input.employeeId,
+        organizationId: sessionUser.organizationId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!employment) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Employee not found." });
+    }
+
+    const grossSalary = parseMoneyInput(input.grossSalary);
+    const incomeTax = parseMoneyInput(input.incomeTax);
+
+    const updated = await ctx.prisma.employmentDetail.update({
+      where: { id: employment.id },
+      data: {
+        ...(grossSalary !== null ? { grossSalary } : {}),
+        ...(incomeTax !== null ? { incomeTax } : {}),
+      },
+      select: {
+        grossSalary: true,
+        incomeTax: true,
+      },
+    });
+
+    return {
+      compensation: {
+        grossSalary: decimalToNumber(updated.grossSalary),
+        incomeTax: decimalToNumber(updated.incomeTax),
       },
     };
   },

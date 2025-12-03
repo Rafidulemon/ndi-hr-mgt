@@ -42,6 +42,20 @@ const updateLeaveQuotaInput = z.object({
   parental: leaveQuotaValue,
 });
 
+const updateCompensationInput = z.object({
+  employeeId: z.string().min(1, "Employee ID is required."),
+  grossSalary: z.coerce
+    .number({
+      invalid_type_error: "Gross salary must be a number.",
+    })
+    .min(0, "Gross salary cannot be negative."),
+  incomeTax: z.coerce
+    .number({
+      invalid_type_error: "Income tax must be a number.",
+    })
+    .min(0, "Income tax cannot be negative."),
+});
+
 const inviteEmployeeInput = z.object({
   fullName: z.string().min(3, "Full name is required."),
   employeeCode: z.string().min(1, "Employee ID is required."),
@@ -90,6 +104,11 @@ export const hrEmployeesRouter = createTRPCRouter({
     .input(updateLeaveQuotaInput)
     .mutation(({ ctx, input }) =>
       hrEmployeesController.updateLeaveQuota({ ctx, input }),
+    ),
+  updateCompensation: protectedProcedure
+    .input(updateCompensationInput)
+    .mutation(({ ctx, input }) =>
+      hrEmployeesController.updateCompensation({ ctx, input }),
     ),
   invite: protectedProcedure
     .input(inviteEmployeeInput)

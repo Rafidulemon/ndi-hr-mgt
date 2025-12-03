@@ -31,6 +31,26 @@ export type HrInviteRoleOption = {
   label: string;
 };
 
+export const COMPENSATION_MANAGER_ROLES = [
+  "HR_ADMIN",
+  "MANAGER",
+  "ORG_ADMIN",
+  "ORG_OWNER",
+  "SUPER_ADMIN",
+] as const;
+
+export type CompensationManagerRole =
+  (typeof COMPENSATION_MANAGER_ROLES)[number];
+
+export const canManageCompensation = (
+  role?: UserRole | null,
+): role is CompensationManagerRole => {
+  if (!role) {
+    return false;
+  }
+  return (COMPENSATION_MANAGER_ROLES as readonly UserRole[]).includes(role);
+};
+
 export type HrManualInviteOptions = {
   organizationDomain: string | null;
   organizationName: string;
@@ -58,6 +78,7 @@ export type HrEmployeeFormPermissions = {
   viewerRole: UserRole;
   targetRole: UserRole;
   reason: string | null;
+  canEditCompensation: boolean;
 };
 
 export type HrEmployeeDashboardResponse = {
@@ -178,6 +199,19 @@ export type HrEmployeeLeaveQuotaUpdateInput = {
 
 export type HrEmployeeLeaveQuotaResponse = {
   leaveBalances: HrEmployeeLeaveBalances;
+};
+
+export type HrEmployeeCompensationUpdateInput = {
+  employeeId: string;
+  grossSalary: number;
+  incomeTax: number;
+};
+
+export type HrEmployeeCompensationResponse = {
+  compensation: {
+    grossSalary: number;
+    incomeTax: number;
+  };
 };
 
 export type HrEmployeeInviteResponse = {

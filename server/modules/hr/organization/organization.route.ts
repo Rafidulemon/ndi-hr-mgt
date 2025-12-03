@@ -18,6 +18,10 @@ const updateOrganizationInput = z.object({
   timezone: z.string().min(2).max(120).optional().nullable(),
   locale: z.string().min(2).max(32).optional().nullable(),
   organizationId: z.string().min(1).optional().nullable(),
+  logoUrl: z
+    .string()
+    .min(5, "Organization logo is required.")
+    .max(1024, "Logo URL must be less than 1024 characters."),
 });
 
 const organizationUserInput = z.object({
@@ -45,6 +49,12 @@ const createOrganizationInput = z.object({
     .nullable(),
   ownerDesignation: z.string().max(120).optional().nullable(),
   sendInvite: z.boolean().optional(),
+  logoUrl: z
+    .string()
+    .min(5, "Logo URL must be at least 5 characters.")
+    .max(1024, "Logo URL must be less than 1024 characters.")
+    .optional()
+    .nullable(),
 });
 
 const deleteOrganizationInput = z.object({

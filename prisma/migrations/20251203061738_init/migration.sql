@@ -26,13 +26,16 @@ CREATE TYPE "LeaveType" AS ENUM ('CASUAL', 'SICK', 'ANNUAL', 'PATERNITY_MATERNIT
 CREATE TYPE "ProjectStatus" AS ENUM ('ACTIVE', 'ON_HOLD', 'COMPLETED', 'ARCHIVED');
 
 -- CreateEnum
-CREATE TYPE "NotificationType" AS ENUM ('ANNOUNCEMENT', 'LEAVE', 'ATTENDANCE', 'REPORT');
+CREATE TYPE "NotificationType" AS ENUM ('ANNOUNCEMENT', 'LEAVE', 'ATTENDANCE', 'REPORT', 'INVOICE');
 
 -- CreateEnum
 CREATE TYPE "NotificationStatus" AS ENUM ('DRAFT', 'SCHEDULED', 'SENT', 'CANCELLED');
 
 -- CreateEnum
 CREATE TYPE "NotificationAudience" AS ENUM ('ORGANIZATION', 'ROLE', 'INDIVIDUAL');
+
+-- CreateEnum
+CREATE TYPE "InvoiceStatus" AS ENUM ('DRAFT', 'PENDING_REVIEW', 'CHANGES_REQUESTED', 'READY_TO_DELIVER');
 
 -- CreateTable
 CREATE TABLE "Organization" (
@@ -41,6 +44,7 @@ CREATE TABLE "Organization" (
     "domain" TEXT,
     "timezone" TEXT DEFAULT 'Asia/Dhaka',
     "locale" TEXT DEFAULT 'en-US',
+    "logoUrl" TEXT NOT NULL DEFAULT '/logo/ndi.logo.png',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -181,6 +185,8 @@ CREATE TABLE "EmploymentDetail" (
     "sickLeaveBalance" DECIMAL(5,2) NOT NULL DEFAULT 0,
     "annualLeaveBalance" DECIMAL(5,2) NOT NULL DEFAULT 0,
     "parentalLeaveBalance" DECIMAL(5,2) NOT NULL DEFAULT 0,
+    "grossSalary" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "incomeTax" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -351,6 +357,83 @@ CREATE TABLE "NotificationReceipt" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "NotificationReceipt_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Invoice" (
+    "id" TEXT NOT NULL,
+    "organizationId" TEXT NOT NULL,
+    "employeeId" TEXT NOT NULL,
+    "createdById" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "periodMonth" INTEGER NOT NULL,
+    "periodYear" INTEGER NOT NULL,
+    "dueDate" TIMESTAMP(3),
+    "currency" TEXT NOT NULL DEFAULT 'USD',
+    "subtotal" DECIMAL(12,2) NOT NULL,
+    "tax" DECIMAL(12,2) NOT NULL,
+    "total" DECIMAL(12,2) NOT NULL,
+    "notes" TEXT,
+    "status" "InvoiceStatus" NOT NULL DEFAULT 'DRAFT',
+    "sentAt" TIMESTAMP(3),
+    "confirmedAt" TIMESTAMP(3),
+    "readyAt" TIMESTAMP(3),
+    "reviewComment" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "reviewedById" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Invoice_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "InvoiceItem" (
+    "id" TEXT NOT NULL,
+    "invoiceId" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "quantity" INTEGER NOT NULL DEFAULT 1,
+    "unitPrice" DECIMAL(12,2) NOT NULL,
+    "amount" DECIMAL(12,2) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "InvoiceItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Thread" (
+    "id" TEXT NOT NULL,
+    "organizationId" TEXT NOT NULL,
+    "createdById" TEXT NOT NULL,
+    "title" TEXT,
+    "isPrivate" BOOLEAN NOT NULL DEFAULT true,
+    "lastMessageAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Thread_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ThreadParticipant" (
+    "id" TEXT NOT NULL,
+    "threadId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastReadAt" TIMESTAMP(3),
+
+    CONSTRAINT "ThreadParticipant_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ChatMessage" (
+    "id" TEXT NOT NULL,
+    "threadId" TEXT NOT NULL,
+    "senderId" TEXT NOT NULL,
+    "body" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ChatMessage_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -552,6 +635,48 @@ CREATE INDEX "NotificationReceipt_userId_idx" ON "NotificationReceipt"("userId")
 CREATE UNIQUE INDEX "NotificationReceipt_notificationId_userId_key" ON "NotificationReceipt"("notificationId", "userId");
 
 -- CreateIndex
+CREATE INDEX "Invoice_organizationId_idx" ON "Invoice"("organizationId");
+
+-- CreateIndex
+CREATE INDEX "Invoice_employeeId_idx" ON "Invoice"("employeeId");
+
+-- CreateIndex
+CREATE INDEX "Invoice_createdById_idx" ON "Invoice"("createdById");
+
+-- CreateIndex
+CREATE INDEX "Invoice_reviewedById_idx" ON "Invoice"("reviewedById");
+
+-- CreateIndex
+CREATE INDEX "Invoice_status_idx" ON "Invoice"("status");
+
+-- CreateIndex
+CREATE INDEX "InvoiceItem_invoiceId_idx" ON "InvoiceItem"("invoiceId");
+
+-- CreateIndex
+CREATE INDEX "Thread_organizationId_idx" ON "Thread"("organizationId");
+
+-- CreateIndex
+CREATE INDEX "Thread_createdById_idx" ON "Thread"("createdById");
+
+-- CreateIndex
+CREATE INDEX "Thread_organizationId_lastMessageAt_idx" ON "Thread"("organizationId", "lastMessageAt");
+
+-- CreateIndex
+CREATE INDEX "ThreadParticipant_userId_idx" ON "ThreadParticipant"("userId");
+
+-- CreateIndex
+CREATE INDEX "ThreadParticipant_threadId_idx" ON "ThreadParticipant"("threadId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ThreadParticipant_threadId_userId_key" ON "ThreadParticipant"("threadId", "userId");
+
+-- CreateIndex
+CREATE INDEX "ChatMessage_threadId_createdAt_idx" ON "ChatMessage"("threadId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "ChatMessage_senderId_idx" ON "ChatMessage"("senderId");
+
+-- CreateIndex
 CREATE INDEX "Holiday_organizationId_date_idx" ON "Holiday"("organizationId", "date");
 
 -- CreateIndex
@@ -672,6 +797,39 @@ ALTER TABLE "NotificationReceipt" ADD CONSTRAINT "NotificationReceipt_notificati
 ALTER TABLE "NotificationReceipt" ADD CONSTRAINT "NotificationReceipt_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_reviewedById_fkey" FOREIGN KEY ("reviewedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "InvoiceItem" ADD CONSTRAINT "InvoiceItem_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "Invoice"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Thread" ADD CONSTRAINT "Thread_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Thread" ADD CONSTRAINT "Thread_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ThreadParticipant" ADD CONSTRAINT "ThreadParticipant_threadId_fkey" FOREIGN KEY ("threadId") REFERENCES "Thread"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ThreadParticipant" ADD CONSTRAINT "ThreadParticipant_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ChatMessage" ADD CONSTRAINT "ChatMessage_threadId_fkey" FOREIGN KEY ("threadId") REFERENCES "Thread"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ChatMessage" ADD CONSTRAINT "ChatMessage_senderId_fkey" FOREIGN KEY ("senderId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Holiday" ADD CONSTRAINT "Holiday_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -685,4 +843,3 @@ ALTER TABLE "MonthlyReport" ADD CONSTRAINT "MonthlyReport_employeeId_fkey" FOREI
 
 -- AddForeignKey
 ALTER TABLE "MonthlyReportEntry" ADD CONSTRAINT "MonthlyReportEntry_monthlyReportId_fkey" FOREIGN KEY ("monthlyReportId") REFERENCES "MonthlyReport"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-

@@ -1,12 +1,14 @@
-/* eslint-disable tailwindcss/migration-from-tailwind-2 */
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { FiAlertCircle, FiCheckCircle, FiPlusCircle } from "react-icons/fi";
 
 import Button from "@/app/components/atoms/buttons/Button";
 import TextInput from "@/app/components/atoms/inputs/TextInput";
 import { trpc } from "@/trpc/client";
+import { uploadOrganizationLogo } from "@/lib/upload-organization-logo";
+import { DEFAULT_ORGANIZATION_LOGO } from "@/lib/organization-branding";
 
 type AlertState = { type: "success" | "error"; message: string } | null;
 
@@ -35,13 +37,21 @@ const initialFormState = {
   ownerPhone: "",
   ownerDesignation: "Org Owner",
   sendInvite: true,
+  logoUrl: DEFAULT_ORGANIZATION_LOGO,
 };
 
 export default function CreateOrganizationClient() {
   const [form, setForm] = useState(initialFormState);
   const [alert, setAlert] = useState<AlertState>(null);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [logoPreview, setLogoPreview] = useState(DEFAULT_ORGANIZATION_LOGO);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const createOrganizationMutation = trpc.hrOrganization.createOrganization.useMutation();
+  const organizationListQuery = trpc.hrOrganization.list.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const creationLocked = (organizationListQuery.data?.organizations.length ?? 0) > 0;
 
   useEffect(() => {
     if (!alert) return;
@@ -51,6 +61,13 @@ export default function CreateOrganizationClient() {
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (creationLocked) {
+      setAlert({
+        type: "error",
+        message: "An organization already exists. Delete it before creating another.",
+      });
+      return;
+    }
     if (!form.name.trim() || !form.ownerName.trim() || !form.ownerEmail.trim()) {
       setAlert({
         type: "error",
@@ -70,6 +87,7 @@ export default function CreateOrganizationClient() {
         ownerPhone: form.ownerPhone.trim() || undefined,
         ownerDesignation: form.ownerDesignation.trim() || undefined,
         sendInvite: form.sendInvite,
+        logoUrl: form.logoUrl?.trim() || undefined,
       },
       {
         onSuccess: (result) => {
@@ -79,10 +97,37 @@ export default function CreateOrganizationClient() {
           });
           setInviteUrl(result.inviteUrl);
           setForm(initialFormState);
+          setLogoPreview(DEFAULT_ORGANIZATION_LOGO);
+          setLogoError(null);
         },
         onError: (error) => setAlert({ type: "error", message: error.message }),
       },
     );
+  };
+
+  const handleLogoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    setLogoError(null);
+    setIsUploadingLogo(true);
+    try {
+      const url = await uploadOrganizationLogo(file);
+      setForm((prev) => ({ ...prev, logoUrl: url }));
+      setLogoPreview(url);
+    } catch (error) {
+      setLogoError(error instanceof Error ? error.message : "Failed to upload logo.");
+    } finally {
+      setIsUploadingLogo(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleUseDefaultLogo = () => {
+    setForm((prev) => ({ ...prev, logoUrl: DEFAULT_ORGANIZATION_LOGO }));
+    setLogoPreview(DEFAULT_ORGANIZATION_LOGO);
+    setLogoError(null);
   };
 
   return (
@@ -107,6 +152,11 @@ export default function CreateOrganizationClient() {
       </div>
 
       <AlertBanner alert={alert} />
+      {creationLocked ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+          An organization already exists in this workspace. Delete the current workspace before creating another.
+        </div>
+      ) : null}
 
       <form
         onSubmit={handleSubmit}
@@ -123,6 +173,49 @@ export default function CreateOrganizationClient() {
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Give the workspace a name, optional domain, and defaults for timezone and locale.
             </p>
+          </div>
+        </div>
+
+        <div className="space-y-3 rounded-2xl border border-dashed border-slate-200/70 p-4 dark:border-slate-700/60">
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            Organization logo
+          </p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <Image
+                src={logoPreview}
+                alt="Organization logo preview"
+                width={80}
+                height={80}
+                className="h-full w-full object-contain"
+              />
+            </div>
+            <div className="space-y-2 text-sm">
+              <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-indigo-200 bg-white px-4 py-2 font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleLogoChange}
+                  disabled={isUploadingLogo || creationLocked}
+                />
+                {isUploadingLogo ? "Uploading..." : "Choose logo"}
+              </label>
+              <button
+                type="button"
+                onClick={handleUseDefaultLogo}
+                disabled={isUploadingLogo}
+                className="block rounded-xl border border-slate-200 bg-transparent px-4 py-2 font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800/60"
+              >
+                Use default logo
+              </button>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                PNG, JPG, or WEBP files up to 5MB.
+              </p>
+              {logoError ? (
+                <p className="text-xs font-semibold text-rose-600 dark:text-rose-300">{logoError}</p>
+              ) : null}
+            </div>
           </div>
         </div>
 
@@ -213,10 +306,14 @@ export default function CreateOrganizationClient() {
 
         <Button
           type="submit"
-          disabled={createOrganizationMutation.isPending}
+          disabled={createOrganizationMutation.isPending || isUploadingLogo || creationLocked}
           className="rounded-2xl px-6 py-2 text-base"
         >
-          {createOrganizationMutation.isPending ? "Creating..." : "Create organization"}
+          {creationLocked
+            ? "Organization already exists"
+            : createOrganizationMutation.isPending
+              ? "Creating..."
+              : "Create organization"}
         </Button>
 
         {inviteUrl ? (

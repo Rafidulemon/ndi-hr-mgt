@@ -15,6 +15,7 @@ import {
   FaCalendarCheck,
   FaClipboardList,
   FaEnvelopeOpenText,
+  FaRegBuilding,
   FaRegClock,
   FaUser,
   FaUsers,
@@ -27,7 +28,9 @@ import { Modal } from "../atoms/frame/Modal";
 import { canManageTeams } from "@/types/hr-team";
 import { canManageWork } from "@/types/hr-work";
 import { canManageOrganization } from "@/types/hr-organization";
+import { canManageDepartments } from "@/types/hr-department";
 import { trpc } from "@/trpc/client";
+import { DEFAULT_ORGANIZATION_LOGO } from "@/lib/organization-branding";
 
 type MenuItem = {
   id:
@@ -35,6 +38,7 @@ type MenuItem = {
     | "employees"
     | "teams"
     | "organization"
+    | "departments"
     | "work"
     | "reports"
     | "attendance"
@@ -59,6 +63,7 @@ type Props = {
   showEmployeeDashboardLink?: boolean;
   pendingLeaveCount?: number;
   viewerRole?: UserRole;
+  organizationLogoUrl?: string;
 };
 
 const hrMenuItems: MenuItem[] = [
@@ -79,6 +84,12 @@ const hrMenuItems: MenuItem[] = [
     label: "Organization",
     icon: <FaBuilding />,
     href: "/hr-admin/organization",
+  },
+  {
+    id: "departments",
+    label: "Department Management",
+    icon: <FaRegBuilding />,
+    href: "/hr-admin/department-management",
   },
   {
     id: "teams",
@@ -137,6 +148,7 @@ const HrAdminLeftMenu = ({
   showEmployeeDashboardLink = false,
   pendingLeaveCount = 0,
   viewerRole,
+  organizationLogoUrl = DEFAULT_ORGANIZATION_LOGO,
 }: Props) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -144,6 +156,10 @@ const HrAdminLeftMenu = ({
   const [isOpenModal, setIsOpenModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
+  const logoSrc =
+    organizationLogoUrl && organizationLogoUrl.trim().length
+      ? organizationLogoUrl
+      : DEFAULT_ORGANIZATION_LOGO;
   const pendingCountQuery = trpc.hrLeave.pendingCount.useQuery(undefined, {
     initialData: pendingLeaveCount,
     refetchInterval: 15000,
@@ -210,6 +226,9 @@ const HrAdminLeftMenu = ({
       if (item.id === "teams") {
         return canManageTeams(viewerRole);
       }
+      if (item.id === "departments") {
+        return canManageDepartments(viewerRole);
+      }
       if (item.id === "work") {
         return canManageWork(viewerRole);
       }
@@ -223,15 +242,17 @@ const HrAdminLeftMenu = ({
   return (
     <div className={containerClasses}>
       <div className="sticky top-0 z-20 flex flex-col items-center gap-3 rounded-[24px] bg-white/95 pb-2 text-center backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:text-left dark:bg-slate-900/85">
-        <div className="flex flex-row items-center justify-center gap-1 sm:justify-start">
-          <Image
-            src="/logo/ndi.logo.png"
-            alt="NDI HR Logo"
-            width={160}
-            height={70}
-            className="h-auto w-10"
-            priority
-          />
+        <div className="flex flex-row items-center justify-center gap-2 sm:justify-start">
+          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <Image
+              src={logoSrc}
+              alt="Organization logo"
+              width={64}
+              height={64}
+              className="h-10 w-10 object-contain"
+              priority
+            />
+          </div>
           <div>
             <p className="text-base font-semibold text-[#364a6e] dark:text-slate-100">
               {organizationName}

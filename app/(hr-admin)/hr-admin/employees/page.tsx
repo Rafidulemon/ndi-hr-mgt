@@ -13,6 +13,7 @@ import type { EmploymentType, UserRole, WorkModel } from "@prisma/client";
 import Button from "../../../components/atoms/buttons/Button";
 import TextArea from "../../../components/atoms/inputs/TextArea";
 import TextInput from "../../../components/atoms/inputs/TextInput";
+import { Modal } from "../../../components/atoms/frame/Modal";
 import { employeeStatusStyles } from "./statusStyles";
 import { trpc } from "@/trpc/client";
 import type { EmployeeDirectoryEntry, EmployeeStatus } from "@/types/hr-admin";
@@ -155,6 +156,8 @@ export default function EmployeeManagementPage() {
     message: string;
   } | null>(null);
   const [terminatingEmployeeId, setTerminatingEmployeeId] = useState<string | null>(null);
+  const [pendingTermination, setPendingTermination] = useState<EmployeeDirectoryEntry | null>(null);
+  const [isTerminateModalOpen, setIsTerminateModalOpen] = useState(false);
   const manualInviteForm = useForm<ManualInviteFormValues>({
     resolver: zodResolver(manualInviteSchema),
     defaultValues: {
@@ -265,7 +268,11 @@ export default function EmployeeManagementPage() {
   }, [defaultManualInviteValues, manualInviteOptions, resetInviteForm]);
 
   const terminateMutation = trpc.hrEmployees.deleteEmployee.useMutation({
-    onSettled: () => setTerminatingEmployeeId(null),
+    onSettled: () => {
+      setTerminatingEmployeeId(null);
+      setIsTerminateModalOpen(false);
+      setPendingTermination(null);
+    },
   });
   const inviteMutation = trpc.hrEmployees.invite.useMutation({
     onSuccess: (data) => {
@@ -312,24 +319,36 @@ export default function EmployeeManagementPage() {
       });
       return;
     }
+    setPendingTermination(employee);
+    setIsTerminateModalOpen(true);
+  };
 
-    if (
-      !window.confirm(
-        `Terminate ${employee.name}? This action immediately revokes access and cannot be undone.`,
-      )
-    ) {
+  const confirmTerminateEmployee = () => {
+    if (!pendingTermination) {
       return;
     }
-
-    setTerminatingEmployeeId(employee.id);
+    if (terminateMutation.isPending) {
+      return;
+    }
+    if (!pendingTermination.canTerminate) {
+      setActionAlert({
+        type: "error",
+        message: "You do not have permission to terminate this employee.",
+      });
+      setPendingTermination(null);
+      setIsTerminateModalOpen(false);
+      return;
+    }
+    const targetName = pendingTermination.name;
+    setTerminatingEmployeeId(pendingTermination.id);
     terminateMutation.mutate(
-      { employeeId: employee.id },
+      { employeeId: pendingTermination.id },
       {
         onSuccess: () => {
           void utils.hrEmployees.dashboard.invalidate();
           setActionAlert({
             type: "success",
-            message: `${employee.name} has been terminated.`,
+            message: `${targetName} has been terminated.`,
           });
         },
         onError: (error) => {
@@ -928,6 +947,27 @@ export default function EmployeeManagementPage() {
           </form>
         </div>
       </section>
+      <Modal
+        open={isTerminateModalOpen}
+        setOpen={(open) => {
+          setIsTerminateModalOpen(open);
+          if (!open) {
+            setPendingTermination(null);
+          }
+        }}
+        title="Terminate employee?"
+        doneButtonText={terminatingEmployeeId ? "Terminating..." : "Terminate"}
+        cancelButtonText="Cancel"
+        isCancelButton
+        buttonWidth="140px"
+        buttonHeight="44px"
+        onDoneClick={confirmTerminateEmployee}
+      >
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Terminate {pendingTermination?.name ?? "this employee"}? This immediately revokes access
+          and cannot be undone.
+        </p>
+      </Modal>
     </div>
   );
 }

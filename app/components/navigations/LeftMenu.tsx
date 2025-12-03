@@ -24,6 +24,7 @@ import { IoIosPaper } from "react-icons/io";
 import { FiSettings } from "react-icons/fi";
 import { Modal } from "../atoms/frame/Modal";
 import { trpc } from "@/trpc/client";
+import { DEFAULT_ORGANIZATION_LOGO } from "@/lib/organization-branding";
 
 type Props = {
   isLeader?: boolean;
@@ -31,6 +32,7 @@ type Props = {
   className?: string;
   organizationName?: string;
   userFullName?: string;
+  organizationLogoUrl?: string;
 };
 
 const menuItems = [
@@ -104,6 +106,7 @@ const LeftMenu = ({
   className = "",
   organizationName = "Ninja Digital Innovations",
   userFullName,
+  organizationLogoUrl = DEFAULT_ORGANIZATION_LOGO,
 }: Props) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -129,6 +132,10 @@ const LeftMenu = ({
   const [isOpenModal, setIsOpenModal] = useState<boolean>(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
+  const logoSrc =
+    organizationLogoUrl && organizationLogoUrl.trim().length
+      ? organizationLogoUrl
+      : DEFAULT_ORGANIZATION_LOGO;
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -204,27 +211,27 @@ const LeftMenu = ({
   return (
     <div className={containerClasses}>
       <div className="sticky top-0 z-20 flex flex-col items-center gap-3 rounded-[24px] bg-white/95 pb-2 text-center backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:text-left dark:bg-slate-900/85">
-      <div className="flex flex-row items-center justify-center gap-1 sm:justify-start">
-        <Image
-          src="/logo/ndi.logo.png"
-          alt="Demo Logo"
-          width={160}
-          height={70}
-          className="h-auto w-10"
-          priority
-        />
-        <div>
-          <p
-            className="text-base font-semibold text-[#364a6e] dark:text-slate-100"
-          >
-            {organizationName}
-          </p>
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-            {nameFallback}
-          </p>
+        <div className="flex flex-row items-center justify-center gap-2 sm:justify-start">
+          <div className="flex h-12 w-12 items-center justify-center overflow-hidden">
+            <Image
+              src={logoSrc}
+              alt="Organization logo"
+              width={64}
+              height={64}
+              className="h-10 w-10 object-contain"
+              priority
+            />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-[#364a6e] dark:text-slate-100">
+              {organizationName}
+            </p>
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+              {nameFallback}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
 
       <nav className="flex flex-1 flex-col">
         <ul className="space-y-1">

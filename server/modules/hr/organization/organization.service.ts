@@ -32,6 +32,7 @@ import {
   requireSuperAdmin,
 } from "@/server/modules/hr/utils";
 import { addHours, createRandomToken, hashToken } from "@/server/utils/token";
+import { DEFAULT_ORGANIZATION_LOGO } from "@/lib/organization-branding";
 
 const buildDisplayName = (
   profile: {
@@ -60,6 +61,7 @@ const mapOrganizationRecord = (record: {
   domain: string | null;
   timezone: string | null;
   locale: string | null;
+  logoUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
   _count: { users: number };
@@ -69,6 +71,7 @@ const mapOrganizationRecord = (record: {
   domain: record.domain,
   timezone: record.timezone,
   locale: record.locale,
+  logoUrl: record.logoUrl ?? DEFAULT_ORGANIZATION_LOGO,
   createdAtIso: record.createdAt.toISOString(),
   updatedAtIso: record.updatedAt.toISOString(),
   totalEmployees: record._count.users,
@@ -121,7 +124,12 @@ export const hrOrganizationService = {
       });
     }
 
-    const canCreateOrganizations = viewerRole === "SUPER_ADMIN";
+    let totalOrganizations = 0;
+    if (viewerRole === "SUPER_ADMIN") {
+      totalOrganizations = await ctx.prisma.organization.count();
+    }
+    const canCreateOrganizations =
+      viewerRole === "SUPER_ADMIN" && totalOrganizations === 0;
     let targetOrganizationId = user.organizationId ?? null;
 
     if (viewerRole === "SUPER_ADMIN" && organizationId) {
@@ -153,6 +161,7 @@ export const hrOrganizationService = {
           domain: true,
           timezone: true,
           locale: true,
+          logoUrl: true,
           createdAt: true,
           updatedAt: true,
           _count: {
@@ -251,6 +260,7 @@ export const hrOrganizationService = {
         domain: true,
         timezone: true,
         locale: true,
+        logoUrl: true,
         createdAt: true,
         updatedAt: true,
         _count: {
@@ -272,6 +282,7 @@ export const hrOrganizationService = {
       timezone?: string | null;
       locale?: string | null;
       organizationId?: string | null;
+      logoUrl?: string | null;
     },
   ) {
     if (!ctx.session) {
@@ -312,6 +323,14 @@ export const hrOrganizationService = {
     const nextDomain = sanitizeOptional(input.domain)?.toLowerCase() ?? null;
     const nextTimezone = sanitizeOptional(input.timezone);
     const nextLocale = sanitizeOptional(input.locale);
+    const nextLogo = sanitizeOptional(input.logoUrl);
+
+    if (!nextLogo) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Organization logo is required.",
+      });
+    }
 
     try {
       const updated = await ctx.prisma.organization.update({
@@ -321,6 +340,7 @@ export const hrOrganizationService = {
           domain: nextDomain,
           timezone: nextTimezone ?? null,
           locale: nextLocale ?? null,
+          logoUrl: nextLogo,
         },
         select: {
           id: true,
@@ -328,6 +348,7 @@ export const hrOrganizationService = {
           domain: true,
           timezone: true,
           locale: true,
+          logoUrl: true,
           createdAt: true,
           updatedAt: true,
           _count: {
@@ -426,6 +447,7 @@ export const hrOrganizationService = {
       ownerPhone?: string | null;
       ownerDesignation?: string | null;
       sendInvite?: boolean;
+      logoUrl?: string | null;
     },
   ): Promise<HrCreateOrganizationResponse> {
     const sessionUser = requireSuperAdmin(ctx);
@@ -438,12 +460,21 @@ export const hrOrganizationService = {
       });
     }
 
+    const existingCount = await ctx.prisma.organization.count();
+    if (existingCount > 0) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Only one organization can exist at a time.",
+      });
+    }
+
     const normalizedEmail = normalizeEmail(input.ownerEmail);
     const normalizedPhone = normalizePhoneNumber(input.ownerPhone);
     const ownerDesignation = sanitizeOptional(input.ownerDesignation) ?? "Org Owner";
     const timezone = sanitizeOptional(input.timezone) ?? "Asia/Dhaka";
     const locale = sanitizeOptional(input.locale) ?? "en-US";
     const domain = sanitizeOptional(input.domain)?.toLowerCase() ?? null;
+    const logoUrl = sanitizeOptional(input.logoUrl) ?? DEFAULT_ORGANIZATION_LOGO;
 
     const existingUser = await ctx.prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -469,6 +500,7 @@ export const hrOrganizationService = {
             domain,
             timezone,
             locale,
+            logoUrl,
           },
         });
 

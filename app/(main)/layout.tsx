@@ -37,6 +37,7 @@ export default async function MainLayout({
               canAccessHrAdmin={canAccessHrAdmin}
               organizationName={organizationName}
               userFullName={fullName}
+              organizationLogoUrl={user.organization?.logoUrl ?? undefined}
             />
           </div>
         </aside>

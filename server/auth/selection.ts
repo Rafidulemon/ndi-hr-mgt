@@ -13,6 +13,7 @@ export const authUserSelect = {
       name: true,
       domain: true,
       timezone: true,
+      logoUrl: true,
     },
   },
   profile: {

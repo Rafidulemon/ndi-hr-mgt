@@ -165,7 +165,15 @@ export default function EditEmployeePage() {
     casual: "",
     parental: "",
   });
+  const [compensationValues, setCompensationValues] = useState({
+    grossSalary: "",
+    incomeTax: "",
+  });
   const [leaveAlert, setLeaveAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [compensationAlert, setCompensationAlert] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
@@ -176,8 +184,10 @@ export default function EditEmployeePage() {
   );
   const updateMutation = trpc.hrEmployees.update.useMutation();
   const updateLeaveQuotaMutation = trpc.hrEmployees.updateLeaveQuota.useMutation();
+  const updateCompensationMutation = trpc.hrEmployees.updateCompensation.useMutation();
   const permissions = employeeFormQuery.data?.permissions;
   const editingDisabled = permissions ? !permissions.canEdit : false;
+  const canEditCompensation = permissions?.canEditCompensation ?? false;
   const permissionMessage =
     permissions?.reason ?? "You don’t have permission to edit this employee.";
 
@@ -201,12 +211,30 @@ export default function EditEmployeePage() {
   }, [employeeFormQuery.data?.form.leaveBalances]);
 
   useEffect(() => {
+    const formData = employeeFormQuery.data?.form;
+    if (formData) {
+      setCompensationValues({
+        grossSalary: formData.grossSalary.toString(),
+        incomeTax: formData.incomeTax.toString(),
+      });
+    }
+  }, [employeeFormQuery.data?.form]);
+
+  useEffect(() => {
     if (!leaveAlert) {
       return undefined;
     }
     const timer = window.setTimeout(() => setLeaveAlert(null), 5000);
     return () => window.clearTimeout(timer);
   }, [leaveAlert]);
+
+  useEffect(() => {
+    if (!compensationAlert) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setCompensationAlert(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [compensationAlert]);
 
   const handlePhotoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!employeeId) {
@@ -331,6 +359,67 @@ export default function EditEmployeePage() {
         },
         onError: (error) => {
           setLeaveAlert({
+            type: "error",
+            message: error.message,
+          });
+        },
+      },
+    );
+  };
+
+  const handleCompensationSubmit = (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    if (!employeeId) {
+      setCompensationAlert({
+        type: "error",
+        message: "Employee not found.",
+      });
+      return;
+    }
+
+    const parseAmount = (value: string) => {
+      if (!value.trim()) {
+        return null;
+      }
+      const parsed = Number(value);
+      if (Number.isNaN(parsed) || parsed < 0) {
+        return null;
+      }
+      return parsed;
+    };
+
+    const grossSalary = parseAmount(compensationValues.grossSalary);
+    const incomeTax = parseAmount(compensationValues.incomeTax);
+
+    if (grossSalary === null || incomeTax === null) {
+      setCompensationAlert({
+        type: "error",
+        message: "Enter valid amounts for both gross salary and income tax.",
+      });
+      return;
+    }
+
+    updateCompensationMutation.mutate(
+      {
+        employeeId,
+        grossSalary,
+        incomeTax,
+      },
+      {
+        onSuccess: (data) => {
+          setCompensationAlert({
+            type: "success",
+            message: "Compensation updated.",
+          });
+          setCompensationValues({
+            grossSalary: data.compensation.grossSalary.toString(),
+            incomeTax: data.compensation.incomeTax.toString(),
+          });
+          void utils.hrEmployees.form.invalidate({ employeeId });
+          void utils.hrEmployees.dashboard.invalidate();
+        },
+        onError: (error) => {
+          setCompensationAlert({
             type: "error",
             message: error.message,
           });
@@ -565,6 +654,9 @@ export default function EditEmployeePage() {
           </div>
         </div>
 
+        </fieldset>
+
+        {/* Compensation section lives outside the disabled fieldset */}
         <div className="rounded-[32px] border border-white/60 bg-white/95 p-8 shadow-xl shadow-indigo-100 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
           <div className="space-y-6">
             <div>
@@ -575,77 +667,142 @@ export default function EditEmployeePage() {
                 Store the fixed payroll values used for each invoice.
               </p>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <TextInput
-                label="Gross salary (BDT)"
-                type="number"
-                step="0.01"
-                className="w-full"
-                name="grossSalary"
-                register={form.register}
-                isRequired
-              />
-              <TextInput
-                label="Income tax (BDT)"
-                type="number"
-                step="0.01"
-                className="w-full"
-                name="incomeTax"
-                register={form.register}
-                isRequired
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-[32px] border border-white/60 bg-white/95 p-8 shadow-xl shadow-indigo-100 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                Emergency contact
-              </h2>
+            {permissions?.canEdit ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <TextInput
+                  label="Gross salary (BDT)"
+                  type="number"
+                  step="0.01"
+                  className="w-full"
+                  name="grossSalary"
+                  register={form.register}
+                  isRequired
+                  disabled={editingDisabled || updateMutation.isPending}
+                />
+                <TextInput
+                  label="Income tax (BDT)"
+                  type="number"
+                  step="0.01"
+                  className="w-full"
+                  name="incomeTax"
+                  register={form.register}
+                  isRequired
+                  disabled={editingDisabled || updateMutation.isPending}
+                />
+              </div>
+            ) : canEditCompensation ? (
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <TextInput
+                    label="Gross salary (BDT)"
+                    type="number"
+                    step="0.01"
+                    className="w-full"
+                    value={compensationValues.grossSalary}
+                    onChange={(event) =>
+                      setCompensationValues((prev) => ({
+                        ...prev,
+                        grossSalary: event.target.value,
+                      }))
+                    }
+                    disabled={updateCompensationMutation.isPending}
+                    isRequired
+                  />
+                  <TextInput
+                    label="Income tax (BDT)"
+                    type="number"
+                    step="0.01"
+                    className="w-full"
+                    value={compensationValues.incomeTax}
+                    onChange={(event) =>
+                      setCompensationValues((prev) => ({
+                        ...prev,
+                        incomeTax: event.target.value,
+                      }))
+                    }
+                    disabled={updateCompensationMutation.isPending}
+                    isRequired
+                  />
+                </div>
+                {compensationAlert ? (
+                  <p
+                    className={`text-sm ${
+                      compensationAlert.type === "success" ? "text-emerald-600" : "text-rose-500"
+                    }`}
+                  >
+                    {compensationAlert.message}
+                  </p>
+                ) : null}
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    onClick={() => handleCompensationSubmit()}
+                    disabled={updateCompensationMutation.isPending}
+                  >
+                    {updateCompensationMutation.isPending ? "Saving..." : "Save compensation"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                HR relies on this for urgent communication.
+                You don’t have permission to update compensation for this employee.
               </p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              <TextInput
-                label="Name"
-                className="w-full"
-                name="emergencyName"
-                register={form.register}
-              />
-              <TextInput
-                label="Phone"
-                type="tel"
-                className="w-full"
-                name="emergencyPhone"
-                register={form.register}
-              />
-              <TextInput
-                label="Relation"
-                className="w-full"
-                name="emergencyRelation"
-                register={form.register}
-              />
-            </div>
+            )}
           </div>
         </div>
 
-        <div className="flex flex-wrap justify-end gap-3">
-          <Link
-            href={`/hr-admin/employees/view/${encodeURIComponent(employeeId)}`}
-            className="inline-flex items-center rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
-          >
-            Cancel
-          </Link>
-          <Button
-            type="submit"
-            disabled={editingDisabled || updateMutation.isPending}
-          >
-            {updateMutation.isPending ? "Saving..." : "Save changes"}
-          </Button>
-        </div>
+        <fieldset
+          disabled={editingDisabled}
+          className="space-y-6 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <div className="rounded-[32px] border border-white/60 bg-white/95 p-8 shadow-xl shadow-indigo-100 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-none">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Emergency contact
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  HR relies on this for urgent communication.
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <TextInput
+                  label="Name"
+                  className="w-full"
+                  name="emergencyName"
+                  register={form.register}
+                />
+                <TextInput
+                  label="Phone"
+                  type="tel"
+                  className="w-full"
+                  name="emergencyPhone"
+                  register={form.register}
+                />
+                <TextInput
+                  label="Relation"
+                  className="w-full"
+                  name="emergencyRelation"
+                  register={form.register}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-3">
+            <Link
+              href={`/hr-admin/employees/view/${encodeURIComponent(employeeId)}`}
+              className="inline-flex items-center rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:text-slate-200"
+            >
+              Cancel
+            </Link>
+            <Button
+              type="submit"
+              disabled={editingDisabled || updateMutation.isPending}
+            >
+              {updateMutation.isPending ? "Saving..." : "Save changes"}
+            </Button>
+          </div>
         </fieldset>
       </form>
 

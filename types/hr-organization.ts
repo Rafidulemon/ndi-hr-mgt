@@ -20,6 +20,7 @@ export type HrOrganizationDetails = {
   domain: string | null;
   timezone: string | null;
   locale: string | null;
+  logoUrl: string;
   createdAtIso: string;
   updatedAtIso: string;
   totalEmployees: number;

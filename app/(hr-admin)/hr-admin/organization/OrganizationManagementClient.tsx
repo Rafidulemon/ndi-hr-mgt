@@ -1,13 +1,11 @@
-/* eslint-disable tailwindcss/migration-from-tailwind-2 */
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
   FiAlertCircle,
   FiCheckCircle,
-  FiEye,
   FiShield,
-  FiTrash2,
   FiUserMinus,
   FiUserPlus,
 } from "react-icons/fi";
@@ -18,6 +16,8 @@ import SelectBox from "@/app/components/atoms/selectBox/SelectBox";
 import LoadingSpinner from "@/app/components/LoadingSpinner";
 import { Modal } from "@/app/components/atoms/frame/Modal";
 import { trpc } from "@/trpc/client";
+import { uploadOrganizationLogo } from "@/lib/upload-organization-logo";
+import { DEFAULT_ORGANIZATION_LOGO } from "@/lib/organization-branding";
 
 type AlertState = { type: "success" | "error"; message: string } | null;
 
@@ -62,16 +62,18 @@ export default function OrganizationManagementClient() {
   const [alert, setAlert] = useState<AlertState>(null);
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [detailsForm, setDetailsForm] = useState({
     name: "",
     domain: "",
     timezone: "",
     locale: "",
+    logoUrl: DEFAULT_ORGANIZATION_LOGO,
   });
+  const [logoPreview, setLogoPreview] = useState(DEFAULT_ORGANIZATION_LOGO);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   const managementQuery = trpc.hrOrganization.management.useQuery(
     selectedOrganizationId ? { organizationId: selectedOrganizationId } : undefined,
@@ -87,35 +89,9 @@ export default function OrganizationManagementClient() {
   const viewerRole = managementQuery.data?.viewerRole;
   const isSuperAdmin = viewerRole === "SUPER_ADMIN";
 
-  const organizationListQuery = trpc.hrOrganization.list.useQuery(undefined, {
-    enabled: isSuperAdmin,
-    refetchOnWindowFocus: false,
-  });
-
-  const organizations = organizationListQuery.data?.organizations ?? [];
   const organization = managementQuery.data?.organization ?? null;
   const admins = managementQuery.data?.admins ?? [];
   const eligibleMembers = managementQuery.data?.eligibleMembers ?? [];
-
-  useEffect(() => {
-    if (!isSuperAdmin) {
-      setSelectedOrganizationId(null);
-    }
-  }, [isSuperAdmin]);
-
-  useEffect(() => {
-    if (!isSuperAdmin) return;
-    if (organizationListQuery.isLoading) return;
-    if (!organizations.length) {
-      if (selectedOrganizationId !== null) {
-        setSelectedOrganizationId(null);
-      }
-      return;
-    }
-    if (!selectedOrganizationId || !organizations.some((org) => org.id === selectedOrganizationId)) {
-      setSelectedOrganizationId(organizations[0]?.id ?? null);
-    }
-  }, [isSuperAdmin, organizations, selectedOrganizationId, organizationListQuery.isLoading]);
 
   useEffect(() => {
     if (organization) {
@@ -124,14 +100,20 @@ export default function OrganizationManagementClient() {
         domain: organization.domain ?? "",
         timezone: organization.timezone ?? "",
         locale: organization.locale ?? "",
+        logoUrl: organization.logoUrl ?? DEFAULT_ORGANIZATION_LOGO,
       });
+      setLogoPreview(organization.logoUrl ?? DEFAULT_ORGANIZATION_LOGO);
+      setLogoError(null);
     } else {
       setDetailsForm({
         name: "",
         domain: "",
         timezone: "",
         locale: "",
+        logoUrl: DEFAULT_ORGANIZATION_LOGO,
       });
+      setLogoPreview(DEFAULT_ORGANIZATION_LOGO);
+      setLogoError(null);
     }
   }, [organization?.id]);
 
@@ -144,10 +126,6 @@ export default function OrganizationManagementClient() {
   useEffect(() => {
     setSelectedMemberId("");
   }, [organization?.id]);
-
-  useEffect(() => {
-    setDeleteError(null);
-  }, [deletePassword]);
 
   const eligibleOptions = useMemo(
     () =>
@@ -173,9 +151,14 @@ export default function OrganizationManagementClient() {
       domain: normalizeField(detailsForm.domain),
       timezone: normalizeField(detailsForm.timezone),
       locale: normalizeField(detailsForm.locale),
+      logoUrl: detailsForm.logoUrl.trim(),
     };
     if (!payload.name.length) {
       setAlert({ type: "error", message: "Organization name cannot be empty." });
+      return;
+    }
+    if (!payload.logoUrl.length) {
+      setAlert({ type: "error", message: "Upload an organization logo before saving." });
       return;
     }
     updateDetailsMutation.mutate(
@@ -191,6 +174,33 @@ export default function OrganizationManagementClient() {
         onError: (error) => setAlert({ type: "error", message: error.message }),
       },
     );
+  };
+
+  const handleLogoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    setLogoError(null);
+    setIsUploadingLogo(true);
+    try {
+      const uploadedUrl = await uploadOrganizationLogo(file, {
+        organizationId: organization?.id,
+      });
+      setDetailsForm((prev) => ({ ...prev, logoUrl: uploadedUrl }));
+      setLogoPreview(uploadedUrl);
+    } catch (error) {
+      setLogoError(error instanceof Error ? error.message : "Failed to upload logo.");
+    } finally {
+      setIsUploadingLogo(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleUseDefaultLogo = () => {
+    setDetailsForm((prev) => ({ ...prev, logoUrl: DEFAULT_ORGANIZATION_LOGO }));
+    setLogoPreview(DEFAULT_ORGANIZATION_LOGO);
+    setLogoError(null);
   };
 
   const handleAddAdmin = (event: React.FormEvent<HTMLFormElement>) => {
@@ -233,47 +243,6 @@ export default function OrganizationManagementClient() {
         },
         onError: (error) => setAlert({ type: "error", message: error.message }),
         onSettled: () => setPendingRemovalId(null),
-      },
-    );
-  };
-
-  const openDeleteModal = (org: { id: string; name: string }) => {
-    setDeleteTarget(org);
-    setDeletePassword("");
-    setDeleteError(null);
-    setIsDeleteModalOpen(true);
-  };
-
-  const handleCloseDeleteModal = () => {
-    setIsDeleteModalOpen(false);
-    setDeletePassword("");
-    setDeleteError(null);
-    setDeleteTarget(null);
-  };
-
-  const handleConfirmDelete = () => {
-    if (!deleteTarget) return;
-    if (!deletePassword.trim()) {
-      setDeleteError("Password is required.");
-      return;
-    }
-    if (deleteOrganizationMutation.isPending) return;
-    deleteOrganizationMutation.mutate(
-      { organizationId: deleteTarget.id, password: deletePassword },
-      {
-        onSuccess: () => {
-          setAlert({
-            type: "success",
-            message: `${deleteTarget.name} and all related data were removed.`,
-          });
-          handleCloseDeleteModal();
-          if (selectedOrganizationId === deleteTarget.id) {
-            setSelectedOrganizationId(null);
-          }
-          void utils.hrOrganization.list.invalidate();
-          void utils.hrOrganization.management.invalidate();
-        },
-        onError: (error) => setDeleteError(error.message),
       },
     );
   };
@@ -321,97 +290,6 @@ export default function OrganizationManagementClient() {
 
       <AlertBanner alert={alert} />
 
-      {isSuperAdmin ? (
-        <section className="space-y-4 rounded-[32px] border border-white/70 bg-white/90 p-6 shadow-lg shadow-indigo-100 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-950/60">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">All organizations</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Choose a workspace to view or edit. Deleting an organization permanently removes every employee and record.
-              </p>
-            </div>
-            <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-              {organizationListQuery.isFetching ? "Refreshing..." : `${organizations.length} workspaces`}
-            </p>
-          </div>
-          {organizationListQuery.isLoading ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-              Loading organizations...
-            </div>
-          ) : organizationListQuery.isError ? (
-            <div className="rounded-2xl border border-dashed border-rose-200 bg-rose-50/70 p-4 text-sm text-rose-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
-              We couldn&apos;t load the organization list. Try refreshing the page.
-            </div>
-          ) : organizations.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-              No organizations yet. Create one to get started.
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm dark:border-slate-700/70">
-              <table className="w-full text-sm text-slate-700 dark:text-slate-200">
-                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
-                  <tr>
-                    <th className="px-4 py-3">Organization</th>
-                    <th className="px-4 py-3 text-center">People</th>
-                    <th className="px-4 py-3">Created</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {organizations.map((org) => {
-                    const isSelected = selectedOrganizationId === org.id;
-                    const isDeletingTarget =
-                      deleteOrganizationMutation.isPending && deleteTarget?.id === org.id;
-                    return (
-                      <tr
-                        key={org.id}
-                        className={`border-t border-slate-100 dark:border-slate-800 ${
-                          isSelected ? "bg-indigo-50/60 dark:bg-indigo-500/5" : "bg-white dark:bg-slate-900/60"
-                        }`}
-                      >
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-slate-900 dark:text-slate-100">{org.name}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {org.domain ?? "No custom domain"}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 text-center font-semibold">{org.totalEmployees}</td>
-                        <td className="px-4 py-3 text-sm">{formatOptionalDate(org.createdAtIso)}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap justify-end gap-2">
-                            <Button
-                              theme={isSelected ? "primary" : "secondary"}
-                              className="rounded-xl px-4 py-2 text-xs"
-                              onClick={() => setSelectedOrganizationId(org.id)}
-                            >
-                              <span className="flex items-center gap-1">
-                                <FiEye />
-                                {isSelected ? "Viewing" : "View"}
-                              </span>
-                            </Button>
-                            <Button
-                              theme="cancel-secondary"
-                              className="rounded-xl px-4 py-2 text-xs"
-                              disabled={isDeletingTarget}
-                              onClick={() => openDeleteModal({ id: org.id, name: org.name })}
-                            >
-                              <span className="flex items-center gap-1">
-                                <FiTrash2 />
-                                Delete
-                              </span>
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      ) : null}
-
       {organization ? (
         <>
           <section className="grid gap-6 lg:grid-cols-3">
@@ -428,6 +306,49 @@ export default function OrganizationManagementClient() {
                   <p className="text-sm text-slate-500 dark:text-slate-400">
                     These details power invites, email domains, and timezone defaults.
                   </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-dashed border-slate-200/70 p-4 dark:border-slate-700/60">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-100">
+                  Organization logo
+                </p>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                    <Image
+                      src={logoPreview}
+                      alt="Organization logo preview"
+                      width={80}
+                      height={80}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-indigo-200 bg-white px-4 py-2 font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleLogoChange}
+                        disabled={isUploadingLogo}
+                      />
+                      {isUploadingLogo ? "Uploading..." : "Change logo"}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleUseDefaultLogo}
+                      disabled={isUploadingLogo}
+                      className="block rounded-xl border border-slate-200 bg-transparent px-4 py-2 font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800/60"
+                    >
+                      Use default logo
+                    </button>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      PNG, JPG, or WEBP files up to 5MB.
+                    </p>
+                    {logoError ? (
+                      <p className="text-xs font-semibold text-rose-600 dark:text-rose-300">{logoError}</p>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
@@ -467,7 +388,7 @@ export default function OrganizationManagementClient() {
               </div>
               <Button
                 type="submit"
-                disabled={updateDetailsMutation.isPending}
+                disabled={updateDetailsMutation.isPending || isUploadingLogo}
                 className="rounded-2xl px-5 py-2 text-sm"
               >
                 {updateDetailsMutation.isPending ? "Saving..." : "Save changes"}
@@ -605,40 +526,6 @@ export default function OrganizationManagementClient() {
           ) : null}
         </div>
       )}
-
-      <Modal
-        open={isDeleteModalOpen}
-        setOpen={setIsDeleteModalOpen}
-        title="Delete organization"
-        doneButtonText={deleteOrganizationMutation.isPending ? "Deleting..." : "Delete organization"}
-        onDoneClick={handleConfirmDelete}
-        isCancelButton
-        cancelButtonText="Cancel"
-        closeOnClick={handleCloseDeleteModal}
-        crossOnClick={handleCloseDeleteModal}
-        className="text-left"
-      >
-        <div className="space-y-4 text-sm">
-          <p>
-            Deleting <span className="font-semibold">{deleteTarget?.name ?? "this organization"}</span> will permanently remove all employees, records, reports, and invoices. This action cannot be undone.
-          </p>
-          <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Confirm with password
-            </label>
-            <input
-              type="password"
-              value={deletePassword}
-              onChange={(event) => setDeletePassword(event.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              placeholder="Enter your password"
-            />
-          </div>
-          {deleteError ? (
-            <p className="text-sm text-rose-500 dark:text-rose-300">{deleteError}</p>
-          ) : null}
-        </div>
-      </Modal>
     </div>
   );
 }

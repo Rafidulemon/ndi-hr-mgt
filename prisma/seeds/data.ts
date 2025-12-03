@@ -6,6 +6,7 @@ export type SeedOrganization = {
   domain: string;
   timezone: string;
   locale: string;
+  logoUrl: string;
 };
 
 export type SeedDepartment = {
@@ -52,6 +53,7 @@ export const organizations: SeedOrganization[] = [
     domain: "ninja-digital-innovations.com",
     timezone: "Asia/Dhaka",
     locale: "en-US",
+    logoUrl: "/logo/ndi.logo.png",
   },
 ];
 
