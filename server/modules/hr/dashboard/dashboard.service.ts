@@ -34,6 +34,21 @@ const timeFormatter = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
 });
 
+const localizedTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+const getLocalizedTimeFormatter = (timeZone: string) => {
+  let formatter = localizedTimeFormatterCache.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone,
+    });
+    localizedTimeFormatterCache.set(timeZone, formatter);
+  }
+  return formatter;
+};
+
 const hourFormatter = new Intl.DateTimeFormat("en-US", {
   hour: "numeric",
 });
@@ -213,8 +228,19 @@ const formatDelta = (value: number) => {
   return `${value > 0 ? "+" : ""}${value} vs yesterday`;
 };
 
-const formatTimeLabel = (value?: Date | null) =>
-  value ? timeFormatter.format(value) : "--";
+const formatTimeLabel = (value?: Date | null, timeZone?: string | null) => {
+  if (!value) {
+    return "--";
+  }
+  if (timeZone) {
+    try {
+      return getLocalizedTimeFormatter(timeZone).format(value);
+    } catch {
+      // Ignore invalid timezones and fall back to server defaults.
+    }
+  }
+  return timeFormatter.format(value);
+};
 
 const formatRelativeTime = (value: Date | null | undefined) => {
   if (!value) {
@@ -342,6 +368,7 @@ const categorizeAttendance = (records: AttendanceRecordWithEmployee[]) => {
 
 const buildAttendanceLog = (
   records: AttendanceRecordWithEmployee[],
+  timeZone?: string | null,
 ): HrDashboardAttendanceLogEntry[] =>
   records.slice(0, 6).map((record) => ({
     id: record.id,
@@ -352,7 +379,7 @@ const buildAttendanceLog = (
       fallback: record.employee.email,
     }),
     department: buildDepartment(record.employee.employment),
-    checkIn: formatTimeLabel(record.checkInAt),
+    checkIn: formatTimeLabel(record.checkInAt, timeZone),
     status: mapStatusLabel(record),
     method: `${record.source ?? "System"} · ${record.location ?? "N/A"}`,
     state: mapAttendanceState(record),
@@ -526,6 +553,7 @@ export const hrDashboardService = {
   ): Promise<HrDashboardResponse> {
     const sessionUser = requireHrAdmin(ctx);
     const organizationId = sessionUser.organizationId;
+    const organizationTimeZone = sessionUser.organization?.timezone ?? null;
     const targetDate = startOfDay(parseDateInput(input?.date));
     const previousDate = addDays(targetDate, -1);
 
@@ -736,7 +764,7 @@ export const hrDashboardService = {
       const right = b.checkInAt ? b.checkInAt.getTime() : 0;
       return right - left;
     });
-    const attendanceLog = buildAttendanceLog(sortedLogs);
+    const attendanceLog = buildAttendanceLog(sortedLogs, organizationTimeZone);
     const attendanceTrend = buildAttendanceTrend(attendanceToday);
 
     const latestSync = attendanceToday.reduce<Date | null>(

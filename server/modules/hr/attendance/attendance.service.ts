@@ -29,9 +29,36 @@ const timeFormatter = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
 });
 
+const localizedTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+const getLocalizedTimeFormatter = (timeZone: string) => {
+  let formatter = localizedTimeFormatterCache.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone,
+    });
+    localizedTimeFormatterCache.set(timeZone, formatter);
+  }
+  return formatter;
+};
+
 const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
 
-const formatTimeLabel = (value?: Date | null) => (value ? timeFormatter.format(value) : "—");
+const formatTimeLabel = (value?: Date | null, timeZone?: string | null) => {
+  if (!value) {
+    return "—";
+  }
+  if (timeZone) {
+    try {
+      return getLocalizedTimeFormatter(timeZone).format(value);
+    } catch {
+      // Ignore invalid timezones and fall back to server defaults.
+    }
+  }
+  return timeFormatter.format(value);
+};
 
 const formatDateKey = (date: Date) => date.toISOString().split("T")[0]!;
 
@@ -245,6 +272,7 @@ type AttendanceRecordWithEmployee = Prisma.AttendanceRecordGetPayload<{
 const mapLog = (
   record: AttendanceRecordWithEmployee,
   timings?: PolicyTimings | null,
+  timeZone?: string | null,
 ): HrAttendanceLog => ({
   id: record.id,
   employeeId: record.employeeId,
@@ -255,8 +283,8 @@ const mapLog = (
     email: record.employee.email,
   }),
   squad: record.employee.employment?.team?.name ?? null,
-  checkIn: formatTimeLabel(record.checkInAt),
-  checkOut: formatTimeLabel(record.checkOutAt),
+  checkIn: formatTimeLabel(record.checkInAt, timeZone),
+  checkOut: formatTimeLabel(record.checkOutAt, timeZone),
   status: resolveHrStatusWithPolicy(record, timings),
   source: isManualSource(record.source) ? "Manual" : "System",
 });
@@ -546,6 +574,7 @@ export const hrAttendanceService = {
   async overview(ctx: TRPCContext, input: HrAttendanceOverviewInput): Promise<HrAttendanceOverviewResponse> {
     const sessionUser = requireHrAdmin(ctx);
     const organizationId = sessionUser.organizationId;
+    const organizationTimeZone = sessionUser.organization?.timezone ?? null;
     const targetDate = startOfDay(parseDateOrThrow(input.date, "Invalid date provided."));
 
     const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
@@ -642,7 +671,7 @@ export const hrAttendanceService = {
 
     const employeesOptions = buildEmployees(employees);
     const policyTimings = resolvePolicyTimings(policyRecord);
-    const dayLogs = dayRecords.map((record) => mapLog(record, policyTimings));
+    const dayLogs = dayRecords.map((record) => mapLog(record, policyTimings, organizationTimeZone));
     const statusCounts = dayLogs.reduce((acc, log) => {
       acc[log.status] += 1;
       return acc;
@@ -670,6 +699,7 @@ export const hrAttendanceService = {
   async history(ctx: TRPCContext, input: HrAttendanceHistoryInput): Promise<HrAttendanceHistoryResponse> {
     const sessionUser = requireHrAdmin(ctx);
     const organizationId = sessionUser.organizationId;
+    const organizationTimeZone = sessionUser.organization?.timezone ?? null;
 
     const monthStart = new Date(input.year, input.month, 1);
     const monthEnd = new Date(input.year, input.month + 1, 1);
@@ -708,8 +738,8 @@ export const hrAttendanceService = {
       year: input.year,
       rows: rows.map((record) => ({
         date: formatDateKey(record.attendanceDate),
-        checkIn: formatTimeLabel(record.checkInAt),
-        checkOut: formatTimeLabel(record.checkOutAt),
+        checkIn: formatTimeLabel(record.checkInAt, organizationTimeZone),
+        checkOut: formatTimeLabel(record.checkOutAt, organizationTimeZone),
         status: resolveHrStatusWithPolicy(record, policyTimings),
         source: isManualSource(record.source) ? "Manual" : "System",
       })),
@@ -719,6 +749,7 @@ export const hrAttendanceService = {
   async recordManualEntry(ctx: TRPCContext, input: HrAttendanceManualEntryInput): Promise<HrAttendanceLog> {
     const sessionUser = requireHrAdmin(ctx);
     const organizationId = sessionUser.organizationId;
+    const organizationTimeZone = sessionUser.organization?.timezone ?? null;
     const attendanceDate = startOfDay(parseDateOrThrow(input.date, "Invalid date provided."));
 
     const [employee, policyRecord] = await Promise.all([
@@ -798,6 +829,8 @@ export const hrAttendanceService = {
       select: attendanceRecordSelect,
     });
 
-    return mapLog(record, policyTimings);
+    const resolvedTimeZone = employee.organization?.timezone ?? organizationTimeZone;
+
+    return mapLog(record, policyTimings, resolvedTimeZone);
   },
 };
