@@ -4,16 +4,20 @@ import type { MouseEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { FiMenu, FiX } from "react-icons/fi";
 
+import { DEFAULT_ORGANIZATION_LOGO } from "@/lib/organization-branding";
+
 type ResponsiveDashboardShellProps = {
   children: ReactNode;
   menu: ReactNode;
   menuLabel?: string;
+  faviconUrl?: string | null;
 };
 
 const ResponsiveDashboardShell = ({
   children,
   menu,
   menuLabel = "Menu",
+  faviconUrl,
 }: ResponsiveDashboardShellProps) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -38,6 +42,24 @@ const ResponsiveDashboardShell = ({
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isDrawerOpen]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+    const resolvedIcon =
+      faviconUrl && faviconUrl.trim().length ? faviconUrl : DEFAULT_ORGANIZATION_LOGO;
+    const rels = ["icon", "shortcut icon", "apple-touch-icon"];
+    rels.forEach((rel) => {
+      let link = document.querySelector<HTMLLinkElement>(`head link[rel="${rel}"]`);
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      link.href = resolvedIcon;
+    });
+  }, [faviconUrl]);
 
   const overlayClasses = [
     "fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm transition-opacity duration-300 lg:hidden",

@@ -68,18 +68,102 @@ const resolvePolicyTimings = (record?: PolicyTimings | null): PolicyTimings => (
   remoteStartTime: record?.remoteStartTime ?? DEFAULT_POLICY_TIMINGS.remoteStartTime,
 });
 
-const buildScheduledStart = (timeValue: string, fallbackValue: string, reference: Date) => {
+const timezoneFormatterCache = new Map<string, Intl.DateTimeFormat>();
+const timezoneValidationCache = new Map<string, boolean>();
+
+const isValidTimeZone = (value: string | null | undefined): value is string => {
+  if (!value) {
+    return false;
+  }
+  if (timezoneValidationCache.has(value)) {
+    return timezoneValidationCache.get(value) ?? false;
+  }
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    timezoneValidationCache.set(value, true);
+    return true;
+  } catch {
+    timezoneValidationCache.set(value, false);
+    return false;
+  }
+};
+
+const getTimeZoneFormatter = (timeZone: string) => {
+  let formatter = timezoneFormatterCache.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    timezoneFormatterCache.set(timeZone, formatter);
+  }
+  return formatter;
+};
+
+const padTimeUnit = (value: number) => value.toString().padStart(2, "0");
+
+const formatDateKey = (date: Date) => date.toISOString().split("T")[0]!;
+
+const getTimeZoneOffsetMs = (date: Date, timeZone: string) => {
+  const formatter = getTimeZoneFormatter(timeZone);
+  const parts = formatter.formatToParts(date);
+  const filled = parts.reduce<Record<string, number>>((acc, part) => {
+    if (part.type !== "literal") {
+      acc[part.type] = Number(part.value);
+    }
+    return acc;
+  }, {});
+
+  const asUtc = Date.UTC(
+    filled.year ?? date.getUTCFullYear(),
+    (filled.month ?? date.getUTCMonth() + 1) - 1,
+    filled.day ?? date.getUTCDate(),
+    filled.hour ?? 0,
+    filled.minute ?? 0,
+    filled.second ?? 0,
+    0,
+  );
+
+  return asUtc - date.getTime();
+};
+
+const convertLocalTimeToUtc = (day: Date, hours: number, minutes: number, timeZone: string) => {
+  const base = new Date(
+    `${formatDateKey(day)}T${padTimeUnit(hours)}:${padTimeUnit(minutes)}:00.000Z`,
+  );
+  const initialOffset = getTimeZoneOffsetMs(base, timeZone);
+  const candidate = new Date(base.getTime() - initialOffset);
+  const verifiedOffset = getTimeZoneOffsetMs(candidate, timeZone);
+  if (verifiedOffset !== initialOffset) {
+    return new Date(base.getTime() - verifiedOffset);
+  }
+  return candidate;
+};
+
+const buildScheduledStart = (
+  timeValue: string,
+  fallbackValue: string,
+  reference: Date,
+  timeZone?: string | null,
+) => {
   const scheduled = new Date(reference);
-  const [hourStr, minuteStr] = timeValue.split(":");
-  const hour = Number.parseInt(hourStr ?? "", 10);
-  const minute = Number.parseInt(minuteStr ?? "", 10);
+  let hour = Number.parseInt(timeValue.split(":")[0] ?? "", 10);
+  let minute = Number.parseInt(timeValue.split(":")[1] ?? "", 10);
 
   if (Number.isNaN(hour) || Number.isNaN(minute)) {
     const [fallbackHourStr, fallbackMinuteStr] = fallbackValue.split(":");
-    const fallbackHour = Number.parseInt(fallbackHourStr ?? "", 10) || 0;
-    const fallbackMinute = Number.parseInt(fallbackMinuteStr ?? "", 10) || 0;
-    scheduled.setHours(fallbackHour, fallbackMinute, 0, 0);
-    return scheduled;
+    hour = Number.parseInt(fallbackHourStr ?? "", 10) || 0;
+    minute = Number.parseInt(fallbackMinuteStr ?? "", 10) || 0;
+  }
+
+  if (timeZone && isValidTimeZone(timeZone)) {
+    return convertLocalTimeToUtc(reference, hour, minute, timeZone);
   }
 
   scheduled.setHours(hour, minute, 0, 0);
@@ -162,7 +246,7 @@ export const attendanceService = {
     const now = new Date();
     const attendanceDate = startOfDay(now);
 
-    const [existing, policyRecord] = await Promise.all([
+    const [existing, policyRecord, organizationRecord] = await Promise.all([
       prisma.attendanceRecord.findUnique({
         where: {
           employeeId_attendanceDate: {
@@ -178,6 +262,10 @@ export const attendanceService = {
           remoteStartTime: true,
         },
       }),
+      prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { timezone: true },
+      }),
     ]);
 
     if (existing) {
@@ -189,17 +277,20 @@ export const attendanceService = {
     }
 
     const timings = resolvePolicyTimings(policyRecord);
+    const organizationTimeZone = organizationRecord?.timezone ?? null;
     const scheduledStart =
       input.location === "REMOTE"
         ? buildScheduledStart(
             timings.remoteStartTime,
             DEFAULT_POLICY_TIMINGS.remoteStartTime,
             now,
+            organizationTimeZone,
           )
         : buildScheduledStart(
             timings.onsiteStartTime,
             DEFAULT_POLICY_TIMINGS.onsiteStartTime,
             now,
+            organizationTimeZone,
           );
     const status = resolveAttendanceStatus(now, scheduledStart);
     const locationLabel = LOCATION_LABELS[input.location];

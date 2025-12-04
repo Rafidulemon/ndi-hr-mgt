@@ -3,6 +3,7 @@ import {
   EmploymentStatus,
   LeaveStatus,
   Prisma,
+  WorkModel,
 } from "@prisma/client";
 
 import { leaveTypeLabelMap } from "@/lib/leave-types";
@@ -64,6 +65,181 @@ const monthFormatter = new Intl.DateTimeFormat("en-US", {
 
 const countFormatter = new Intl.NumberFormat("en-US");
 
+const FALLBACK_POLICY_TIMINGS = {
+  onsiteStartTime: "09:00",
+  remoteStartTime: "08:00",
+} as const;
+
+const LATE_TOLERANCE_MS = 10 * 60 * 1000;
+
+type PolicyTimings = {
+  onsiteStartTime: string;
+  remoteStartTime: string;
+};
+
+const resolvePolicyTimings = (
+  policy?: { onsiteStartTime: string; remoteStartTime: string } | null,
+): PolicyTimings => ({
+  onsiteStartTime: policy?.onsiteStartTime ?? FALLBACK_POLICY_TIMINGS.onsiteStartTime,
+  remoteStartTime: policy?.remoteStartTime ?? FALLBACK_POLICY_TIMINGS.remoteStartTime,
+});
+
+const timezoneValidationCache = new Map<string, boolean>();
+const timezoneFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+const isValidTimeZone = (value: string | null | undefined): value is string => {
+  if (!value) {
+    return false;
+  }
+  if (timezoneValidationCache.has(value)) {
+    return timezoneValidationCache.get(value) ?? false;
+  }
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    timezoneValidationCache.set(value, true);
+    return true;
+  } catch {
+    timezoneValidationCache.set(value, false);
+    return false;
+  }
+};
+
+const getTimeZoneFormatter = (timeZone: string) => {
+  let formatter = timezoneFormatterCache.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    timezoneFormatterCache.set(timeZone, formatter);
+  }
+  return formatter;
+};
+
+const padTimeUnit = (value: number) => value.toString().padStart(2, "0");
+
+const formatDateKey = (date: Date) => date.toISOString().split("T")[0]!;
+
+const getTimeZoneOffsetMs = (date: Date, timeZone: string) => {
+  const formatter = getTimeZoneFormatter(timeZone);
+  const parts = formatter.formatToParts(date);
+  const filled = parts.reduce<Record<string, number>>((acc, part) => {
+    if (part.type !== "literal") {
+      acc[part.type] = Number(part.value);
+    }
+    return acc;
+  }, {});
+
+  const asUtc = Date.UTC(
+    filled.year ?? date.getUTCFullYear(),
+    (filled.month ?? date.getUTCMonth() + 1) - 1,
+    filled.day ?? date.getUTCDate(),
+    filled.hour ?? 0,
+    filled.minute ?? 0,
+    filled.second ?? 0,
+    0,
+  );
+
+  return asUtc - date.getTime();
+};
+
+const convertLocalTimeToUtc = (day: Date, hours: number, minutes: number, timeZone: string) => {
+  const base = new Date(
+    `${formatDateKey(day)}T${padTimeUnit(hours)}:${padTimeUnit(minutes)}:00.000Z`,
+  );
+  const initialOffset = getTimeZoneOffsetMs(base, timeZone);
+  const candidate = new Date(base.getTime() - initialOffset);
+  const verifiedOffset = getTimeZoneOffsetMs(candidate, timeZone);
+  if (verifiedOffset !== initialOffset) {
+    return new Date(base.getTime() - verifiedOffset);
+  }
+  return candidate;
+};
+
+const buildScheduledStart = (
+  timeValue: string,
+  fallbackValue: string,
+  reference: Date,
+  timeZone?: string | null,
+) => {
+  const scheduled = new Date(reference);
+  let hour = Number.parseInt(timeValue.split(":")[0] ?? "", 10);
+  let minute = Number.parseInt(timeValue.split(":")[1] ?? "", 10);
+
+  if (Number.isNaN(hour) || Number.isNaN(minute)) {
+    const [fallbackHourStr, fallbackMinuteStr] = fallbackValue.split(":");
+    hour = Number.parseInt(fallbackHourStr ?? "", 10) || 0;
+    minute = Number.parseInt(fallbackMinuteStr ?? "", 10) || 0;
+  }
+
+  if (timeZone && isValidTimeZone(timeZone)) {
+    return convertLocalTimeToUtc(reference, hour, minute, timeZone);
+  }
+
+  scheduled.setHours(hour, minute, 0, 0);
+  return scheduled;
+};
+
+const inferWorkType = (
+  record: AttendanceRecordWithEmployee,
+): "REMOTE" | "ONSITE" => {
+  if (record.status === AttendanceStatus.REMOTE) {
+    return "REMOTE";
+  }
+  const normalized = record.location?.toLowerCase().trim() ?? "";
+  if (normalized.includes("remote")) {
+    return "REMOTE";
+  }
+  const profileWorkModel = record.employee.profile?.workModel;
+  if (profileWorkModel === WorkModel.REMOTE) {
+    return "REMOTE";
+  }
+  return "ONSITE";
+};
+
+const resolveScheduledStartForRecord = (
+  record: AttendanceRecordWithEmployee,
+  timings: PolicyTimings,
+  timeZone?: string | null,
+) => {
+  const reference = record.checkInAt ?? record.attendanceDate;
+  const workType = inferWorkType(record);
+  return workType === "REMOTE"
+    ? buildScheduledStart(
+        timings.remoteStartTime,
+        FALLBACK_POLICY_TIMINGS.remoteStartTime,
+        reference,
+        timeZone,
+      )
+    : buildScheduledStart(
+        timings.onsiteStartTime,
+        FALLBACK_POLICY_TIMINGS.onsiteStartTime,
+        reference,
+        timeZone,
+      );
+};
+
+const shouldFlagLate = (
+  record: AttendanceRecordWithEmployee,
+  timings?: PolicyTimings | null,
+  timeZone?: string | null,
+) => {
+  if (record.status === AttendanceStatus.LATE) {
+    return true;
+  }
+  if (!timings || !record.checkInAt) {
+    return false;
+  }
+  const scheduledStart = resolveScheduledStartForRecord(record, timings, timeZone);
+  return record.checkInAt.getTime() > scheduledStart.getTime() + LATE_TOLERANCE_MS;
+};
+
 const employeeSelect = {
   id: true,
   email: true,
@@ -122,6 +298,7 @@ const attendanceRecordSelect = {
           firstName: true,
           lastName: true,
           preferredName: true,
+          workModel: true,
         },
       },
       employment: {
@@ -302,32 +479,39 @@ const isRemoteRecord = (record: AttendanceRecordWithEmployee) => {
   );
 };
 
-const mapStatusLabel = (record: AttendanceRecordWithEmployee) => {
-  switch (record.status) {
-    case AttendanceStatus.LATE:
-      return "Late";
-    case AttendanceStatus.ABSENT:
-      return "Missing";
-    case AttendanceStatus.HOLIDAY:
-      return "Holiday";
-    case AttendanceStatus.HALF_DAY:
-      return "Half day";
-    default:
-      return isRemoteRecord(record) ? "Remote" : "On-site";
+const mapStatusLabel = (
+  record: AttendanceRecordWithEmployee,
+  timings?: PolicyTimings | null,
+  timeZone?: string | null,
+) => {
+  if (record.status === AttendanceStatus.ABSENT) {
+    return "Missing";
   }
+  if (record.status === AttendanceStatus.HOLIDAY) {
+    return "Holiday";
+  }
+  if (record.status === AttendanceStatus.HALF_DAY) {
+    return "Half day";
+  }
+  if (shouldFlagLate(record, timings, timeZone)) {
+    return "Late";
+  }
+  return isRemoteRecord(record) ? "Remote" : "On-site";
 };
 
 const mapAttendanceState = (
   record: AttendanceRecordWithEmployee,
+  timings?: PolicyTimings | null,
+  timeZone?: string | null,
 ): HrDashboardAttendanceState => {
-  if (record.status === AttendanceStatus.LATE) {
-    return "late";
-  }
   if (record.status === AttendanceStatus.ABSENT) {
     return "missing";
   }
   if (record.status === AttendanceStatus.HOLIDAY) {
     return "remote";
+  }
+  if (shouldFlagLate(record, timings, timeZone)) {
+    return "late";
   }
   if (isRemoteRecord(record)) {
     return "remote";
@@ -335,7 +519,11 @@ const mapAttendanceState = (
   return "on-time";
 };
 
-const categorizeAttendance = (records: AttendanceRecordWithEmployee[]) => {
+const categorizeAttendance = (
+  records: AttendanceRecordWithEmployee[],
+  timings?: PolicyTimings | null,
+  timeZone?: string | null,
+) => {
   const counts = {
     onsite: 0,
     remote: 0,
@@ -352,7 +540,7 @@ const categorizeAttendance = (records: AttendanceRecordWithEmployee[]) => {
       counts.absent += 1;
       return;
     }
-    if (record.status === AttendanceStatus.LATE) {
+    if (shouldFlagLate(record, timings, timeZone)) {
       counts.late += 1;
       return;
     }
@@ -368,9 +556,15 @@ const categorizeAttendance = (records: AttendanceRecordWithEmployee[]) => {
 
 const buildAttendanceLog = (
   records: AttendanceRecordWithEmployee[],
-  timeZone?: string | null,
-): HrDashboardAttendanceLogEntry[] =>
-  records.slice(0, 6).map((record) => ({
+  options?: {
+    timeZone?: string | null;
+    timings?: PolicyTimings | null;
+    scheduleTimeZone?: string | null;
+  },
+): HrDashboardAttendanceLogEntry[] => {
+  const { timeZone, timings, scheduleTimeZone } = options ?? {};
+  const timingZone = scheduleTimeZone ?? timeZone;
+  return records.slice(0, 6).map((record) => ({
     id: record.id,
     name: buildName({
       preferredName: record.employee.profile?.preferredName ?? null,
@@ -380,10 +574,11 @@ const buildAttendanceLog = (
     }),
     department: buildDepartment(record.employee.employment),
     checkIn: formatTimeLabel(record.checkInAt, timeZone),
-    status: mapStatusLabel(record),
+    status: mapStatusLabel(record, timings, timingZone),
     method: `${record.source ?? "System"} · ${record.location ?? "N/A"}`,
-    state: mapAttendanceState(record),
+    state: mapAttendanceState(record, timings, timingZone),
   }));
+};
 
 const buildAttendanceTrend = (records: AttendanceRecordWithEmployee[]) => {
   const hours = [9, 10, 11, 12, 13, 14];
@@ -557,8 +752,14 @@ export const hrDashboardService = {
     const targetDate = startOfDay(parseDateInput(input?.date));
     const previousDate = addDays(targetDate, -1);
 
-    const [employees, attendanceToday, attendanceYesterday, leaveRequests, pendingLeavesCount] =
-      await Promise.all([
+    const [
+      employees,
+      attendanceToday,
+      attendanceYesterday,
+      leaveRequests,
+      pendingLeavesCount,
+      policyRecord,
+    ] = await Promise.all([
         ctx.prisma.user.findMany({
           where: {
             organizationId,
@@ -620,7 +821,16 @@ export const hrDashboardService = {
             },
           },
         }),
+        ctx.prisma.workPolicy.findUnique({
+          where: { organizationId },
+          select: {
+            onsiteStartTime: true,
+            remoteStartTime: true,
+          },
+        }),
       ]);
+
+    const policyTimings = resolvePolicyTimings(policyRecord);
 
     const allowedStatuses: EmploymentStatus[] = [
       EmploymentStatus.ACTIVE,
@@ -648,12 +858,6 @@ export const hrDashboardService = {
       AttendanceStatus.REMOTE,
       AttendanceStatus.HALF_DAY,
     ]);
-    const onTimeStatuses = new Set<AttendanceStatus>([
-      AttendanceStatus.PRESENT,
-      AttendanceStatus.REMOTE,
-      AttendanceStatus.HALF_DAY,
-    ]);
-
     const presentCount = attendanceToday.filter((record) =>
       presentStatuses.has(record.status),
     ).length;
@@ -665,17 +869,18 @@ export const hrDashboardService = {
     const previousCoveragePercent =
       totalEmployees > 0 ? (previousPresent / totalEmployees) * 100 : 0;
 
+    const onTimeToday = attendanceToday.filter(
+      (record) => !shouldFlagLate(record, policyTimings, organizationTimeZone),
+    ).length;
+    const onTimeYesterday = attendanceYesterday.filter(
+      (record) => !shouldFlagLate(record, policyTimings, organizationTimeZone),
+    ).length;
+
     const accuracy =
-      attendanceToday.length > 0
-        ? (attendanceToday.filter((record) => onTimeStatuses.has(record.status)).length /
-            attendanceToday.length) *
-          100
-        : 100;
+      attendanceToday.length > 0 ? (onTimeToday / attendanceToday.length) * 100 : 100;
     const previousAccuracy =
       attendanceYesterday.length > 0
-        ? (attendanceYesterday.filter((record) => onTimeStatuses.has(record.status)).length /
-            attendanceYesterday.length) *
-          100
+        ? (onTimeYesterday / attendanceYesterday.length) * 100
         : accuracy;
 
     const utilizedEmployees = activeEmployees.filter(
@@ -741,8 +946,16 @@ export const hrDashboardService = {
       absent: "from-rose-400 to-pink-500",
     };
 
-    const currentCategories = categorizeAttendance(attendanceToday);
-    const previousCategories = categorizeAttendance(attendanceYesterday);
+    const currentCategories = categorizeAttendance(
+      attendanceToday,
+      policyTimings,
+      organizationTimeZone,
+    );
+    const previousCategories = categorizeAttendance(
+      attendanceYesterday,
+      policyTimings,
+      organizationTimeZone,
+    );
     const attendanceBreakdown: HrDashboardAttendanceBreakdownCard[] = (Object.keys(
       currentCategories,
     ) as Array<keyof typeof currentCategories>).map((key) => ({
@@ -764,7 +977,11 @@ export const hrDashboardService = {
       const right = b.checkInAt ? b.checkInAt.getTime() : 0;
       return right - left;
     });
-    const attendanceLog = buildAttendanceLog(sortedLogs, organizationTimeZone);
+    const attendanceLog = buildAttendanceLog(sortedLogs, {
+      timeZone: organizationTimeZone,
+      timings: policyTimings,
+      scheduleTimeZone: organizationTimeZone,
+    });
     const attendanceTrend = buildAttendanceTrend(attendanceToday);
 
     const latestSync = attendanceToday.reduce<Date | null>(

@@ -58,6 +58,7 @@ export default async function HrAdminLayout({
           organizationLogoUrl={user.organization?.logoUrl ?? undefined}
         />
       }
+      faviconUrl={user.organization?.logoUrl ?? undefined}
     >
       {children}
     </ResponsiveDashboardShell>

@@ -39,6 +39,7 @@ export default async function MainLayout({
           organizationLogoUrl={user.organization?.logoUrl ?? undefined}
         />
       }
+      faviconUrl={user.organization?.logoUrl ?? undefined}
     >
       {children}
     </ResponsiveDashboardShell>
