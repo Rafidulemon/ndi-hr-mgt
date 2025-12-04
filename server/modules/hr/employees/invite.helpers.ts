@@ -130,13 +130,13 @@ export const sendInvitationEmail = async ({
     month: "short",
     day: "numeric",
   }).format(expiresAt);
-  const senderDisplay = senderName?.trim()?.length ? senderName : "NDI HR team";
+  const senderDisplay = senderName?.trim()?.length ? senderName : "HR team";
   const roleLabel = formatRoleLabel(invitedRole);
 
   const textBody = [
     greeting,
     "",
-    `${senderDisplay} invited you to join ${organizationName} on NDI HR as ${roleLabel}.`,
+    `${senderDisplay} invited you to join ${organizationName} on HR as ${roleLabel}.`,
     "Use the secure link below to finish setting up your account and choose a password.",
     "",
     inviteLink,
@@ -150,12 +150,12 @@ export const sendInvitationEmail = async ({
   await transporter.sendMail({
     from: `"${organizationName} HR" <${emailUser}>`,
     to,
-    subject: `You're invited to ${organizationName} on NDI HR`,
+    subject: `You're invited to ${organizationName} on HR`,
     text: textBody,
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.5;">
         <p>${greeting}</p>
-        <p>${senderDisplay} invited you to join <strong>${organizationName}</strong> on NDI HR as <strong>${roleLabel}</strong>.</p>
+        <p>${senderDisplay} invited you to join <strong>${organizationName}</strong> on HR as <strong>${roleLabel}</strong>.</p>
         <p>Use the secure link below to finish setting up your account and choose a password. The link will expire on <strong>${expiresLabel}</strong>.</p>
         <p style="margin: 24px 0;">
           <a

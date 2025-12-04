@@ -49,11 +49,11 @@ export const NDI_ORG_ID = "org-ndi";
 export const organizations: SeedOrganization[] = [
   {
     id: NDI_ORG_ID,
-    name: "Ninja Digital Innovation",
-    domain: "ninja-digital-innovations.com",
+    name: "Demo Company",
+    domain: "example.com",
     timezone: "Asia/Dhaka",
     locale: "en-US",
-    logoUrl: "/logo/ndi.logo.png",
+    logoUrl: "/logo/demo.logo.png",
   },
 ];
 

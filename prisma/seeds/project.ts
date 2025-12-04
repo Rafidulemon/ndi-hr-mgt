@@ -4,10 +4,10 @@ const projects = [
   {
     id: "proj-hr-platform",
     organizationId: "org-ndi",
-    name: "NDI HR Platform",
+    name: "HR Platform",
     code: "NDI-HR-001",
     description: "Rollout of a unified HR and attendance platform.",
-    clientName: "Ninja Digital Innovation",
+    clientName: "Demo Company",
     status: "ACTIVE" as const,
     startDate: new Date("2024-01-15"),
     projectManager: "eng-head-sakib",

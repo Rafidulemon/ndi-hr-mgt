@@ -34,10 +34,6 @@ function ForgetPasswordPage() {
     resolver: zodResolver(schema),
   });
 
-  const handleSignUpButton = () => {
-    router.push("/auth/signup");
-  };
-
   const handleLoginButton = () => {
     router.push("/auth/login");
   };
@@ -107,13 +103,7 @@ function ForgetPasswordPage() {
           </button>
         </p>
       }
-      showcase={{
-        footer: (
-          <Button onClick={handleSignUpButton} theme="white" isWidthFull>
-            <Text text="Create an account" className="text-[15px] font-semibold" />
-          </Button>
-        ),
-      }}
+      showShowcase={false}
     >
       <form onSubmit={handleSubmit(handleSubmitForm)} className="space-y-6">
         <EmailInput

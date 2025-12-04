@@ -56,10 +56,6 @@ function LoginPage() {
     router.push("/auth/forget-password");
   };
 
-  const handleSignUpButton = () => {
-    router.push("/auth/signup");
-  };
-
   const toggleRememberMe = (event: ChangeEvent<HTMLInputElement>) => {
     setRememberMe(event.target.checked);
   };
@@ -110,25 +106,7 @@ function LoginPage() {
       subtitle="Sign in to continue."
       description="Use your work email and password to access your dashboard."
       helper="Forgot your credentials? Use the recovery link below."
-      footer={
-        <p className="text-sm">
-          New to NDI HR?
-          <button
-            type="button"
-            onClick={handleSignUpButton}
-            className="ml-2 font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-sky-400 dark:hover:text-sky-300"
-          >
-            Create an account
-          </button>
-        </p>
-      }
-      showcase={{
-        footer: (
-          <Button onClick={handleSignUpButton} theme="white" isWidthFull>
-            <Text text="Create an account" className="text-[15px] font-semibold" />
-          </Button>
-        ),
-      }}
+      showShowcase={false}
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="space-y-4">

@@ -44,7 +44,7 @@ CREATE TABLE "Organization" (
     "domain" TEXT,
     "timezone" TEXT DEFAULT 'Asia/Dhaka',
     "locale" TEXT DEFAULT 'en-US',
-    "logoUrl" TEXT NOT NULL DEFAULT '/logo/ndi.logo.png',
+    "logoUrl" TEXT NOT NULL DEFAULT '/logo/demo.logo.png',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

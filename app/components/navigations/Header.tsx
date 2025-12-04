@@ -27,8 +27,8 @@ function Header() {
       >
         <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg shadow-indigo-500/30">
           <Image
-            src="/logo/ndi.logo.png"
-            alt="NDI HR Management"
+            src="/logo/demo.logo.png"
+            alt="HR Management"
             width={36}
             height={36}
             className="h-9 w-9 object-contain"
@@ -37,10 +37,10 @@ function Header() {
         </span>
         <div className="hidden flex-col sm:flex">
           <span className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-            NINJA
+            Demo
           </span>
           <span className="text-base font-semibold leading-tight">
-            Digital Innovations
+            Company
           </span>
         </div>
       </button>
@@ -66,12 +66,14 @@ function Header() {
             </Link>
           );
         })}
-        <Link
-          href={isLoginPage ? '/auth/signup' : '/auth/login'}
-          className="inline-flex items-center rounded border border-transparent bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 px-5 py-2 text-white shadow-lg shadow-indigo-500/30 transition hover:from-indigo-600 hover:via-sky-600 hover:to-cyan-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:from-sky-600 dark:via-sky-500 dark:to-cyan-400"
-        >
-          {isLoginPage ? 'Sign Up' : 'Login'}
-        </Link>
+        {!isLoginPage ? (
+          <Link
+            href="/auth/login"
+            className="inline-flex items-center rounded border border-transparent bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 px-5 py-2 text-white shadow-lg shadow-indigo-500/30 transition hover:from-indigo-600 hover:via-sky-600 hover:to-cyan-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:from-sky-600 dark:via-sky-500 dark:to-cyan-400"
+          >
+            Login
+          </Link>
+        ) : null}
       </nav>
     </header>
   );

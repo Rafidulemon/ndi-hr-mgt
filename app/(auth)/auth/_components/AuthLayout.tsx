@@ -26,6 +26,7 @@ type AuthLayoutProps = {
   children: ReactNode;
   footer?: ReactNode;
   showcase?: Partial<ShowcaseContent>;
+  showShowcase?: boolean;
 };
 
 const defaultShowcase: ShowcaseContent = {
@@ -53,6 +54,7 @@ export default function AuthLayout({
   children,
   footer,
   showcase,
+  showShowcase = true,
 }: AuthLayoutProps) {
   const hero: ShowcaseContent = {
     ...defaultShowcase,
@@ -77,34 +79,38 @@ export default function AuthLayout({
       </div>
 
       <div className="relative z-10 flex min-h-screen items-center px-6 pb-12 pt-32 lg:pt-36">
-        <div className="mx-auto grid w-full max-w-6xl gap-8 lg:grid-cols-[1.05fr,0.95fr]">
-          <section className="rounded-[32px] border border-white/30 bg-gradient-to-br from-indigo-600 via-sky-500 to-cyan-400 p-10 text-white shadow-2xl shadow-sky-500/30 backdrop-blur-lg dark:border-slate-900/60 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 dark:shadow-slate-950">
-            <span className="inline-flex items-center rounded-full border border-white/30 px-4 py-1 text-xs uppercase tracking-[0.3em] text-white/80">
-              {hero.eyebrow}
-            </span>
-            <h2 className="mt-6 text-3xl font-semibold leading-tight md:text-4xl">
-              {hero.title}
-            </h2>
-            <p className="mt-4 text-base text-white/80 md:text-lg">
-              {hero.description}
-            </p>
+        <div
+          className={`mx-auto ${showShowcase ? "grid w-full max-w-6xl gap-8 lg:grid-cols-[1.05fr,0.95fr]" : "w-full max-w-xl"}`}
+        >
+          {showShowcase ? (
+            <section className="rounded-[32px] border border-white/30 bg-gradient-to-br from-indigo-600 via-sky-500 to-cyan-400 p-10 text-white shadow-2xl shadow-sky-500/30 backdrop-blur-lg dark:border-slate-900/60 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 dark:shadow-slate-950">
+              <span className="inline-flex items-center rounded-full border border-white/30 px-4 py-1 text-xs uppercase tracking-[0.3em] text-white/80">
+                {hero.eyebrow}
+              </span>
+              <h2 className="mt-6 text-3xl font-semibold leading-tight md:text-4xl">
+                {hero.title}
+              </h2>
+              <p className="mt-4 text-base text-white/80 md:text-lg">
+                {hero.description}
+              </p>
 
-            <div className="relative mt-8 overflow-hidden rounded-[28px] border border-white/20 bg-white/10">
-              <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/30 via-transparent to-transparent" />
-              <div className="relative aspect-[4/3] w-full">
-                <Image
-                  src={hero.image.src}
-                  alt={hero.image.alt}
-                  fill
-                  className="object-contain p-6"
-                  sizes="(max-width: 1024px) 100vw, 600px"
-                  priority
-                />
+              <div className="relative mt-8 overflow-hidden rounded-[28px] border border-white/20 bg-white/10">
+                <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/30 via-transparent to-transparent" />
+                <div className="relative aspect-[4/3] w-full">
+                  <Image
+                    src={hero.image.src}
+                    alt={hero.image.alt}
+                    fill
+                    className="object-contain p-6"
+                    sizes="(max-width: 1024px) 100vw, 600px"
+                    priority
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="mt-8">{hero.footer}</div>
-          </section>
+              <div className="mt-8">{hero.footer}</div>
+            </section>
+          ) : null}
 
           <section className="rounded-[32px] border border-white/70 bg-white/90 p-10 shadow-2xl shadow-slate-200/70 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 dark:shadow-slate-950/50">
             <div className="space-y-3">

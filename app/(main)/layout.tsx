@@ -24,7 +24,7 @@ export default async function MainLayout({
     [user.profile?.firstName, user.profile?.lastName]
       .filter(Boolean)
       .join(" ");
-  const organizationName = user.organization?.name ?? "NDI HR";
+  const organizationName = user.organization?.name ?? "HR";
 
   return (
     <ResponsiveDashboardShell

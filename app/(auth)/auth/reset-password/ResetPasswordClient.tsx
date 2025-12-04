@@ -57,10 +57,6 @@ export function ResetPasswordClient({ token, userId }: ResetPasswordClientProps)
     },
   });
 
-  const handleSignUpButton = () => {
-    router.push("/auth/signup");
-  };
-
   const handleLogin = (data: FormData) => {
     if (!token || !userId) {
       setServerError("Reset link is invalid or has expired.");
@@ -80,7 +76,7 @@ export function ResetPasswordClient({ token, userId }: ResetPasswordClientProps)
       title="Set a fresh password"
       subtitle="Choose a new password to finish securing your account."
       description="Make it unique. We recommend combining upper & lowercase letters, numbers, and special characters."
-      helper="Tip: Avoid using previous passwords from NDI HR or other apps. We'll let you know if your new password meets our security requirements."
+      helper="Tip: Avoid using previous passwords or other apps. We'll let you know if your new password meets our security requirements."
       badge="Recovery portal"
       footer={
         <p className="text-sm">
@@ -94,13 +90,7 @@ export function ResetPasswordClient({ token, userId }: ResetPasswordClientProps)
           </button>
         </p>
       }
-      showcase={{
-        footer: (
-          <Button onClick={handleSignUpButton} theme="white" isWidthFull>
-            <Text text="Invite a teammate" className="text-[15px] font-semibold" />
-          </Button>
-        ),
-      }}
+      showShowcase={false}
     >
       <form onSubmit={handleSubmit(handleLogin)} className="space-y-6">
         <PasswordInput

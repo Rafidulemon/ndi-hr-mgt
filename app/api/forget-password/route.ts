@@ -100,7 +100,7 @@ export async function POST(request: Request) {
     const textBody = [
       salutation,
       "",
-      "You recently requested assistance resetting the password for your NDI HR account.",
+      "You recently requested assistance resetting the password for your HR account.",
       `Use the secure link below to create a new password. The link will remain active for ${TOKEN_TTL_MINUTES} minutes.`,
       "",
       resetLink,
@@ -108,18 +108,18 @@ export async function POST(request: Request) {
       "If you did not submit this request, please disregard this email or notify your workspace administrator.",
       "",
       "Best regards,",
-      "NDI HR Security Team",
+      "HR Security Team",
     ].join("\n");
 
     await transporter.sendMail({
       from: emailUser,
       to: user.email,
-      subject: "NDI HR password reset instructions",
+      subject: "HR password reset instructions",
       text: textBody,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.5;">
           <p>${salutation}</p>
-          <p>You recently requested assistance resetting the password for your NDI HR account.</p>
+          <p>You recently requested assistance resetting the password for your HR account.</p>
           <p>Please use the secure link below to create a new password. The link will remain active for ${TOKEN_TTL_MINUTES} minutes.</p>
           <p style="margin: 24px 0;">
             <a
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
             </a>
           </p>
           <p style="margin-bottom: 16px;">If you did not submit this request, please disregard this email or notify your workspace administrator.</p>
-          <p>Best regards,<br />NDI HR Security Team</p>
+          <p>Best regards,<br />HR Security Team</p>
         </div>
       `,
     });

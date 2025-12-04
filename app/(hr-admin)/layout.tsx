@@ -32,7 +32,7 @@ export default async function HrAdminLayout({
     [user.profile?.firstName, user.profile?.lastName]
       .filter(Boolean)
       .join(" ");
-  const organizationName = user.organization?.name ?? "NDI HR";
+  const organizationName = user.organization?.name ??  "HR";
   const pendingLeaveCount =
     user.organizationId &&
     (await prisma.leaveRequest.count({

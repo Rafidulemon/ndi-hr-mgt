@@ -143,7 +143,7 @@ const hrMenuItems: MenuItem[] = [
 
 const HrAdminLeftMenu = ({
   className = "",
-  organizationName = "NDI HR",
+  organizationName = "HR",
   userFullName,
   showEmployeeDashboardLink = false,
   pendingLeaveCount = 0,
