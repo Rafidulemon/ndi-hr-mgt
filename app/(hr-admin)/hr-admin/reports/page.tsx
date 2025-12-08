@@ -217,14 +217,24 @@ export default function HrAdminReportsPage() {
     setAppliedFilters(defaults);
   };
 
-  const handleDownload = (rows: TableRow[], fileName: string) => {
+  const handleDownload = (
+    rows: TableRow[],
+    fileName: string,
+    options: { title: string; columns: { key: string; label: string; width?: number }[] },
+  ) => {
     if (rows.length === 0) {
       setDownloadError("No rows are available to download right now.");
       return;
     }
     setDownloadError(null);
     try {
-      exportToExcel(rows, { fileName });
+      exportToExcel(rows, {
+        fileName,
+        sheetName: "Report",
+        title: options.title,
+        autoFilter: true,
+        columns: options.columns,
+      });
     } catch (error) {
       setDownloadError((error as Error).message ?? "Failed to export Excel file.");
     }
@@ -329,7 +339,18 @@ export default function HrAdminReportsPage() {
                   type="button"
                   theme="secondary"
                   className="w-48 gap-2"
-                  onClick={() => handleDownload(dailyTableRows, "hr-daily-reports")}
+                  onClick={() =>
+                    handleDownload(dailyTableRows, "hr-daily-reports", {
+                      title: "Daily report submissions",
+                      columns: [
+                        { key: "Date", label: "Date", width: 16 },
+                        { key: "Employee", label: "Employee", width: 24 },
+                        { key: "Tasks Logged", label: "Tasks Logged", width: 18 },
+                        { key: "Work Types", label: "Work Types", width: 24 },
+                        { key: "Hours", label: "Hours", width: 12 },
+                      ],
+                    })
+                  }
                   disabled={dailyTableRows.length === 0}
                 >
                   <MdDownload size={18} />
@@ -429,7 +450,18 @@ export default function HrAdminReportsPage() {
                   type="button"
                   theme="secondary"
                   className="w-48 gap-2"
-                  onClick={() => handleDownload(monthlyTableRows, "hr-monthly-reports")}
+                  onClick={() =>
+                    handleDownload(monthlyTableRows, "hr-monthly-reports", {
+                      title: "Monthly report summaries",
+                      columns: [
+                        { key: "Month", label: "Month", width: 18 },
+                        { key: "Employee", label: "Employee", width: 24 },
+                        { key: "Entries", label: "Entries", width: 12 },
+                        { key: "Story Points", label: "Story Points", width: 16 },
+                        { key: "Hours", label: "Hours", width: 12 },
+                      ],
+                    })
+                  }
                   disabled={monthlyTableRows.length === 0}
                 >
                   <MdDownload size={18} />

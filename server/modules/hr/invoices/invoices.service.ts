@@ -75,7 +75,7 @@ export const hrInvoiceService = {
         orderBy: { updatedAt: "desc" },
       }),
       ctx.prisma.user.findMany({
-        where: { organizationId: orgId, role: "EMPLOYEE" },
+        where: { organizationId: orgId },
         select: {
           id: true,
           employment: {

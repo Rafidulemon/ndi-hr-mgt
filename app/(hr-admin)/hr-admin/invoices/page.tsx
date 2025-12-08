@@ -13,7 +13,7 @@ import { InvoiceDetailCard } from "@/app/components/invoices/InvoiceDetailCard";
 
 import { trpc } from "@/trpc/client";
 import type { InvoiceDetail } from "@/types/invoice";
-import { downloadInvoicePdf } from "@/app/lib/downloadInvoicePdf";
+import { downloadInvoicePdf, renderInvoicePdfBlob } from "@/app/lib/downloadInvoicePdf";
 
 type LineItemKind = "EARNING" | "DEDUCTION";
 
@@ -180,6 +180,12 @@ function HrInvoiceManagementPage() {
     { invoiceId: previewInvoiceId ?? "" },
     { enabled: Boolean(previewInvoiceId) },
   );
+  const [filterMonth, setFilterMonth] = useState(String(new Date().getMonth() + 1));
+  const [filterYear, setFilterYear] = useState(String(currentYear));
+  const [isBatchDownloading, setIsBatchDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const batchDownloadRef = useRef<HTMLDivElement | null>(null);
+  const [batchInvoiceDetail, setBatchInvoiceDetail] = useState<InvoiceDetail | null>(null);
 
   const [form, setForm] = useState({
     employeeId: "",
@@ -217,6 +223,39 @@ function HrInvoiceManagementPage() {
       return null;
     }
   }, [activeReviewContext?.requestedAt]);
+  const filterYearOptions = useMemo(() => {
+    const yearSet = new Set(invoices.map((invoice) => invoice.periodYear));
+    const parsedFilterYear = Number(filterYear);
+    if (!Number.isNaN(parsedFilterYear)) {
+      yearSet.add(parsedFilterYear);
+    }
+    if (!yearSet.size) {
+      yearSet.add(currentYear);
+    }
+    return Array.from(yearSet)
+      .sort((a, b) => a - b)
+      .map((year) => ({
+        label: String(year),
+        value: String(year),
+      }));
+  }, [filterYear, invoices]);
+  const filteredInvoices = useMemo(() => {
+    const monthNumber = Number(filterMonth);
+    const yearNumber = Number(filterYear);
+    if (Number.isNaN(monthNumber) || Number.isNaN(yearNumber)) {
+      return [];
+    }
+    return invoices.filter((invoice) => invoice.periodMonth === monthNumber && invoice.periodYear === yearNumber);
+  }, [filterMonth, filterYear, invoices]);
+  const readyToDeliverInvoices = useMemo(
+    () => filteredInvoices.filter((invoice) => invoice.status === "READY_TO_DELIVER"),
+    [filteredInvoices],
+  );
+  const readyToDeliverCount = readyToDeliverInvoices.length;
+  const selectedPeriodLabel = useMemo(() => {
+    const monthLabel = monthOptions.find((option) => option.value === filterMonth)?.label ?? "Selected";
+    return `${monthLabel} ${filterYear}`;
+  }, [filterMonth, filterYear]);
 
   const totals = useMemo(() => {
     const earnings = lineItems.reduce((sum, item) => {
@@ -233,6 +272,13 @@ function HrInvoiceManagementPage() {
     const total = subtotal + tax;
     return { subtotal, tax, total, earnings, deductions };
   }, [lineItems, form.taxRate]);
+  const waitForRenderCycle = useCallback(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+    [],
+  );
 
   function resetForm() {
     setForm({
@@ -361,6 +407,52 @@ function HrInvoiceManagementPage() {
     await downloadInvoicePdf(previewContentRef.current, invoiceDetailQuery.data.invoice.title);
   };
 
+  const handleDownloadReadyInvoices = useCallback(async () => {
+    setDownloadError(null);
+    const monthNumber = Number(filterMonth);
+    const yearNumber = Number(filterYear);
+    if (Number.isNaN(monthNumber) || Number.isNaN(yearNumber)) {
+      setDownloadError("Select a valid month and year.");
+      return;
+    }
+    if (!readyToDeliverInvoices.length) {
+      setDownloadError("No ready-to-deliver invoices for this period.");
+      return;
+    }
+    setIsBatchDownloading(true);
+    try {
+      const jszipModule = await import("jszip");
+      const zip = new jszipModule.default();
+      for (const invoice of readyToDeliverInvoices) {
+        const detail = await utils.hrInvoices.detail.fetch({ invoiceId: invoice.id });
+        setBatchInvoiceDetail(detail.invoice);
+        await waitForRenderCycle();
+        if (!batchDownloadRef.current) {
+          throw new Error("Unable to prepare invoice layout.");
+        }
+        const filenameSeed = `${detail.invoice.title}-${detail.invoice.employee.employeeCode ?? detail.invoice.employee.name}-${detail.invoice.id.slice(0, 6)}`;
+        const { blob, filename } = await renderInvoicePdfBlob(batchDownloadRef.current, filenameSeed);
+        zip.file(`${filename}.pdf`, blob);
+      }
+      const formattedMonth = String(monthNumber).padStart(2, "0");
+      const archiveName = `ready-invoices-${yearNumber}-${formattedMonth}`;
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const downloadUrl = URL.createObjectURL(zipBlob);
+      const anchor = document.createElement("a");
+      anchor.href = downloadUrl;
+      anchor.download = `${archiveName}.zip`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : "Failed to download invoices.");
+    } finally {
+      setIsBatchDownloading(false);
+      setBatchInvoiceDetail(null);
+    }
+  }, [filterMonth, filterYear, readyToDeliverInvoices, utils, waitForRenderCycle]);
+
   const handleSaveInvoice = () => {
     const payloadItems = lineItems.map((item) => {
       const quantity = Math.max(1, Math.floor(item.quantity));
@@ -438,75 +530,129 @@ function HrInvoiceManagementPage() {
             <p className="text-sm">Start by creating your first invoice for the team.</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            <div className="grid grid-cols-6 gap-4 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
-              <span>Invoice</span>
-              <span>Employee</span>
-              <span>Period</span>
-              <span>Due</span>
-              <span>Total</span>
-              <span>Status</span>
-            </div>
-            {invoices.map((invoice) => (
-              <div
-                key={invoice.id}
-                className="grid grid-cols-6 items-center gap-4 px-4 py-4 text-sm text-slate-700 transition-colors duration-200 hover:bg-white dark:text-slate-200 dark:hover:bg-slate-900"
-              >
-                <div className="truncate font-semibold text-slate-900 dark:text-white">{invoice.title}</div>
-                <div className="truncate text-slate-500 dark:text-slate-400">{invoice.employeeName}</div>
-                <div>{invoice.periodLabel}</div>
-                <div>{invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "Not set"}</div>
-                <div className="font-semibold text-blue-600 dark:text-sky-400">{invoice.totalFormatted}</div>
-                <div className="flex flex-col gap-2">
-                  <span
-                    className={`inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass[invoice.status] ?? "bg-slate-100"}`}
-                  >
-                    {invoice.statusLabel}
-                  </span>
-                  {invoice.reviewComment && (
-                    <p className="text-xs text-rose-600 dark:text-rose-300">
-                      “{invoice.reviewComment}”
-                      {invoice.reviewRequestedAt
-                        ? ` · ${reviewDateTimeFormatter.format(new Date(invoice.reviewRequestedAt))}`
-                        : ""}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      theme="secondary"
-                      className="text-xs"
-                      onClick={() => setPreviewInvoiceId(invoice.id)}
-                    >
-                      Preview
-                    </Button>
-                    {invoice.status === "CHANGES_REQUESTED" && (
-                      <Button
-                        theme="secondary"
-                        className="text-xs"
-                        onClick={() => void handleEditInvoice(invoice.id)}
-                        disabled={isEditingLoading}
-                      >
-                        Edit
-                      </Button>
-                    )}
-                    {invoice.canSend && (
-                      <Button
-                        className="text-xs"
-                        disabled={sendMutation.isPending && sendMutation.variables?.invoiceId === invoice.id}
-                        onClick={() => sendMutation.mutate({ invoiceId: invoice.id })}
-                      >
-                        {sendMutation.isPending && sendMutation.variables?.invoiceId === invoice.id
-                          ? "Sending..."
-                          : invoice.status === "CHANGES_REQUESTED"
-                            ? "Resend"
-                            : "Send"}
-                      </Button>
-                    )}
-                  </div>
-                </div>
+          <>
+            <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div className="grid gap-4 sm:grid-cols-2 md:flex md:flex-wrap md:items-end">
+                <SelectBox
+                  label="Filter month"
+                  value={filterMonth}
+                  includePlaceholder={false}
+                  options={monthOptions}
+                  onChange={(event) => {
+                    setFilterMonth(event.target.value);
+                    setDownloadError(null);
+                  }}
+                />
+                <SelectBox
+                  label="Filter year"
+                  value={filterYear}
+                  includePlaceholder={false}
+                  options={filterYearOptions}
+                  onChange={(event) => {
+                    setFilterYear(event.target.value);
+                    setDownloadError(null);
+                  }}
+                />
               </div>
-            ))}
-          </div>
+              <div className="flex flex-col gap-2 md:w-64">
+                <Button
+                  theme="secondary"
+                  onClick={() => void handleDownloadReadyInvoices()}
+                  disabled={isBatchDownloading || readyToDeliverCount === 0}
+                >
+                  {isBatchDownloading
+                    ? "Preparing zip..."
+                    : readyToDeliverCount > 0
+                      ? `Download ${readyToDeliverCount} ready invoice${readyToDeliverCount > 1 ? "s" : ""}`
+                      : "Download ready invoices"}
+                </Button>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {readyToDeliverCount > 0
+                    ? `${readyToDeliverCount} ready to deliver for ${selectedPeriodLabel}.`
+                    : `No ready-to-deliver invoices for ${selectedPeriodLabel}.`}
+                </p>
+                {downloadError && (
+                  <p className="text-xs font-semibold text-rose-600 dark:text-rose-300">{downloadError}</p>
+                )}
+              </div>
+            </div>
+            {filteredInvoices.length === 0 ? (
+              <div className="flex min-h-[8rem] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center text-slate-500 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400">
+                <p className="font-semibold">No invoices for {selectedPeriodLabel}</p>
+                <p className="text-sm">Try a different month or year.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                <div className="grid grid-cols-6 gap-4 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
+                  <span>Invoice</span>
+                  <span>Employee</span>
+                  <span>Period</span>
+                  <span>Due</span>
+                  <span>Total</span>
+                  <span>Status</span>
+                </div>
+                {filteredInvoices.map((invoice) => (
+                  <div
+                    key={invoice.id}
+                    className="grid grid-cols-6 items-center gap-4 px-4 py-4 text-sm text-slate-700 transition-colors duration-200 hover:bg-white dark:text-slate-200 dark:hover:bg-slate-900"
+                  >
+                    <div className="truncate font-semibold text-slate-900 dark:text-white">{invoice.title}</div>
+                    <div className="truncate text-slate-500 dark:text-slate-400">{invoice.employeeName}</div>
+                    <div>{invoice.periodLabel}</div>
+                    <div>{invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "Not set"}</div>
+                    <div className="font-semibold text-blue-600 dark:text-sky-400">{invoice.totalFormatted}</div>
+                    <div className="flex flex-col gap-2">
+                      <span
+                        className={`inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass[invoice.status] ?? "bg-slate-100"}`}
+                      >
+                        {invoice.statusLabel}
+                      </span>
+                      {invoice.reviewComment && (
+                        <p className="text-xs text-rose-600 dark:text-rose-300">
+                          “{invoice.reviewComment}”
+                          {invoice.reviewRequestedAt
+                            ? ` · ${reviewDateTimeFormatter.format(new Date(invoice.reviewRequestedAt))}`
+                            : ""}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          theme="secondary"
+                          className="text-xs"
+                          onClick={() => setPreviewInvoiceId(invoice.id)}
+                        >
+                          Preview
+                        </Button>
+                        {invoice.status === "CHANGES_REQUESTED" && (
+                          <Button
+                            theme="secondary"
+                            className="text-xs"
+                            onClick={() => void handleEditInvoice(invoice.id)}
+                            disabled={isEditingLoading}
+                          >
+                            Edit
+                          </Button>
+                        )}
+                        {invoice.canSend && (
+                          <Button
+                            className="text-xs"
+                            disabled={sendMutation.isPending && sendMutation.variables?.invoiceId === invoice.id}
+                            onClick={() => sendMutation.mutate({ invoiceId: invoice.id })}
+                          >
+                            {sendMutation.isPending && sendMutation.variables?.invoiceId === invoice.id
+                              ? "Sending..."
+                              : invoice.status === "CHANGES_REQUESTED"
+                                ? "Resend"
+                                : "Send"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </section>
 
@@ -746,6 +892,13 @@ function HrInvoiceManagementPage() {
           </p>
         )}
       </Modal>
+
+      <div
+        aria-hidden="true"
+        style={{ position: "fixed", left: "-9999px", top: 0, width: "900px", pointerEvents: "none" }}
+      >
+        <div ref={batchDownloadRef}>{batchInvoiceDetail && <InvoiceDetailCard invoice={batchInvoiceDetail} />}</div>
+      </div>
     </div>
   );
 }

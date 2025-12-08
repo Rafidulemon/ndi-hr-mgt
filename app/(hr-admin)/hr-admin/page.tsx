@@ -8,6 +8,7 @@ import type {
   HrDashboardAttendanceState,
   HrDashboardResponse,
 } from "@/types/hr-dashboard";
+import LoadingSpinner from "@/app/components/LoadingSpinner";
 
 type WorkforcePoint = HrDashboardResponse["workforceCapacity"][number];
 type WorkforceMetricKey = "plan" | "actual";
@@ -144,8 +145,8 @@ export default function HrAdminDashboardPage() {
 
   if (dashboardQuery.isLoading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center text-slate-500">
-        Loading dashboard...
+      <div className="flex min-h-screen items-center justify-center text-slate-500">
+        <LoadingSpinner label="Loading dashboard..." helper=""/>
       </div>
     );
   }
