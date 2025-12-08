@@ -4,6 +4,7 @@ export type HrAttendanceLog = {
   id: string;
   employeeId: string;
   name: string;
+  department: string | null;
   squad: string | null;
   checkIn: string;
   checkOut: string;
@@ -30,6 +31,7 @@ export type HrAttendanceWeeklyTrendPoint = {
 export type HrAttendanceEmployeeOption = {
   id: string;
   name: string;
+  department: string | null;
   squad: string | null;
 };
 

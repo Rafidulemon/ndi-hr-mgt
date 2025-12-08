@@ -5,10 +5,8 @@ import { BiChevronDown, BiChevronUp, BiDownload } from "react-icons/bi";
 import { FiCheck, FiEye, FiSearch, FiX } from "react-icons/fi";
 import ApplicationPreview from "@/app/components/Preview";
 import { Modal } from "@/app/components/atoms/frame/Modal";
-import {
-  leaveTypeOptions,
-  leaveTypeValues,
-} from "@/lib/leave-types";
+import { leaveTypeOptions, leaveTypeValues } from "@/lib/leave-types";
+import { exportToExcel } from "@/lib/export-to-excel";
 import type { HrLeaveRequest } from "@/types/hr-leave";
 import { trpc } from "@/trpc/client";
 
@@ -94,15 +92,6 @@ const parseMonthInput = (
   }
   const label = monthFormatter.format(new Date(parsedYear, parsedMonth - 1, 1));
   return { month: parsedMonth, year: parsedYear, label };
-};
-
-const escapeForCsv = (value: string | number | null | undefined) => {
-  const safe = value ?? "";
-  const stringValue = typeof safe === "number" ? safe.toString() : safe;
-  if (stringValue.includes(",") || stringValue.includes('"') || stringValue.includes("\n")) {
-    return `"${stringValue.replace(/"/g, '""')}"`;
-  }
-  return stringValue;
 };
 
 const SortButton = ({
@@ -261,43 +250,47 @@ export default function HrAdminLeaveManagementPage() {
   const handleExport = () => {
     if (!requests.length) return;
 
-    const rows = [
-      [
-        "Submitted On",
-        "Employee",
-        "Department",
-        "Leave Type",
-        "From",
-        "To",
-        "Days",
-        "Status",
-        "Remaining Quota",
-        "Reason",
-      ],
-      ...requests.map((request) => [
-        formatDate(request.submittedAt),
-        request.employee.name,
-        request.employee.department ?? "—",
-        request.leaveTypeLabel,
-        formatDate(request.startDate),
-        formatDate(request.endDate),
-        request.totalDays,
-        formatStatus(request.status),
-        `${request.remainingBalance.remaining} / ${request.remainingBalance.label}`,
-        request.reason ?? "—",
-      ]),
-    ];
+    const title =
+      monthLabel && monthLabel !== "All time"
+        ? `Leave requests for ${monthLabel}`
+        : "Leave requests overview";
 
-    const csv = rows.map((row) => row.map(escapeForCsv).join(",")).join("\n");
-    const blob = new Blob([`\ufeff${csv}`], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `leave-requests-${selectedMonth || "all"}.xlsx`;
-    link.click();
-    URL.revokeObjectURL(url);
+    exportToExcel(
+      requests.map((request, index) => ({
+        sl: index + 1,
+        submittedOn: formatDate(request.submittedAt),
+        employee: request.employee.name,
+        employeeId: request.employee.employeeCode ?? "—",
+        department: request.employee.department ?? "—",
+        leaveType: request.leaveTypeLabel,
+        from: formatDate(request.startDate),
+        to: formatDate(request.endDate),
+        days: formatDays(request.totalDays),
+        status: formatStatus(request.status),
+        remainingQuota: `${request.remainingBalance.remaining} / ${request.remainingBalance.label}`,
+        reason: request.reason ?? "—",
+      })),
+      {
+        fileName: `leave-requests-${selectedMonth || "all"}`,
+        sheetName: "Leave Requests",
+        title,
+        autoFilter: true,
+        columns: [
+          { key: "sl", label: "SL", width: 6 },
+          { key: "submittedOn", label: "Submitted On", width: 16 },
+          { key: "employee", label: "Employee", width: 24 },
+          { key: "employeeId", label: "Employee ID", width: 18 },
+          { key: "department", label: "Department", width: 18 },
+          { key: "leaveType", label: "Leave Type", width: 18 },
+          { key: "from", label: "From", width: 14 },
+          { key: "to", label: "To", width: 14 },
+          { key: "days", label: "Days", width: 12 },
+          { key: "status", label: "Status", width: 14 },
+          { key: "remainingQuota", label: "Remaining Quota", width: 22 },
+          { key: "reason", label: "Reason", width: 32 },
+        ],
+      },
+    );
   };
 
   const previewData = selectedRequest

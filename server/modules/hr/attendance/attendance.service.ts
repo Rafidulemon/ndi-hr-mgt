@@ -267,6 +267,11 @@ const attendanceRecordSelect = {
       },
       employment: {
         select: {
+          department: {
+            select: {
+              name: true,
+            },
+          },
           team: {
             select: {
               name: true,
@@ -295,6 +300,7 @@ const mapLog = (
     lastName: record.employee.profile?.lastName ?? null,
     email: record.employee.email,
   }),
+  department: record.employee.employment?.department?.name ?? null,
   squad: record.employee.employment?.team?.name ?? null,
   checkIn: formatTimeLabel(record.checkInAt, timeZone),
   checkOut: formatTimeLabel(record.checkOutAt, timeZone),
@@ -569,7 +575,12 @@ const buildEmployees = (
         id: true;
         email: true;
         profile: { select: { firstName: true; lastName: true; preferredName: true } };
-        employment: { select: { team: { select: { name: true } } } };
+        employment: {
+          select: {
+            department: { select: { name: true } };
+            team: { select: { name: true } };
+          };
+        };
       };
     }>
   >,
@@ -582,6 +593,7 @@ const buildEmployees = (
       lastName: user.profile?.lastName ?? null,
       email: user.email,
     }),
+    department: user.employment?.department?.name ?? null,
     squad: user.employment?.team?.name ?? null,
   }));
 
@@ -623,6 +635,11 @@ export const hrAttendanceService = {
           },
           employment: {
             select: {
+              department: {
+                select: {
+                  name: true,
+                },
+              },
               team: {
                 select: {
                   name: true,

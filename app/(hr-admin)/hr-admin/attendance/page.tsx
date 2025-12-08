@@ -4,8 +4,10 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { FiCalendar, FiDownload, FiPlus } from "react-icons/fi";
 
 import CustomDatePicker from "@/app/components/atoms/inputs/DatePicker";
+import { exportToExcel } from "@/lib/export-to-excel";
 import { trpc } from "@/trpc/client";
 import type { HrAttendanceCalendarSignal, HrAttendanceStatus } from "@/types/hr-attendance";
+import LoadingSpinner from "@/app/components/LoadingSpinner";
 
 type ManualWorkType = "REMOTE" | "ONSITE";
 
@@ -104,7 +106,32 @@ const calendarSignalColor: Record<Exclude<DaySignal, "none">, string> = {
   absent: "bg-rose-400",
 };
 
-const escapeForCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
+const BREAK_PLACEHOLDER = "—";
+
+const formatOrdinalDay = (day: number) => {
+  const mod100 = day % 100;
+  if (mod100 >= 11 && mod100 <= 13) {
+    return `${day}th`;
+  }
+  switch (day % 10) {
+    case 1:
+      return `${day}st`;
+    case 2:
+      return `${day}nd`;
+    case 3:
+      return `${day}rd`;
+    default:
+      return `${day}th`;
+  }
+};
+
+const formatAttendanceTitleDate = (date: Date) => {
+  const monthLabel = date.toLocaleString("en-US", { month: "long" });
+  return `${formatOrdinalDay(date.getDate())} ${monthLabel}, ${date.getFullYear()}`;
+};
+
+const formatMonthTitle = (date: Date) =>
+  date.toLocaleString("en-US", { month: "long", year: "numeric" });
 
 const buildCalendarCells = (
   referenceDate: Date,
@@ -171,6 +198,11 @@ export default function HrAdminAttendancePage() {
     () => overviewQuery.data?.employees ?? [],
     [overviewQuery.data?.employees],
   );
+  const employeeLookup = useMemo(() => {
+    const map = new Map<string, (typeof employees)[number]>();
+    employees.forEach((employee) => map.set(employee.id, employee));
+    return map;
+  }, [employees]);
   const dayLogs = useMemo(
     () => overviewQuery.data?.dayLogs ?? [],
     [overviewQuery.data?.dayLogs],
@@ -411,75 +443,104 @@ export default function HrAdminAttendancePage() {
   const handleExport = () => {
     if (!filteredDayLogs.length) return;
 
-    const rows = [
-      [
-        "Name",
-        "Squad",
-        "Check-in",
-        "Check-out",
-        "Total working hour",
-        "Status",
-        "Source",
-      ],
-      ...filteredDayLogs.map((log) => [
-        log.name,
-        log.squad ?? "—",
-        log.checkIn,
-        log.checkOut,
-        calculateWorkingHours(log.checkIn, log.checkOut),
-        log.status,
-        log.source,
-      ]),
-    ];
-
-    const csv = rows.map((row) => row.map(escapeForCsv).join(",")).join("\n");
-    const blob = new Blob([`\ufeff${csv}`], {
-      type: "text/csv;charset=utf-8;",
-    });
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `attendance-${selectedDayKey}.xlsx`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const title = `Attendance Record of ${formatAttendanceTitleDate(selectedDate)}`;
+    exportToExcel(
+      filteredDayLogs.map((log, index) => {
+        const employeeMeta = employeeLookup.get(log.employeeId);
+        return {
+          sl: index + 1,
+          employeeId: log.employeeId,
+          employeeName: log.name,
+          department: log.department ?? employeeMeta?.department ?? "—",
+          team: log.squad ?? employeeMeta?.squad ?? "—",
+          checkIn: log.checkIn,
+          checkOut: log.checkOut,
+          breakStart: BREAK_PLACEHOLDER,
+          breakEnd: BREAK_PLACEHOLDER,
+          totalHours: calculateWorkingHours(log.checkIn, log.checkOut),
+          status: log.status,
+          source: log.source,
+        };
+      }),
+      {
+        fileName: `attendance-${selectedDayKey}`,
+        sheetName: "Attendance Log",
+        title,
+        autoFilter: true,
+        columns: [
+          { key: "sl", label: "SL", width: 6 },
+          { key: "employeeId", label: "Employee ID", width: 18 },
+          { key: "employeeName", label: "Employee Name", width: 28 },
+          { key: "department", label: "Department", width: 20 },
+          { key: "team", label: "Team", width: 18 },
+          { key: "checkIn", label: "Check-in", width: 16 },
+          { key: "checkOut", label: "Check-out", width: 16 },
+          { key: "breakStart", label: "Break Start Time", width: 18 },
+          { key: "breakEnd", label: "Break End Time", width: 18 },
+          { key: "totalHours", label: "Total Working Hour", width: 20 },
+          { key: "status", label: "Status", width: 14 },
+          { key: "source", label: "Source", width: 14 },
+        ],
+      },
+    );
   };
 
   const handleMonthlyExport = () => {
     if (!monthlyHistoryRows.length) return;
 
-    const employee = employees.find((emp) => emp.id === resolvedHistoryEmployeeId);
-    const rows = [
-      ["Date", "Check-in", "Check-out", "Total working hour", "Status", "Source"],
-      ...monthlyHistoryRows.map((row) => [
-        row.date.toLocaleDateString(),
-        row.checkIn,
-        row.checkOut,
-        row.workingHours,
-        row.status,
-        row.source,
-      ]),
-    ];
+    const employee = resolvedHistoryEmployeeId
+      ? employeeLookup.get(resolvedHistoryEmployeeId)
+      : undefined;
+    const title = `Attendance Record of ${employee?.name ?? "Employee"} for ${formatMonthTitle(historyMonth)}`;
 
-    const csv = rows.map((row) => row.map(escapeForCsv).join(",")).join("\n");
-    const blob = new Blob([`\ufeff${csv}`], {
-      type: "text/csv;charset=utf-8;",
-    });
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `attendance-${employee?.name ?? "employee"}-${buildMonthInputValue(
-      historyMonth
-    )}.xlsx`;
-    link.click();
-    URL.revokeObjectURL(url);
+    exportToExcel(
+      monthlyHistoryRows.map((row, index) => ({
+        sl: index + 1,
+        employeeId: resolvedHistoryEmployeeId ?? "—",
+        employeeName: employee?.name ?? "—",
+        department: employee?.department ?? "—",
+        team: employee?.squad ?? "—",
+        date: row.date.toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        }),
+        checkIn: row.checkIn,
+        checkOut: row.checkOut,
+        breakStart: BREAK_PLACEHOLDER,
+        breakEnd: BREAK_PLACEHOLDER,
+        totalHours: row.workingHours,
+        status: row.status,
+        source: row.source,
+      })),
+      {
+        fileName: `attendance-${employee?.name ?? "employee"}-${buildMonthInputValue(historyMonth)}`,
+        sheetName: "Monthly Attendance",
+        title,
+        autoFilter: true,
+        columns: [
+          { key: "sl", label: "SL", width: 6 },
+          { key: "employeeId", label: "Employee ID", width: 18 },
+          { key: "employeeName", label: "Employee Name", width: 28 },
+          { key: "department", label: "Department", width: 20 },
+          { key: "team", label: "Team", width: 18 },
+          { key: "date", label: "Date", width: 16 },
+          { key: "checkIn", label: "Check-in", width: 16 },
+          { key: "checkOut", label: "Check-out", width: 16 },
+          { key: "breakStart", label: "Break Start Time", width: 18 },
+          { key: "breakEnd", label: "Break End Time", width: 18 },
+          { key: "totalHours", label: "Total Working Hour", width: 20 },
+          { key: "status", label: "Status", width: 14 },
+          { key: "source", label: "Source", width: 14 },
+        ],
+      },
+    );
   };
 
   if (overviewQuery.isLoading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center text-slate-500">
-        Loading attendance overview...
+      <div className="flex min-h-screen items-center justify-center text-slate-500">
+        <LoadingSpinner label="Loading attendance record..." helper=""/>
       </div>
     );
   }
