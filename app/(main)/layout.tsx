@@ -31,7 +31,7 @@ export default async function MainLayout({
       menuLabel="Navigation"
       menu={
         <LeftMenu
-          className="lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:scrollbar-none"
+          className="md:max-h-[calc(100vh-3rem)] md:overflow-y-auto md:overscroll-contain md:scrollbar-none"
           isLeader={isLeader}
           canAccessHrAdmin={canAccessHrAdmin}
           organizationName={organizationName}

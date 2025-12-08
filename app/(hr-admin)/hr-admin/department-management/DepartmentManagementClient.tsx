@@ -82,7 +82,7 @@ export default function DepartmentManagementClient() {
 
   if (overviewQuery.isLoading) {
     return (
-      <div className="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-md dark:border-slate-700/70 dark:bg-slate-900/80">
+      <div className="min-h-screen flex flex-col items-center justify-center">
         <LoadingSpinner
           label="Loading departments"
           helper="Collecting department summaries and team members."

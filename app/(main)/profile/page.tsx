@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-
+import LoadingSpinner from "@/app/components/LoadingSpinner";
 import Button from "../../components/atoms/buttons/Button";
 import PasswordInput from "../../components/atoms/inputs/PasswordInput";
 import { Card } from "../../components/atoms/frame/Card";
@@ -203,7 +203,7 @@ function ProfilePage() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-slate-500">
-        Loading profile...
+        <LoadingSpinner label="Loading profile..." helper="Fetching your profile..."/>
       </div>
     );
   }

@@ -125,7 +125,7 @@ function InvoicePage() {
           </div>
         ) : invoiceQuery.isLoading ? (
           <div className="flex min-h-[8rem] items-center justify-center">
-            <LoadingSpinner />
+            <LoadingSpinner label="Loading invoices..." helper="Fetching your invoice records"/>
           </div>
         ) : invoices.length === 0 ? (
           <div className="flex min-h-[8rem] flex-col items-center justify-center gap-2 px-6 text-center text-slate-500 dark:text-slate-300">

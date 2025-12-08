@@ -49,7 +49,7 @@ export default async function HrAdminLayout({
       menuLabel="HR Menu"
       menu={
         <HrAdminLeftMenu
-          className="lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:scrollbar-none"
+          className="md:max-h-[calc(100vh-3rem)] md:overflow-y-auto md:overscroll-contain md:scrollbar-none"
           organizationName={organizationName}
           userFullName={fullName}
           showEmployeeDashboardLink

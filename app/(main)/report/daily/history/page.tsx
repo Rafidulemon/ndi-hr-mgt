@@ -212,7 +212,7 @@ export default function DailyReportHistory() {
 
       {isLoading ? (
         <div className="flex min-h-64 items-center justify-center rounded-[32px] border border-white/60 bg-white/90 p-6 shadow-lg shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/70">
-          <LoadingSpinner />
+          <LoadingSpinner label="Loading daily report history..." helper="Fetching your daily report history"/>
         </div>
       ) : tableRows.length === 0 ? (
         <div className="rounded-[32px] border border-dashed border-slate-200 bg-white/70 p-10 text-center text-slate-500 dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-400">

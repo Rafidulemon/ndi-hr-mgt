@@ -10,8 +10,8 @@ const pulseRing =
   "absolute inset-0 rounded-full border-2 border-indigo-400/60 animate-[ping_2s_linear_infinite]";
 
 export const LoadingSpinner = ({
-  label = "Loading your dashboard...",
-  helper = "Crunching attendance, leave, and notifications in one place.",
+  label = "Loading...",
+  helper = "",
   fullscreen = false,
 }: LoadingSpinnerProps) => {
   const containerClass = fullscreen

@@ -522,7 +522,7 @@ function HrInvoiceManagementPage() {
       <section className="rounded-[32px] border border-white/60 bg-white/90 p-6 shadow-xl shadow-indigo-100 transition-colors duration-200 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-slate-900/60">
         {dashboardQuery.isLoading ? (
           <div className="flex min-h-[12rem] items-center justify-center">
-            <LoadingSpinner />
+            <LoadingSpinner label="Loading invoices..."/>
           </div>
         ) : invoices.length === 0 ? (
           <div className="flex min-h-[12rem] flex-col items-center justify-center gap-2 text-center text-slate-500 dark:text-slate-300">

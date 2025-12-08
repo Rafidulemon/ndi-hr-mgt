@@ -17,6 +17,7 @@ import { Modal } from "../../../components/atoms/frame/Modal";
 import { employeeStatusStyles } from "./statusStyles";
 import { trpc } from "@/trpc/client";
 import type { EmployeeDirectoryEntry, EmployeeStatus } from "@/types/hr-admin";
+import LoadingSpinner from "@/app/components/LoadingSpinner";
 
 const IconActionButton = ({
   label,
@@ -442,8 +443,8 @@ export default function EmployeeManagementPage() {
 
   if (dashboardQuery.isLoading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center text-slate-500">
-        Loading employees...
+      <div className="flex min-h-screen items-center justify-center text-slate-500">
+        <LoadingSpinner label="Loading employees..." helper=""/>
       </div>
     );
   }

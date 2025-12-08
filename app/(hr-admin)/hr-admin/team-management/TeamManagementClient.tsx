@@ -210,7 +210,7 @@ export default function TeamManagementClient() {
 
   if (overviewQuery.isLoading) {
     return (
-      <div className="rounded-3xl border border-slate-100 bg-white/80 p-6 shadow-md dark:border-slate-700/70 dark:bg-slate-900/70">
+      <div className="min-h-screen flex flex-col items-center justify-center">
         <LoadingSpinner
           label="Loading team management"
           helper="Fetching teams, departments, and eligible teammates."

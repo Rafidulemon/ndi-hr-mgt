@@ -146,7 +146,7 @@ export default function HrAdminDashboardPage() {
   if (dashboardQuery.isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-slate-500">
-        <LoadingSpinner label="Loading dashboard..." helper=""/>
+        <LoadingSpinner label="Loading dashboard..." helper="Crunching attendance, leave, and notifications in one place."/>
       </div>
     );
   }

@@ -201,7 +201,7 @@ const LeftMenu = ({
   };
 
   const containerClasses = [
-    "flex min-h-full w-full flex-col gap-4 rounded-[32px] border border-white/60 bg-white/90 p-6 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur transition-colors duration-200 lg:min-w-[18rem]",
+    "flex min-h-full w-full flex-col gap-4 rounded-[32px] border border-white/60 bg-white/90 p-6 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur transition-colors duration-200 md:min-w-[18rem]",
     "dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:shadow-slate-900/60",
     className,
   ]

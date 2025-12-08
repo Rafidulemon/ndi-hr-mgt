@@ -62,14 +62,14 @@ const ResponsiveDashboardShell = ({
   }, [faviconUrl]);
 
   const overlayClasses = [
-    "fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm transition-opacity duration-300 lg:hidden",
+    "fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm transition-opacity duration-300 md:hidden",
     isDrawerOpen
       ? "pointer-events-auto opacity-100"
       : "pointer-events-none opacity-0",
   ].join(" ");
 
   const drawerClasses = [
-    "fixed inset-y-0 left-0 z-50 flex w-[85%] max-w-sm -translate-x-full transform px-4 py-6 transition-transform duration-300 lg:hidden",
+    "fixed inset-y-0 left-0 z-50 flex w-[85%] max-w-sm -translate-x-full transform px-4 py-6 transition-transform duration-300 md:hidden",
     isDrawerOpen ? "translate-x-0" : "",
   ].join(" ");
 
@@ -88,8 +88,8 @@ const ResponsiveDashboardShell = ({
   return (
     <div className="relative flex min-h-screen w-full">
       <div className="absolute inset-x-0 top-0 h-40 w-full bg-gradient-to-b from-white/70 to-transparent blur-2xl dark:from-slate-900/60" />
-      <div className="relative z-10 flex w-full flex-col gap-4 px-4 py-4 transition-colors duration-200 sm:px-6 lg:flex-row lg:gap-6 lg:px-10 xl:px-14">
-        <div className="flex items-center justify-between lg:hidden">
+      <div className="relative z-10 flex w-full flex-col gap-4 px-4 py-4 transition-colors duration-200 sm:px-6 md:flex-row md:gap-6 md:px-10 xl:px-14">
+        <div className="flex items-center justify-between md:hidden">
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}
@@ -99,7 +99,7 @@ const ResponsiveDashboardShell = ({
             <span>{menuLabel}</span>
           </button>
         </div>
-        <aside className="hidden w-full flex-shrink-0 lg:block lg:w-72 xl:w-80">
+        <aside className="hidden w-full flex-shrink-0 md:block md:w-72 xl:w-80">
           <div className="sticky top-6">
             {menu}
           </div>

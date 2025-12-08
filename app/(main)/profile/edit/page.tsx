@@ -16,6 +16,7 @@ import SelectBox from "../../../components/atoms/selectBox/SelectBox";
 import { trpc } from "@/trpc/client";
 import { uploadProfileImage } from "@/lib/upload-profile-image";
 import type { UserProfileResponse } from "@/server/modules/user/user.service";
+import LoadingSpinner from "@/app/components/LoadingSpinner";
 
 const profileFormSchema = z.object({
   profile: z.object({
@@ -308,7 +309,7 @@ function EditProfilePage() {
   if (profileQuery.isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-slate-500">
-        Loading profile...
+        <LoadingSpinner label="Loading profile..." helper="Fetching your profile..."/>
       </div>
     );
   }

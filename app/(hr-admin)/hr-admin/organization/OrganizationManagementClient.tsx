@@ -14,7 +14,6 @@ import Button from "@/app/components/atoms/buttons/Button";
 import TextInput from "@/app/components/atoms/inputs/TextInput";
 import SelectBox from "@/app/components/atoms/selectBox/SelectBox";
 import LoadingSpinner from "@/app/components/LoadingSpinner";
-import { Modal } from "@/app/components/atoms/frame/Modal";
 import { trpc } from "@/trpc/client";
 import { uploadOrganizationLogo } from "@/lib/upload-organization-logo";
 import { DEFAULT_ORGANIZATION_LOGO } from "@/lib/organization-branding";
@@ -29,7 +28,9 @@ const AlertBanner = ({ alert }: { alert: AlertState }) => {
       ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200"
       : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200";
   return (
-    <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${baseClasses}`}>
+    <div
+      className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${baseClasses}`}
+    >
       <Icon className="text-base" />
       <p className="font-semibold">{alert.message}</p>
     </div>
@@ -58,12 +59,17 @@ const normalizeField = (value: string) => {
 
 export default function OrganizationManagementClient() {
   const utils = trpc.useUtils();
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<
+    string | null
+  >(null);
   const [alert, setAlert] = useState<AlertState>(null);
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
   const [deletePassword, setDeletePassword] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [detailsForm, setDetailsForm] = useState({
     name: "",
     domain: "",
@@ -76,15 +82,18 @@ export default function OrganizationManagementClient() {
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   const managementQuery = trpc.hrOrganization.management.useQuery(
-    selectedOrganizationId ? { organizationId: selectedOrganizationId } : undefined,
+    selectedOrganizationId
+      ? { organizationId: selectedOrganizationId }
+      : undefined,
     {
       refetchOnWindowFocus: false,
-    },
+    }
   );
   const updateDetailsMutation = trpc.hrOrganization.updateDetails.useMutation();
   const addAdminMutation = trpc.hrOrganization.addAdmin.useMutation();
   const removeAdminMutation = trpc.hrOrganization.removeAdmin.useMutation();
-  const deleteOrganizationMutation = trpc.hrOrganization.deleteOrganization.useMutation();
+  const deleteOrganizationMutation =
+    trpc.hrOrganization.deleteOrganization.useMutation();
 
   const viewerRole = managementQuery.data?.viewerRole;
   const isSuperAdmin = viewerRole === "SUPER_ADMIN";
@@ -133,12 +142,14 @@ export default function OrganizationManagementClient() {
         value: member.id,
         label: `${member.name} (${member.role.replace("_", " ")})`,
       })),
-    [eligibleMembers],
+    [eligibleMembers]
   );
 
   const handleDetailsSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const targetOrgId = isSuperAdmin ? selectedOrganizationId ?? organization?.id ?? null : organization?.id ?? null;
+    const targetOrgId = isSuperAdmin
+      ? selectedOrganizationId ?? organization?.id ?? null
+      : organization?.id ?? null;
     if (!targetOrgId) {
       setAlert({
         type: "error",
@@ -154,11 +165,17 @@ export default function OrganizationManagementClient() {
       logoUrl: detailsForm.logoUrl.trim(),
     };
     if (!payload.name.length) {
-      setAlert({ type: "error", message: "Organization name cannot be empty." });
+      setAlert({
+        type: "error",
+        message: "Organization name cannot be empty.",
+      });
       return;
     }
     if (!payload.logoUrl.length) {
-      setAlert({ type: "error", message: "Upload an organization logo before saving." });
+      setAlert({
+        type: "error",
+        message: "Upload an organization logo before saving.",
+      });
       return;
     }
     updateDetailsMutation.mutate(
@@ -168,15 +185,20 @@ export default function OrganizationManagementClient() {
       },
       {
         onSuccess: () => {
-          setAlert({ type: "success", message: "Organization details updated." });
+          setAlert({
+            type: "success",
+            message: "Organization details updated.",
+          });
           void utils.hrOrganization.management.invalidate();
         },
         onError: (error) => setAlert({ type: "error", message: error.message }),
-      },
+      }
     );
   };
 
-  const handleLogoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) {
       return;
@@ -190,7 +212,9 @@ export default function OrganizationManagementClient() {
       setDetailsForm((prev) => ({ ...prev, logoUrl: uploadedUrl }));
       setLogoPreview(uploadedUrl);
     } catch (error) {
-      setLogoError(error instanceof Error ? error.message : "Failed to upload logo.");
+      setLogoError(
+        error instanceof Error ? error.message : "Failed to upload logo."
+      );
     } finally {
       setIsUploadingLogo(false);
       event.target.value = "";
@@ -223,12 +247,15 @@ export default function OrganizationManagementClient() {
       { userId: selectedMemberId },
       {
         onSuccess: () => {
-          setAlert({ type: "success", message: "Org Admin added successfully." });
+          setAlert({
+            type: "success",
+            message: "Org Admin added successfully.",
+          });
           setSelectedMemberId("");
           void utils.hrOrganization.management.invalidate();
         },
         onError: (error) => setAlert({ type: "error", message: error.message }),
-      },
+      }
     );
   };
 
@@ -243,16 +270,18 @@ export default function OrganizationManagementClient() {
         },
         onError: (error) => setAlert({ type: "error", message: error.message }),
         onSettled: () => setPendingRemovalId(null),
-      },
+      }
     );
   };
 
   if (managementQuery.isLoading) {
     return (
-      <LoadingSpinner
-        label="Loading organization settings..."
-        helper="Fetching workspace profile, admins, and eligible members."
-      />
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <LoadingSpinner
+          label="Loading organization settings..."
+          helper="Fetching workspace profile, admins, and eligible members."
+        />
+      </div>
     );
   }
 
@@ -260,9 +289,7 @@ export default function OrganizationManagementClient() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center text-slate-600 dark:text-slate-300">
         <p>We couldn&apos;t load organization management right now.</p>
-        <Button onClick={() => managementQuery.refetch()}>
-          Retry
-        </Button>
+        <Button onClick={() => managementQuery.refetch()}>Retry</Button>
       </div>
     );
   }
@@ -278,11 +305,15 @@ export default function OrganizationManagementClient() {
             Keep your workspace profile accurate
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-            Update organization details, review Org Admin access, or archive entire workspaces when they&apos;re no longer needed.
+            Update organization details, review Org Admin access, or archive
+            entire workspaces when they&apos;re no longer needed.
           </p>
         </div>
         {managementQuery.data?.canCreateOrganizations ? (
-          <Button href="/hr-admin/organization/create" className="self-start rounded-2xl px-6 py-3 text-base">
+          <Button
+            href="/hr-admin/organization/create"
+            className="self-start rounded-2xl px-6 py-3 text-base"
+          >
             Create new organization
           </Button>
         ) : null}
@@ -304,7 +335,8 @@ export default function OrganizationManagementClient() {
                     Workspace profile
                   </h2>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
-                    These details power invites, email domains, and timezone defaults.
+                    These details power invites, email domains, and timezone
+                    defaults.
                   </p>
                 </div>
               </div>
@@ -346,7 +378,9 @@ export default function OrganizationManagementClient() {
                       PNG, JPG, or WEBP files up to 5MB.
                     </p>
                     {logoError ? (
-                      <p className="text-xs font-semibold text-rose-600 dark:text-rose-300">{logoError}</p>
+                      <p className="text-xs font-semibold text-rose-600 dark:text-rose-300">
+                        {logoError}
+                      </p>
                     ) : null}
                   </div>
                 </div>
@@ -357,7 +391,10 @@ export default function OrganizationManagementClient() {
                 isRequired
                 value={detailsForm.name}
                 onChange={(event) =>
-                  setDetailsForm((prev) => ({ ...prev, name: event.target.value }))
+                  setDetailsForm((prev) => ({
+                    ...prev,
+                    name: event.target.value,
+                  }))
                 }
               />
               <TextInput
@@ -365,7 +402,10 @@ export default function OrganizationManagementClient() {
                 placeholder="example.com"
                 value={detailsForm.domain}
                 onChange={(event) =>
-                  setDetailsForm((prev) => ({ ...prev, domain: event.target.value }))
+                  setDetailsForm((prev) => ({
+                    ...prev,
+                    domain: event.target.value,
+                  }))
                 }
               />
               <div className="grid gap-4 md:grid-cols-2">
@@ -374,7 +414,10 @@ export default function OrganizationManagementClient() {
                   placeholder="Asia/Dhaka"
                   value={detailsForm.timezone}
                   onChange={(event) =>
-                    setDetailsForm((prev) => ({ ...prev, timezone: event.target.value }))
+                    setDetailsForm((prev) => ({
+                      ...prev,
+                      timezone: event.target.value,
+                    }))
                   }
                 />
                 <TextInput
@@ -382,7 +425,10 @@ export default function OrganizationManagementClient() {
                   placeholder="en-US"
                   value={detailsForm.locale}
                   onChange={(event) =>
-                    setDetailsForm((prev) => ({ ...prev, locale: event.target.value }))
+                    setDetailsForm((prev) => ({
+                      ...prev,
+                      locale: event.target.value,
+                    }))
                   }
                 />
               </div>
@@ -403,14 +449,20 @@ export default function OrganizationManagementClient() {
                 <p className="text-xs uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
                   Total teammates
                 </p>
-                <p className="text-3xl font-bold">{organization.totalEmployees}</p>
+                <p className="text-3xl font-bold">
+                  {organization.totalEmployees}
+                </p>
               </div>
               <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 text-sm dark:border-slate-700/70 dark:bg-slate-800/70 dark:text-slate-300">
-                <p className="font-semibold text-slate-900 dark:text-slate-100">Created</p>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">
+                  Created
+                </p>
                 <p>{formatOptionalDate(organization.createdAtIso)}</p>
               </div>
               <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 text-sm dark:border-slate-700/70 dark:bg-slate-800/70 dark:text-slate-300">
-                <p className="font-semibold text-slate-900 dark:text-slate-100">Last updated</p>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">
+                  Last updated
+                </p>
                 <p>{formatOptionalDate(organization.updatedAtIso)}</p>
               </div>
             </div>
@@ -424,7 +476,8 @@ export default function OrganizationManagementClient() {
                     Org Admins
                   </h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Promote trusted teammates to help manage departments, work policies, and invites.
+                    Promote trusted teammates to help manage departments, work
+                    policies, and invites.
                   </p>
                 </div>
                 <div className="rounded-full bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200">
@@ -434,7 +487,8 @@ export default function OrganizationManagementClient() {
               <div className="space-y-3">
                 {admins.length === 0 ? (
                   <p className="rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                    No Org Admins yet. Promote a teammate using the form on the right.
+                    No Org Admins yet. Promote a teammate using the form on the
+                    right.
                   </p>
                 ) : (
                   admins.map((admin) => (
@@ -453,12 +507,17 @@ export default function OrganizationManagementClient() {
                       <Button
                         theme="cancel-secondary"
                         className="rounded-xl px-3 py-1 text-xs"
-                        disabled={pendingRemovalId === admin.id || removeAdminMutation.isPending}
+                        disabled={
+                          pendingRemovalId === admin.id ||
+                          removeAdminMutation.isPending
+                        }
                         onClick={() => handleRemoveAdmin(admin.id)}
                       >
                         <span className="flex items-center gap-1">
                           <FiUserMinus />
-                          {pendingRemovalId === admin.id ? "Removing..." : "Remove"}
+                          {pendingRemovalId === admin.id
+                            ? "Removing..."
+                            : "Remove"}
                         </span>
                       </Button>
                     </div>
@@ -480,7 +539,8 @@ export default function OrganizationManagementClient() {
                     Promote a teammate
                   </h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Choose any HR Admin, Manager, or Employee to grant Org Admin access.
+                    Choose any HR Admin, Manager, or Employee to grant Org Admin
+                    access.
                   </p>
                 </div>
               </div>
@@ -495,7 +555,9 @@ export default function OrganizationManagementClient() {
                 }
                 value={selectedMemberId}
                 onChange={(event) => setSelectedMemberId(event.target.value)}
-                isDisabled={!eligibleOptions.length || addAdminMutation.isPending}
+                isDisabled={
+                  !eligibleOptions.length || addAdminMutation.isPending
+                }
               />
               <Button
                 type="submit"
@@ -520,7 +582,10 @@ export default function OrganizationManagementClient() {
               : "Ask a Super Admin to assign you to an organization to unlock these controls."}
           </p>
           {isSuperAdmin && managementQuery.data?.canCreateOrganizations ? (
-            <Button href="/hr-admin/organization/create" className="mt-4 rounded-xl px-4 py-2 text-sm">
+            <Button
+              href="/hr-admin/organization/create"
+              className="mt-4 rounded-xl px-4 py-2 text-sm"
+            >
               Create the first organization
             </Button>
           ) : null}
