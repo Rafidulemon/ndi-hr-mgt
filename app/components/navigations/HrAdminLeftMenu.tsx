@@ -21,6 +21,7 @@ import {
   FaUsers,
   FaSitemap,
   FaFileInvoice,
+  FaProjectDiagram,
 } from "react-icons/fa";
 import { TbReportAnalytics } from "react-icons/tb";
 
@@ -29,6 +30,7 @@ import { canManageTeams } from "@/types/hr-team";
 import { canManageWork } from "@/types/hr-work";
 import { canManageOrganization } from "@/types/hr-organization";
 import { canManageDepartments } from "@/types/hr-department";
+import { canManageProjects } from "@/types/hr-project";
 import { trpc } from "@/trpc/client";
 import { DEFAULT_ORGANIZATION_LOGO } from "@/lib/organization-branding";
 
@@ -40,6 +42,7 @@ type MenuItem = {
     | "organization"
     | "departments"
     | "work"
+    | "projects"
     | "reports"
     | "attendance"
     | "leave"
@@ -102,6 +105,12 @@ const hrMenuItems: MenuItem[] = [
     label: "Work Management",
     icon: <FaRegClock />,
     href: "/hr-admin/work-management",
+  },
+  {
+    id: "projects",
+    label: "Project Management",
+    icon: <FaProjectDiagram />,
+    href: "/hr-admin/project-management",
   },
   {
     id: "attendance",
@@ -231,6 +240,9 @@ const HrAdminLeftMenu = ({
       }
       if (item.id === "work") {
         return canManageWork(viewerRole);
+      }
+      if (item.id === "projects") {
+        return canManageProjects(viewerRole);
       }
       if (item.id === "organization") {
         return canManageOrganization(viewerRole);

@@ -6,6 +6,7 @@ import { canManageTeams } from "@/types/hr-team";
 import { canManageWork } from "@/types/hr-work";
 import { canManageOrganization } from "@/types/hr-organization";
 import { canManageDepartments } from "@/types/hr-department";
+import { canManageProjects } from "@/types/hr-project";
 
 const HR_ALLOWED_ROLES: UserRole[] = [
   "HR_ADMIN",
@@ -52,6 +53,17 @@ export const requireDepartmentManager = (ctx: TRPCContext) => {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Only org admins, org owners, or super admins can manage departments.",
+    });
+  }
+  return user;
+};
+
+export const requireProjectManager = (ctx: TRPCContext) => {
+  const user = requireHrAdmin(ctx);
+  if (!canManageProjects(user.role as UserRole)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only managers, org admins, org owners, or super admins can manage projects.",
     });
   }
   return user;

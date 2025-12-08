@@ -9,6 +9,7 @@ NDI HR Management is a multi-tenant workforce operations platform built on Next.
 - **Attendance automation** — Remote vs onsite inference, lateness detection, shift policies, and granular logs reside in `server/modules/hr/attendance`.
 - **Leave & PTO management** — Submission, approval, attachment handling, and secure download tokens (see `server/modules/leave`) cover the full leave lifecycle.
 - **Employee lifecycle** — Invitations, onboarding flows, employment records, bank details, and emergency contacts are orchestrated via `server/modules/hr/employees`.
+- **Project portfolio management** — HR, org admins, managers, and super admins can spin up initiatives, assign project managers/members, and drive CRUD workflows via `app/(hr-admin)/hr-admin/project-management` backed by `server/modules/hr/project`.
 - **Invoices & payroll review** — Employees confirm payroll-ready invoices with short-lived unlock tokens implemented in `server/modules/invoice`.
 - **Reports & compliance** — Daily/monthly reporting plus exports in `server/modules/report` give HR verifiable history.
 - **Messaging & notifications** — Threaded conversations, notifications, and Socket.IO (`pages/api/socket.ts`, `server/modules/messages`) enable real-time collaboration.
