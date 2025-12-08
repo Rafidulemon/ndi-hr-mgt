@@ -81,7 +81,7 @@ const hrMenuItems: MenuItem[] = [
   },
   {
     id: "organization",
-    label: "Organization",
+    label: "Organization Management",
     icon: <FaBuilding />,
     href: "/hr-admin/organization",
   },
@@ -105,7 +105,7 @@ const hrMenuItems: MenuItem[] = [
   },
   {
     id: "attendance",
-    label: "Attendance",
+    label: "Attendance Management",
     icon: <FaCalendarCheck />,
     href: "/hr-admin/attendance",
   },
@@ -206,7 +206,7 @@ const HrAdminLeftMenu = ({
   };
 
   const containerClasses = [
-    "flex min-h-full w-full flex-col gap-4 rounded-[32px] border border-white/60 bg-white/90 px-4 py-6 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur transition-colors duration-200 md:min-w-[18rem]",
+    "flex min-h-full w-full flex-col gap-4 rounded-[32px] border border-white/60 bg-white/90 px-2 py-6 text-slate-700 shadow-2xl shadow-indigo-100 backdrop-blur transition-colors duration-200 md:min-w-[18rem]",
     "dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:shadow-slate-900/60",
     className,
   ]
@@ -242,7 +242,7 @@ const HrAdminLeftMenu = ({
   return (
     <div className={containerClasses}>
       <div className="sticky top-0 z-20 flex flex-col items-center gap-3 rounded-[24px] bg-white/95 pb-2 text-center backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:text-left dark:bg-slate-900/85">
-        <div className="flex flex-row items-center justify-center gap-2 sm:justify-start">
+        <div className="flex flex-row items-center justify-center gap-2 sm:justify-start px-2">
           <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
             <Image
               src={logoSrc}
@@ -309,7 +309,7 @@ const HrAdminLeftMenu = ({
           type="button"
           onClick={() => setIsOpenModal(true)}
           disabled={isLoggingOut}
-          className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-400 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200 transition-transform hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70 dark:from-rose-500 dark:via-amber-500 dark:to-orange-400 dark:shadow-rose-900/50"
+          className="mt-4 flex w-full items-center justify-center gap-3 rounded bg-gradient-to-r from-rose-500 to-orange-400 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200 transition-transform hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70 dark:from-rose-500 dark:via-amber-500 dark:to-orange-400 dark:shadow-rose-900/50"
         >
           <BiLogOut className="text-lg" />
           {isLoggingOut ? "Logging out..." : "Logout"}
