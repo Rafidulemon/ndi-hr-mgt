@@ -2,6 +2,7 @@ import { AttendanceStatus, type WorkModel } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import { prisma } from "@/server/db";
+import { WEEKDAY_OPTIONS, type WeekdayOption } from "@/types/hr-work";
 import type {
   AttendanceHistoryInput,
   CompleteDayInput,
@@ -63,10 +64,74 @@ type PolicyTimings = {
   remoteStartTime: string;
 };
 
+type WeekSchedule = {
+  workingDays: WeekdayOption[];
+  weekendDays: WeekdayOption[];
+};
+
+const DEFAULT_WEEK_SCHEDULE: WeekSchedule = {
+  workingDays: [
+    "MONDAY",
+    "TUESDAY",
+    "WEDNESDAY",
+    "THURSDAY",
+    "FRIDAY",
+  ] as WeekdayOption[],
+  weekendDays: ["SATURDAY", "SUNDAY"] as WeekdayOption[],
+};
+
 const resolvePolicyTimings = (record?: PolicyTimings | null): PolicyTimings => ({
   onsiteStartTime: record?.onsiteStartTime ?? DEFAULT_POLICY_TIMINGS.onsiteStartTime,
   remoteStartTime: record?.remoteStartTime ?? DEFAULT_POLICY_TIMINGS.remoteStartTime,
 });
+
+const weekdayOrder = WEEKDAY_OPTIONS.reduce<Record<WeekdayOption, number>>(
+  (acc, day, index) => {
+    acc[day] = index;
+    return acc;
+  },
+  {} as Record<WeekdayOption, number>,
+);
+
+const normalizeWeekdayList = (values?: string[] | null): WeekdayOption[] => {
+  if (!values?.length) {
+    return [];
+  }
+  const seen = new Set<WeekdayOption>();
+  const options = values.reduce<WeekdayOption[]>((acc, raw) => {
+    if ((WEEKDAY_OPTIONS as readonly string[]).includes(raw)) {
+      const day = raw as WeekdayOption;
+      if (!seen.has(day)) {
+        seen.add(day);
+        acc.push(day);
+      }
+    }
+    return acc;
+  }, []);
+  return options.sort(
+    (a, b) => (weekdayOrder[a] ?? 0) - (weekdayOrder[b] ?? 0),
+  );
+};
+
+const resolveWeekSchedule = (
+  record?: { workingDays: string[]; weekendDays: string[] } | null,
+): WeekSchedule => {
+  if (!record) {
+    return DEFAULT_WEEK_SCHEDULE;
+  }
+
+  const workingDays = normalizeWeekdayList(record.workingDays);
+  const weekendDays = normalizeWeekdayList(record.weekendDays).filter(
+    (day) => !workingDays.includes(day),
+  );
+
+  return {
+    workingDays:
+      workingDays.length > 0 ? workingDays : DEFAULT_WEEK_SCHEDULE.workingDays,
+    weekendDays:
+      weekendDays.length > 0 ? weekendDays : DEFAULT_WEEK_SCHEDULE.weekendDays,
+  };
+};
 
 const timezoneFormatterCache = new Map<string, Intl.DateTimeFormat>();
 const timezoneValidationCache = new Map<string, boolean>();
@@ -350,28 +415,36 @@ export const attendanceService = {
     return formatRecord(updated);
   },
 
-  async history({ userId, params }: AttendanceHistoryServiceInput) {
+  async history({ userId, organizationId, params }: AttendanceHistoryServiceInput) {
     if (!userId) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
     const { rangeStart, rangeEnd } = resolveHistoryRange(params);
 
-    const records = await prisma.attendanceRecord.findMany({
-      where: {
-        employeeId: userId,
-        attendanceDate: {
-          gte: rangeStart,
-          lt: rangeEnd,
+    const [records, policyRecord] = await Promise.all([
+      prisma.attendanceRecord.findMany({
+        where: {
+          employeeId: userId,
+          attendanceDate: {
+            gte: rangeStart,
+            lt: rangeEnd,
+          },
         },
-      },
-      orderBy: {
-        attendanceDate: "desc",
-      },
-    });
+        orderBy: {
+          attendanceDate: "desc",
+        },
+      }),
+      prisma.workPolicy.findUnique({
+        where: { organizationId },
+        select: { workingDays: true, weekendDays: true },
+      }),
+    ]);
+    const weekSchedule = resolveWeekSchedule(policyRecord);
 
     return {
       records: records.map(formatRecord),
+      weekSchedule,
     };
   },
 };

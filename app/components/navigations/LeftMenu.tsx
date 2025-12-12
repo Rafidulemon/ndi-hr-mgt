@@ -39,6 +39,7 @@ const menuItems = [
   { label: "Dashboard", icon: <MdOutlineDashboard />, href: "/" },
   { label: "Profile", icon: <FaUser />, href: "/profile" },
   { label: "Attendance", icon: <FaCalendarCheck />, href: "/attendance" },
+  { label: "Calender", icon: <FaCalendarCheck />, href: "/calender" },
   {
     label: "Leave",
     icon: <FaClipboardList />,
