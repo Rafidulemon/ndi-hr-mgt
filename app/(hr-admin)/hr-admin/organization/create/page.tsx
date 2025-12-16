@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { requireUser } from "@/server/auth/guards";
 
-import CreateOrganizationClient from "./CreateOrganizationClient";
+import CreateOrganizationClient from "../../../../components/hr-admin/CreateOrganizationClient";
 
 export default async function CreateOrganizationPage() {
   const user = await requireUser();

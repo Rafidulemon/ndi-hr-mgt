@@ -14,7 +14,7 @@ import Button from "../../../components/atoms/buttons/Button";
 import TextArea from "../../../components/atoms/inputs/TextArea";
 import TextInput from "../../../components/atoms/inputs/TextInput";
 import { Modal } from "../../../components/atoms/frame/Modal";
-import { employeeStatusStyles } from "./statusStyles";
+import { employeeStatusStyles } from "../../../utils/statusStyles";
 import { trpc } from "@/trpc/client";
 import type { EmployeeDirectoryEntry, EmployeeStatus } from "@/types/hr-admin";
 import LoadingSpinner from "@/app/components/LoadingSpinner";

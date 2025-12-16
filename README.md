@@ -73,9 +73,8 @@ NDI HR Management is a multi-tenant workforce operations platform built on Next.
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `NEXTAUTH_SECRET` | Yes | Secret for NextAuth session/JWT signing (also used by Socket.IO auth). |
-| `NEXT_PUBLIC_JWT_SECRET` | Yes | Base secret shared by password reset, invite, and attachment flows. |
-| `JWT_SECRET` | No | Server-only fallback secret when `NEXT_PUBLIC_JWT_SECRET` is absent. |
-| `AUTH_SECRET` | No | Legacy fallback secret for token validation. |
+| `JWT_SECRET` | Yes | Base secret shared by password reset, invite, and attachment flows (falls back to `AUTH_SECRET`/`NEXTAUTH_SECRET` only for backward compatibility). |
+| `AUTH_SECRET` | No | Legacy fallback secret for token validation when `JWT_SECRET` is not set. |
 | `INVOICE_UNLOCK_SECRET` | No | Dedicated secret for invoice unlock tokens (`server/modules/invoice`). |
 | `LEAVE_ATTACHMENT_TOKEN_SECRET` | No | Secret for leave attachment download tokens. |
 | `LEAVE_ATTACHMENT_TOKEN_TTL` | No | Override attachment token lifetime (default `30d`). |
@@ -87,8 +86,8 @@ NDI HR Management is a multi-tenant workforce operations platform built on Next.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `NEXT_PUBLIC_EMAIL_USER` | Yes | Gmail/SMTP user used by Nodemailer for invites & reset emails. |
-| `NEXT_PUBLIC_EMAIL_PASS` | Yes | App password or SMTP password paired with the email user. |
+| `EMAIL_USER` | Yes | Gmail/SMTP user used by Nodemailer for invites & reset emails (`SMTP_USER` also accepted). |
+| `EMAIL_PASS` | Yes | App password or SMTP password paired with the email user (`SMTP_PASS` also accepted). |
 
 #### Storage & assets
 
@@ -101,7 +100,7 @@ NDI HR Management is a multi-tenant workforce operations platform built on Next.
 | `S3_BUCKET` | Yes | Bucket name where uploads are stored. |
 | `S3_PUBLIC_BASE_URL` | Yes | Public CDN/base URL; also feeds `next.config.ts` remote image patterns. |
 
-> Tip: Keep `NEXT_PUBLIC_JWT_SECRET`, `JWT_SECRET`, and `AUTH_SECRET` aligned to avoid token verification mismatches between the server and browser runtime.
+> Tip: Keep `JWT_SECRET`, `AUTH_SECRET`, and `NEXTAUTH_SECRET` aligned to avoid token verification mismatches between the server and browser runtime, and never expose them with the `NEXT_PUBLIC_` prefix.
 
 ## Deployment Guidelines
 

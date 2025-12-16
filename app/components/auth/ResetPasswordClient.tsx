@@ -5,11 +5,10 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-
-import AuthLayout from "../_components/AuthLayout";
-import Button from "../../../components/atoms/buttons/Button";
-import PasswordInput from "../../../components/atoms/inputs/PasswordInput";
-import Text from "../../../components/atoms/Text/Text";
+import AuthLayout from "@/app/components/auth/AuthLayout";
+import Button from "@/app/components/atoms/buttons/Button";
+import PasswordInput from "@/app/components/atoms/inputs/PasswordInput";
+import Text from "@/app/components/atoms/Text/Text";
 import { trpc } from "@/trpc/client";
 
 const schema = z

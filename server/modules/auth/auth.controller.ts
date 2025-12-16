@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import { AuthService } from "./auth.service";
 import type { CompleteInviteInput, RegisterInput } from "./auth.validation";
+import { getJwtSecret } from "@/lib/env";
 
 const getSignupOptionsHandler = async () => {
   try {
@@ -40,15 +41,15 @@ const sendResetPasswordLinkHandler = async (email: string) => {
   try {
     const user = await AuthService.sendResetPasswordLinkService(email);
     if (email === user?.email) {
-      const JWT_SECRET = process.env.NEXT_PUBLIC_JWT_SECRET ?? "Nw3oRAt7GSozu9";
-      const GENERATED_JWT_SECRET = JWT_SECRET + user?.id;
+      const jwtSecret = getJwtSecret();
+      const generatedJwtSecret = jwtSecret + user?.id;
 
       const payload = {
         email: user?.email,
         id: user?.id,
       };
 
-      const token = jwt.sign(payload, GENERATED_JWT_SECRET, {
+      const token = jwt.sign(payload, generatedJwtSecret, {
         expiresIn: "24h",
       });
     } else {

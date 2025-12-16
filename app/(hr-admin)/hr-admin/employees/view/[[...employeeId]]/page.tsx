@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import Text from "@/app/components/atoms/Text/Text";
 import Button from "@/app/components/atoms/buttons/Button";
 import { EmployeeHeader } from "@/app/components/layouts/EmployeeHeader";
-import { employeeStatusStyles } from "@/app/(hr-admin)/hr-admin/employees/statusStyles";
+import { employeeStatusStyles } from "@/app/utils/statusStyles";
 import { trpc } from "@/trpc/client";
 import type { HrEmployeeProfile } from "@/types/hr-admin";
 

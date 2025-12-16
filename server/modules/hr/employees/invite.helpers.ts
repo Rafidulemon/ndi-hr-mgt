@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
 
 import { createRandomToken } from "@/server/utils/token";
+import { getEmailCredentials } from "@/lib/env";
 
 const roleLabels: Record<UserRole, string> = {
   SUPER_ADMIN: "Super Admin",
@@ -109,10 +110,12 @@ export const sendInvitationEmail = async ({
   expiresAt: Date;
   senderName?: string | null;
 }) => {
-  const emailUser = process.env.NEXT_PUBLIC_EMAIL_USER;
-  const emailPass = process.env.NEXT_PUBLIC_EMAIL_PASS;
+  let emailUser: string;
+  let emailPass: string;
 
-  if (!emailUser || !emailPass) {
+  try {
+    ({ user: emailUser, pass: emailPass } = getEmailCredentials());
+  } catch (error) {
     console.warn("Email credentials are not configured. Skipping invite email.");
     return false;
   }

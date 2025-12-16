@@ -9,6 +9,7 @@ import jwt from "jsonwebtoken";
 import { getServerSession } from "next-auth";
 import type { RegisterInput } from "./auth.validation";
 import { hashToken } from "@/server/utils/token";
+import { getJwtSecret } from "@/lib/env";
 
 const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
 
@@ -332,9 +333,8 @@ const updateUserPassworIntoDb = async (input: UserPasswordUpdateType) => {
 
 const tokenValidate = async ({ token }: { token: string }) => {
   try {
-    const JWT_SECRET =
-      process.env.NEXT_PUBLIC_JWT_SECRET || process.env.JWT_SECRET || "Nw3oRAt7GSozu9";
-    const decoded = jwt.verify(token, JWT_SECRET) as UserInfoParam;
+    const jwtSecret = getJwtSecret();
+    const decoded = jwt.verify(token, jwtSecret) as UserInfoParam;
 
     if (!decoded.exp || decoded.exp < Math.floor(Date.now() / 1000)) {
       throw new TRPCError({

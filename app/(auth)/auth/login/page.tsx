@@ -8,7 +8,7 @@ import type { ChangeEvent } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import AuthLayout from "../_components/AuthLayout";
+import AuthLayout from "../../../components/auth/AuthLayout";
 import Button from "../../../components/atoms/buttons/Button";
 import EmailInput from "../../../components/atoms/inputs/EmailInput";
 import PasswordInput from "../../../components/atoms/inputs/PasswordInput";
@@ -43,11 +43,9 @@ function LoginPage() {
 
   useEffect(() => {
     const rememberedEmail = localStorage.getItem("rememberedEmail");
-    const rememberedPassword = localStorage.getItem("rememberedPassword");
 
-    if (rememberedEmail && rememberedPassword) {
+    if (rememberedEmail) {
       setValue("email", rememberedEmail);
-      setValue("password", rememberedPassword);
       setRememberMe(true);
     }
   }, [setValue]);
@@ -63,10 +61,8 @@ function LoginPage() {
   const persistRememberedCredentials = (data: FormData) => {
     if (rememberMe) {
       localStorage.setItem("rememberedEmail", data.email);
-      localStorage.setItem("rememberedPassword", data.password);
     } else {
       localStorage.removeItem("rememberedEmail");
-      localStorage.removeItem("rememberedPassword");
     }
   };
 
@@ -136,7 +132,7 @@ function LoginPage() {
               checked={rememberMe}
               onChange={toggleRememberMe}
             />
-            <span>Remember me</span>
+            <span>Remember my email</span>
           </label>
           <button
             type="button"

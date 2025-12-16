@@ -1,21 +1,9 @@
 import jwt from "jsonwebtoken";
 
+import { getAttachmentTokenSecret } from "@/lib/env";
+
 const TOKEN_PURPOSE = "leave-attachment";
 const TOKEN_TTL = process.env.LEAVE_ATTACHMENT_TOKEN_TTL ?? "30d";
-
-const getAttachmentTokenSecret = (): jwt.Secret => {
-  const secret =
-    process.env.LEAVE_ATTACHMENT_TOKEN_SECRET ||
-    process.env.NEXT_PUBLIC_JWT_SECRET ||
-    process.env.JWT_SECRET ||
-    process.env.AUTH_SECRET;
-
-  if (!secret) {
-    throw new Error("Attachment token secret is not configured.");
-  }
-
-  return secret;
-};
 
 export type AttachmentTokenPayload = {
   key: string;

@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import jwt, { JsonWebTokenError } from "jsonwebtoken";
 import { notFound } from "next/navigation";
-
-import { ResetPasswordClient } from "./ResetPasswordClient";
+import { ResetPasswordClient } from "@/app/components/auth/ResetPasswordClient";
+import { getJwtSecret } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -10,17 +10,6 @@ type SearchParams = { [key: string]: string | string[] | undefined };
 
 type ResetPasswordPageProps = {
   searchParams?: SearchParams | Promise<SearchParams>;
-};
-
-const getJwtSecret = () => {
-  const secret =
-    process.env.NEXT_PUBLIC_JWT_SECRET || process.env.JWT_SECRET || process.env.AUTH_SECRET;
-
-  if (!secret) {
-    throw new Error("JWT secret is not configured.");
-  }
-
-  return secret;
 };
 
 type ResetTokenPayload = jwt.JwtPayload & {

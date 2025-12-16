@@ -2,9 +2,11 @@
 
 import Image from "next/image";
 import { ReactNode } from "react";
+import { FiMoon, FiSun } from "react-icons/fi";
 import Button from "@/app/components/atoms/buttons/Button";
 import Text from "@/app/components/atoms/Text/Text";
 import Header from "@/app/components/navigations/Header";
+import { useTheme } from "@/app/components/theme/ThemeProvider";
 
 type ShowcaseContent = {
   eyebrow: string;
@@ -28,6 +30,49 @@ type AuthLayoutProps = {
   showcase?: Partial<ShowcaseContent>;
   showShowcase?: boolean;
 };
+
+type ThemeToggleButtonProps = {
+  className?: string;
+};
+
+function ThemeToggleButton({ className = "" }: ThemeToggleButtonProps) {
+  const { preference, resolvedTheme, toggleTheme } = useTheme();
+  const isSystem = preference === "system";
+  const isDark = resolvedTheme === "dark";
+
+  const label = isSystem
+    ? `System · ${isDark ? "dark" : "light"}`
+    : isDark
+    ? "Dark mode"
+    : "Light mode";
+
+  const helper = isSystem ? "Matches device setting" : "Manual override";
+  const nextThemeLabel = isDark ? "light" : "dark";
+
+  return (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      className={`group inline-flex w-full items-center gap-3 rounded-2xl border border-slate-200/80 bg-white/90 px-3 py-2 text-left text-sm font-medium text-slate-600 shadow-sm shadow-slate-200/70 backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200 dark:shadow-slate-950/40 dark:hover:border-slate-600 ${className}`}
+      aria-label={`Switch to ${nextThemeLabel} theme`}
+    >
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/10 to-sky-500/10 text-lg text-indigo-500 transition-colors dark:from-slate-800 dark:to-slate-900 dark:text-sky-300">
+        {isDark ? <FiMoon /> : <FiSun />}
+      </span>
+      <span className="flex flex-1 flex-col">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-400 transition-colors duration-150 dark:text-slate-500">
+          Theme
+        </span>
+        <span className="text-sm font-semibold text-slate-900 transition-colors duration-150 dark:text-slate-100">
+          {label}
+        </span>
+        <span className="text-xs text-slate-400 transition-colors duration-150 dark:text-slate-500">
+          {helper}
+        </span>
+      </span>
+    </button>
+  );
+}
 
 const defaultShowcase: ShowcaseContent = {
   eyebrow: "People Ops OS",
@@ -113,21 +158,24 @@ export default function AuthLayout({
           ) : null}
 
           <section className="rounded-[32px] border border-white/70 bg-white/90 p-10 shadow-2xl shadow-slate-200/70 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 dark:shadow-slate-950/50">
-            <div className="space-y-3">
-              <span className="inline-flex items-center rounded-full border border-slate-200/70 bg-slate-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-                {badge}
-              </span>
-              <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
-                {title}
-              </h1>
-              <p className="text-base text-slate-600 dark:text-slate-300">
-                {subtitle}
-              </p>
-              {description ? (
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {description}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-3">
+                <span className="inline-flex items-center rounded-full border border-slate-200/70 bg-slate-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                  {badge}
+                </span>
+                <h1 className="text-3xl font-semibold leading-tight text-slate-900 dark:text-white">
+                  {title}
+                </h1>
+                <p className="text-base text-slate-600 dark:text-slate-300">
+                  {subtitle}
                 </p>
-              ) : null}
+                {description ? (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {description}
+                  </p>
+                ) : null}
+              </div>
+              <ThemeToggleButton className="sm:w-auto sm:min-w-[230px] sm:self-start" />
             </div>
 
             {helper ? (

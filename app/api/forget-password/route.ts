@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 
+import { getEmailCredentials, getJwtSecret } from "@/lib/env";
 import { prisma } from "@/prisma";
 
 const TOKEN_TTL_MINUTES = 30;
@@ -58,14 +59,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const baseSecret =
-      process.env.NEXT_PUBLIC_JWT_SECRET ||
-      process.env.JWT_SECRET ||
-      process.env.AUTH_SECRET;
-
-    if (!baseSecret) {
-      throw new Error("JWT secret is not configured.");
-    }
+    const baseSecret = getJwtSecret();
 
     const token = jwt.sign(
       {
@@ -78,12 +72,7 @@ export async function POST(request: Request) {
       { expiresIn: `${TOKEN_TTL_MINUTES}m` },
     );
 
-    const emailUser = process.env.NEXT_PUBLIC_EMAIL_USER;
-    const emailPass = process.env.NEXT_PUBLIC_EMAIL_PASS;
-
-    if (!emailUser || !emailPass) {
-      throw new Error("Email credentials are not configured.");
-    }
+    const { user: emailUser, pass: emailPass } = getEmailCredentials();
 
     const transporter = nodemailer.createTransport({
       service: "gmail",
