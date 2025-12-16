@@ -119,16 +119,20 @@ export default function AuthLayout({
         <div className="absolute inset-x-0 bottom-[-20%] h-96 bg-gradient-to-t from-slate-200/70 to-transparent dark:from-slate-900/50" />
       </div>
 
-      <div className="fixed left-0 right-0 top-6 z-40 px-6">
+      <div className="fixed left-0 right-0 top-4 z-40 px-4 sm:top-6 sm:px-6">
         <Header />
       </div>
 
-      <div className="relative z-10 flex min-h-screen items-center px-6 pb-12 pt-32 lg:pt-36">
+      <div className="relative z-10 flex min-h-screen items-center px-4 pb-16 pt-28 sm:px-6 sm:pb-12 sm:pt-32 lg:pt-36">
         <div
-          className={`mx-auto ${showShowcase ? "grid w-full max-w-6xl gap-8 lg:grid-cols-[1.05fr,0.95fr]" : "w-full max-w-xl"}`}
+          className={`mx-auto ${
+            showShowcase
+              ? "grid w-full max-w-6xl gap-6 lg:grid-cols-[1.05fr,0.95fr] lg:gap-8"
+              : "w-full max-w-lg sm:max-w-xl"
+          }`}
         >
           {showShowcase ? (
-            <section className="rounded-[32px] border border-white/30 bg-gradient-to-br from-indigo-600 via-sky-500 to-cyan-400 p-10 text-white shadow-2xl shadow-sky-500/30 backdrop-blur-lg dark:border-slate-900/60 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 dark:shadow-slate-950">
+            <section className="order-2 rounded-[32px] border border-white/30 bg-gradient-to-br from-indigo-600 via-sky-500 to-cyan-400 p-6 text-white shadow-2xl shadow-sky-500/30 backdrop-blur-lg dark:border-slate-900/60 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 dark:shadow-slate-950 sm:p-8 lg:order-1 lg:p-10">
               <span className="inline-flex items-center rounded-full border border-white/30 px-4 py-1 text-xs uppercase tracking-[0.3em] text-white/80">
                 {hero.eyebrow}
               </span>
@@ -157,9 +161,9 @@ export default function AuthLayout({
             </section>
           ) : null}
 
-          <section className="rounded-[32px] border border-white/70 bg-white/90 p-10 shadow-2xl shadow-slate-200/70 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 dark:shadow-slate-950/50">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="space-y-3">
+          <section className="order-1 rounded-[32px] border border-white/70 bg-white/90 p-6 shadow-2xl shadow-slate-200/70 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 dark:shadow-slate-950/50 sm:p-8 lg:order-2 lg:p-10">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
+              <div className="space-y-3 lg:flex-1 lg:min-w-0">
                 <span className="inline-flex items-center rounded-full border border-slate-200/70 bg-slate-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
                   {badge}
                 </span>
@@ -175,7 +179,7 @@ export default function AuthLayout({
                   </p>
                 ) : null}
               </div>
-              <ThemeToggleButton className="sm:w-auto sm:min-w-[230px] sm:self-start" />
+              <ThemeToggleButton className="lg:w-auto lg:min-w-[230px] lg:self-start" />
             </div>
 
             {helper ? (

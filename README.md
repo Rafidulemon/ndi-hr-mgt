@@ -1,28 +1,44 @@
 # NDI HR Management
 
-NDI HR Management is a multi-tenant workforce operations platform built on Next.js 16. It centralizes employee data, automates attendance and leave workflows, powers finance reviews for invoices, and surfaces live insights for HR administrators. The application ships with a tRPC-powered API layer, Prisma ORM, Socket.IO messaging, and S3-compatible storage for attachments.
+NDI HR Management is a **single-tenant** workforce operations portal built with Next.js 16, React 19, tRPC, and Prisma. A single deployment powers one organization’s HR team and employees, covering onboarding, attendance, time-off, invoices, projects, and internal comms. The system relies on PostgreSQL for state, S3-compatible storage for documents, and Socket.IO for live updates.
 
-## Features
+---
 
-- **Multi-tenant workspaces & RBAC** — Organizations, departments, teams, and rich role hierarchy (`SUPER_ADMIN` → `EMPLOYEE`) are modeled in `prisma/schema.prisma`.
-- **Workforce analytics dashboard** — `server/modules/hr/dashboard` aggregates attendance, engagement, coverage, and policy adherence KPIs with timezone-aware scheduling.
-- **Attendance automation** — Remote vs onsite inference, lateness detection, shift policies, and granular logs reside in `server/modules/hr/attendance`.
-- **Leave & PTO management** — Submission, approval, attachment handling, and secure download tokens (see `server/modules/leave`) cover the full leave lifecycle.
-- **Employee lifecycle** — Invitations, onboarding flows, employment records, bank details, and emergency contacts are orchestrated via `server/modules/hr/employees`.
-- **Project portfolio management** — HR, org admins, managers, and super admins can spin up initiatives, assign project managers/members, and drive CRUD workflows via `app/(hr-admin)/hr-admin/project-management` backed by `server/modules/hr/project`.
-- **Invoices & payroll review** — Employees confirm payroll-ready invoices with short-lived unlock tokens implemented in `server/modules/invoice`.
-- **Reports & compliance** — Daily/monthly reporting plus exports in `server/modules/report` give HR verifiable history.
-- **Messaging & notifications** — Threaded conversations, notifications, and Socket.IO (`pages/api/socket.ts`, `server/modules/messages`) enable real-time collaboration.
-- **Storage & documents** — Cloudflare R2 / S3 buckets (see `server/storage/r2.ts`) store policies, proofs, and downloadable artifacts with signed URLs.
+## Application Surfaces
+
+| Surface | Location | Highlights |
+| --- | --- | --- |
+| **Authentication** | `app/(auth)` | Email + password login, invite acceptance, password reset flows, and status messaging. |
+| **HR Admin workspace** | `app/(hr-admin)/hr-admin` | Dashboards, organization configuration, employee records, attendance & leave approvals, invoices, projects, org/team/department admin, and announcements. |
+| **Employee workspace** | `app/(main)` | Self-service attendance, leave requests, invoices, team directory, messaging, notifications, reports, and profile management. |
+
+---
+
+## Feature Highlights
+
+- **Role-based workspace (single tenant)** — RBAC spanning `SUPER_ADMIN` through `EMPLOYEE` is modeled in `prisma/schema.prisma` and enforced across admin vs. employee routes.
+- **Attendance automation** — Check-ins, onsite/remote tracking, shift adherence, and anomaly detection handled in `server/modules/hr/attendance` with UIs in `app/(hr-admin)/hr-admin/attendance` and `app/(main)/attendance`.
+- **Leave & PTO lifecycle** — Employees submit requests with attachments, HR reviews/approves, and PDFs are guarded by signed download tokens (`server/modules/leave`, `app/(hr-admin)/hr-admin/leave-approvals`, `app/(main)/leave`).
+- **Employee records & onboarding** — Invitation tokens, profile data, emergency contacts, banking, and lifecycle updates live in `server/modules/hr/employees` and `app/(hr-admin)/hr-admin/employees`.
+- **Organization configuration** — HR admins curate org info, departments, teams, work arrangements, and announcements via `app/components/hr-admin` modules backed by `server/modules/hr/organization`, `department`, and `team`.
+- **Projects & work management** — Admins and managers assign initiatives, roles, and deliverables (`app/(hr-admin)/hr-admin/project-management`, `server/modules/hr/project`, `work`).
+- **Invoices & payroll review** — Employees unlock invoices with short-lived tokens (`app/(main)/invoice`), while finance/HR audit via `app/(hr-admin)/hr-admin/invoices` and `server/modules/invoice`.
+- **Reporting & analytics** — Daily/monthly snapshots plus exports through `server/modules/hr/reports`, `server/modules/report`, and UI tables/charts in `app/(hr-admin)/hr-admin/reports`.
+- **Messaging & notifications** — Threaded conversations, presence, and alert delivery using Socket.IO (`pages/api/socket.ts`, `app/components/realtime`, `server/modules/messages`, `notification`).
+- **Document storage** — Policies, proofs, and avatars stream to Cloudflare R2/AWS S3 via `server/storage/r2.ts` with signed URL access control.
+
+---
 
 ## Technology Stack
 
-- **Frontend** — Next.js 16 App Router, React 19, TypeScript 5, Tailwind CSS 3, DaisyUI, next/font (Geist), TanStack Query, React Hook Form, React Datepicker, React Icons.
-- **API & Services** — Next.js Route Handlers, tRPC 11, Prisma 6, NextAuth custom session helpers, Socket.IO, Zod validation, jsonwebtoken, bcryptjs.
-- **Data & Infrastructure** — PostgreSQL, S3-compatible object storage (Cloudflare R2 or AWS S3), Nodemailer (Gmail) for transactional mail, AWS SDK v3 for S3.
-- **Tooling & DX** — ESLint 9 + `eslint-config-next`, Tailwind/PostCSS toolchain, `tsx` for scripts, Prisma Migrate/Studio, npm scripts (`dev`, `build`, `start`, `lint`).
+- **Frontend** — Next.js 16 App Router, React 19, TypeScript 5, Tailwind CSS 3 + DaisyUI, next/font (Geist), TanStack Query, React Hook Form, React Datepicker, React Icons.
+- **APIs & Services** — Next.js route handlers, tRPC 11, Prisma 6, NextAuth credentials provider, Socket.IO, Zod, JSON Web Tokens, bcryptjs.
+- **Data & Infra** — PostgreSQL, S3-compatible object storage (Cloudflare R2 or AWS S3), Nodemailer (Gmail by default) for transactional email.
+- **DX Tooling** — ESLint 9 (`eslint-config-next`), Tailwind/PostCSS, `tsx` scripts, Prisma Migrate/Studio, npm scripts (`dev`, `build`, `start`, `lint`).
 
-## Project Setup
+---
+
+## Getting Started
 
 1. **Clone & install**
    ```bash
@@ -30,8 +46,10 @@ NDI HR Management is a multi-tenant workforce operations platform built on Next.
    cd ndi-hr-mgt
    npm install
    ```
-2. **Create your environment file** — Copy an existing `.env` (if present) or create a new one at the repo root using the variables listed below.
-3. **Provision PostgreSQL & storage** — Start a PostgreSQL instance (local Docker container or managed service) and an S3-compatible bucket (Cloudflare R2, AWS S3, etc.).
+2. **Configure environment variables** — Create `.env` with the values listed below.
+3. **Provision PostgreSQL & storage**
+   - Start PostgreSQL (Docker or managed) and create a database.
+   - Create an S3-compatible bucket (Cloudflare R2, AWS S3, etc.) for uploads.
 4. **Run database migrations**
    ```bash
    npx prisma migrate dev
@@ -40,102 +58,99 @@ NDI HR Management is a multi-tenant workforce operations platform built on Next.
    ```bash
    npx prisma db seed
    ```
-6. **Start the Next.js dev server**
+6. **Start the dev server**
    ```bash
    npm run dev
-   # visit http://localhost:3000
+   # open http://localhost:3000
    ```
+
+---
 
 ## Environment Setup
 
 ### Required services
 
-- **PostgreSQL** — Prisma targets PostgreSQL (`datasource db` in `prisma/schema.prisma`). Provide a connection string via `DATABASE_URL`.
-- **S3-compatible storage** — Attachments and organization assets are uploaded via the AWS SDK configured in `server/storage/r2.ts`. Cloudflare R2 or AWS S3 both work.
-- **SMTP (Gmail by default)** — Password reset and invite flows depend on Nodemailer with Gmail service credentials.
+- **PostgreSQL** for relational data (`DATABASE_URL`).
+- **S3-compatible storage** for avatars, documents, policies, etc. (`server/storage/r2.ts`).
+- **SMTP** credentials for invites/password resets (Nodemailer uses Gmail out of the box).
 
-### Environment variables
+### Core variables
 
-#### Core application
-
-| Variable | Required | Purpose |
+| Variable | Required | Description |
 | --- | --- | --- |
-| `DATABASE_URL` | Yes | PostgreSQL connection string used by Prisma. |
-| `NEXTAUTH_URL` | Yes (prod) | Fully qualified base URL for NextAuth callbacks and absolute links. |
-| `NEXT_PUBLIC_SITE_URL` | Yes | Public URL exposed to the client for password resets and email links. |
-| `NEXT_PUBLIC_BASE_URL` | No | Override host for invitation links when marketing and app domains differ. |
-| `PORT` | No | Port used by `next dev` and invite helpers (defaults to `3000`). |
-| `NODE_ENV` | No | Controls logging and cookie security (`development`/`production`). |
-| `VERCEL_URL` | Auto | Provided by Vercel; used as a fallback for absolute URLs. |
+| `DATABASE_URL` | Yes | PostgreSQL connection string for Prisma. |
+| `NEXTAUTH_URL` | Yes (prod) | Absolute base URL used by NextAuth callbacks. |
+| `NEXT_PUBLIC_SITE_URL` | Yes | Public origin used in emails/password reset links. |
+| `NEXT_PUBLIC_BASE_URL` | No | Override for invite links when marketing + app domains differ. |
+| `PORT` | No | Dev server port (defaults to `3000`). |
+| `NODE_ENV` | No | `development` or `production`. |
+| `VERCEL_URL` | Auto | Provided by Vercel when deployed there. |
 
-#### Authentication & security
+### Auth & security
 
-| Variable | Required | Purpose |
+| Variable | Required | Description |
 | --- | --- | --- |
-| `NEXTAUTH_SECRET` | Yes | Secret for NextAuth session/JWT signing (also used by Socket.IO auth). |
-| `JWT_SECRET` | Yes | Base secret shared by password reset, invite, and attachment flows (falls back to `AUTH_SECRET`/`NEXTAUTH_SECRET` only for backward compatibility). |
-| `AUTH_SECRET` | No | Legacy fallback secret for token validation when `JWT_SECRET` is not set. |
-| `INVOICE_UNLOCK_SECRET` | No | Dedicated secret for invoice unlock tokens (`server/modules/invoice`). |
-| `LEAVE_ATTACHMENT_TOKEN_SECRET` | No | Secret for leave attachment download tokens. |
-| `LEAVE_ATTACHMENT_TOKEN_TTL` | No | Override attachment token lifetime (default `30d`). |
+| `NEXTAUTH_SECRET` | Yes | Secret for NextAuth sessions/JWTs (shared with Socket.IO auth). |
+| `JWT_SECRET` | Yes | Base secret for invites, password reset, and attachment tokens (falls back to `AUTH_SECRET`/`NEXTAUTH_SECRET` if unset). |
+| `AUTH_SECRET` | No | Legacy fallback. |
+| `INVOICE_UNLOCK_SECRET` | No | Overrides invoice unlock token secret. |
+| `LEAVE_ATTACHMENT_TOKEN_SECRET` | No | Secret for leave attachment downloads; TTL configurable via `LEAVE_ATTACHMENT_TOKEN_TTL`. |
 | `NEXT_PUBLIC_INVITE_TOKEN_TTL_HOURS` / `INVITE_TOKEN_TTL_HOURS` | No | Invitation expiry in hours (default `72`). |
-| `NEXT_PUBLIC_TRIAL_DURATION_DAYS` | No | Trial period before organizations require activation (default `10`). |
-| `NEXT_PUBLIC_ACCOUNT_VISIBILITY` | No | Set to `PRIVATE` to block expired trials from logging in. |
+| `NEXT_PUBLIC_TRIAL_DURATION_DAYS` | No | Trial gating for dormant orgs (default `10`). |
+| `NEXT_PUBLIC_ACCOUNT_VISIBILITY` | No | `PRIVATE` blocks expired trials from signing in. |
 
-#### Email & messaging
+### Email
 
-| Variable | Required | Purpose |
+| Variable | Required | Description |
 | --- | --- | --- |
-| `EMAIL_USER` | Yes | Gmail/SMTP user used by Nodemailer for invites & reset emails (`SMTP_USER` also accepted). |
-| `EMAIL_PASS` | Yes | App password or SMTP password paired with the email user (`SMTP_PASS` also accepted). |
+| `EMAIL_USER` or `SMTP_USER` | Yes | SMTP username (Gmail address recommended). |
+| `EMAIL_PASS` or `SMTP_PASS` | Yes | App password/SMTP password. |
 
-#### Storage & assets
+### Storage
 
-| Variable | Required | Purpose |
+| Variable | Required | Description |
 | --- | --- | --- |
-| `S3_ENDPOINT` | Yes | HTTPS endpoint for your S3-compatible bucket (Cloudflare R2, etc.). |
-| `S3_REGION` | No | Region for the bucket (`auto` by default for R2). |
-| `S3_ACCESS_KEY_ID` | Yes | Access key for the bucket. |
-| `S3_SECRET_ACCESS_KEY` | Yes | Secret key for the bucket. |
-| `S3_BUCKET` | Yes | Bucket name where uploads are stored. |
-| `S3_PUBLIC_BASE_URL` | Yes | Public CDN/base URL; also feeds `next.config.ts` remote image patterns. |
+| `S3_ENDPOINT` | Yes | HTTPS endpoint for your bucket (Cloudflare R2, AWS S3, etc.). |
+| `S3_REGION` | No | Bucket region (`auto` for R2). |
+| `S3_ACCESS_KEY_ID` | Yes | Access key. |
+| `S3_SECRET_ACCESS_KEY` | Yes | Secret key. |
+| `S3_BUCKET` | Yes | Bucket name. |
+| `S3_PUBLIC_BASE_URL` | Yes | Public CDN/base URL (also used in `next.config.ts`). |
 
-> Tip: Keep `JWT_SECRET`, `AUTH_SECRET`, and `NEXTAUTH_SECRET` aligned to avoid token verification mismatches between the server and browser runtime, and never expose them with the `NEXT_PUBLIC_` prefix.
+> Keep `NEXTAUTH_SECRET`, `JWT_SECRET`, and `AUTH_SECRET` aligned. Never ship secrets with a `NEXT_PUBLIC_` prefix.
 
-## Deployment Guidelines
+---
 
-1. **Prepare infrastructure**
-   - Provision a managed PostgreSQL instance and run `npx prisma migrate deploy` against it.
-   - Create the object storage bucket + CDN, and update the `S3_*` variables.
-   - Configure SMTP credentials that work from your runtime (Gmail requires an App Password).
-2. **Configure environment secrets**
-   - Mirror the `.env` values into your platform’s secret store (Vercel, Docker, Kubernetes, etc.).
-   - Ensure `NEXTAUTH_URL` matches the production hostname and uses HTTPS.
+## Deployment Notes
+
+1. **Provision infra** — Managed PostgreSQL, S3/R2 bucket, and SMTP provider reachable from your hosting environment.
+2. **Mirror environment variables** — Add every `.env` entry to your platform’s secret store (Vercel, Docker, Kubernetes, etc.) and ensure `NEXTAUTH_URL` is HTTPS.
 3. **Build & verify**
    ```bash
    npm run lint
    npm run build
    ```
-   The `postinstall` hook runs `prisma generate`, so ensure build containers execute `npm install`.
-4. **Database seeding (optional)**
+   `prisma generate` runs during `npm install`, so production builds need dependencies installed.
+4. **Seed (optional)**
    ```bash
    npx prisma db seed
    ```
-   Run only when you need sample organizations/data in non-production environments.
-5. **Launch the server**
+   Useful for demo/QA environments.
+5. **Launch**
    ```bash
    npm run start
    ```
-   - For containerized or VM deployments, wrap the command with a process manager such as PM2 or systemd.
-   - On Vercel or similar platforms, deploy via `vercel --prod` once all env vars are set. Socket.IO lives at `pages/api/socket.ts`, so choose a hosting target that supports WebSockets/persistent functions.
+   Use a process manager (PM2/systemd) when deploying to VMs/containers. On Vercel or similar, Socket.IO lives under `pages/api/socket.ts`, so choose a hosting plan that supports WebSockets.
+
+---
 
 ## Useful Commands
 
-- `npm run dev` — Start the Next.js dev server with hot reloading.
-- `npm run build` — Compile the production bundle (runs `next build`).
-- `npm run start` — Launch the production server (requires prior build).
-- `npm run lint` — Run ESLint with the Next.js config.
-- `npx prisma studio` — Open Prisma Studio for inspecting Postgres data.
+- `npm run dev` — Start the Next.js dev server with hot reload.
+- `npm run lint` — Run ESLint against the repo.
+- `npm run build` — Create the production bundle (`next build`).
+- `npm run start` — Serve the production build (`next start`).
+- `npx prisma studio` — Inspect PostgreSQL data.
 - `npx prisma migrate dev` / `npx prisma migrate deploy` — Apply schema changes locally or in production.
 
-With the sections above you now have a complete view of the platform’s feature set, technology stack, environment requirements, deployment workflow, and day-to-day project setup steps.
+This README now reflects the actual single-tenant nature of the app, highlights the concrete modules in this repository, and documents how to configure, run, and deploy the platform end-to-end.
